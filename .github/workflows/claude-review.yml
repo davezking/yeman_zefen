@@ -1,0 +1,70 @@
+name: Opus review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Opus review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Opus review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: "--model claude-opus-5-5 --max-turns 20 --allowedTools 'Read,Grep,Glob,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)'"
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+
+            Do this, in order:
+
+            1. Read `CLAUDE.md` at the repo root for project conventions.
+            2. Run `gh pr view ${{ github.event.pull_request.number }}` to read the PR description,
+               including its "Task", "Model used", and "Checklist" sections.
+            3. Run `gh pr diff ${{ github.event.pull_request.number }}` to read the diff. Review
+               **only this diff** — do not review pre-existing code it doesn't touch.
+            4. Evaluate the diff for:
+               - Correctness.
+               - Security: missing or wrong auth checks, secrets committed or logged, injection
+                 risks, unvalidated input.
+               - Adherence to `CLAUDE.md`'s conventions.
+               - Missing tests for new behavior.
+               - Whether each item in the PR description's Checklist is actually satisfied by
+                 the code in this diff, not just asserted.
+            5. Post exactly one PR comment (`gh pr comment ${{ github.event.pull_request.number }} --body "..."`)
+               that lists every finding as either `Blocking:` or `Suggestion:`, each with a file
+               and line reference, followed by a line that is exactly one of:
+               `VERDICT: APPROVE`
+               `VERDICT: CHANGES_REQUESTED`
+               Use APPROVE only when there are no Blocking findings.
+            6. Write that same single word (`APPROVE` or `CHANGES_REQUESTED`) to a file named
+               `review-verdict.txt` in the workspace root. The file must contain nothing else.
+
+      - name: Require an approve verdict
+        run: |
+          if [ ! -f review-verdict.txt ]; then
+            echo "review did not complete"
+            exit 1
+          fi
+          verdict="$(tr -d '[:space:]' < review-verdict.txt)"
+          echo "Verdict: $verdict"
+          if [ "$verdict" != "APPROVE" ]; then
+            echo "Opus requested changes; see the PR comment."
+            exit 1
+          fi
