@@ -1,0 +1,16 @@
+[project]
+name = "yz-ingest"
+version = "0.1.0"
+description = "Yeman Zefen ingestion: ethiozeima scraper and ffmpeg clip cutter"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32,<3",
+    "beautifulsoup4>=4.12,<5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

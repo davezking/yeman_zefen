@@ -1,0 +1,53 @@
+name = "yz-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENV = "dev"
+FIREBASE_PROJECT_ID = "yeman-zefen-dev"
+ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
+ACCESS_AUD = ""
+CDN_BASE_URL = "http://localhost:8787/cdn"
+INGEST_SERVICE_CLIENT_ID = ""
+# DEV_ADMIN_EMAIL: set in .dev.vars (gitignored) to skip Access locally. Never set in prod.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yz-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "CLIPS"
+bucket_name = "yz-clips"
+
+[[r2_buckets]]
+binding = "SOURCE"
+bucket_name = "yz-source"
+
+# Production. Bindings and vars are not inherited by environments, so repeat them.
+[env.prod]
+name = "yz-api-prod"
+
+[env.prod.vars]
+ENV = "prod"
+FIREBASE_PROJECT_ID = "yeman-zefen"
+ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
+ACCESS_AUD = ""
+CDN_BASE_URL = "https://cdn.example.com"
+INGEST_SERVICE_CLIENT_ID = ""
+
+[[env.prod.d1_databases]]
+binding = "DB"
+database_name = "yz-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[env.prod.r2_buckets]]
+binding = "CLIPS"
+bucket_name = "yz-clips"
+
+[[env.prod.r2_buckets]]
+binding = "SOURCE"
+bucket_name = "yz-source"
