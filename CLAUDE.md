@@ -16,6 +16,7 @@ The architecture doc is `docs/architecture.md`. Read only the section a task nam
 | Package | Dev | Test | Deploy |
 |---|---|---|---|
 | `api/` | `npm run dev` (wrangler dev, local D1/R2) | `npm run typecheck && npm test` | `npm run deploy` (`--env prod`); `npx wrangler d1 migrations apply yz-db` |
+| `api/` schema | edit `src/db/schema.ts`, then `npm run db:generate` | `npm run db:migrate:local` | commit the generated `migrations/` (incl. `meta/`) |
 | `ingest/` | `pip install -r requirements.txt pytest` | `pytest` | runs on GitHub Actions |
 
 ## Conventions
