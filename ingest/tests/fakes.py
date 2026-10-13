@@ -63,10 +63,16 @@ class FakeApi:
         self.fail_status_report = fail_status_report
         self.snapshot = snapshot or {"artists": [], "tracks": []}
         self.snapshot_calls = 0
+        self.created_jobs = []
+        self.status_calls = []
 
     def get_catalog_snapshot(self):
         self.snapshot_calls += 1
         return self.snapshot
+
+    def create_job(self, kind, params=None):
+        self.created_jobs.append((kind, params))
+        return 100 + len(self.created_jobs)
 
     def post_tracks(self, job_id, tracks):
         if self.fail_on_post == len(self.posts) + 1:
@@ -78,6 +84,7 @@ class FakeApi:
         if self.fail_status_report and status == "failed":
             raise ApiError(500, "internal", "cannot report")
         self.statuses.append((status, summary))
+        self.status_calls.append({"job_id": job_id, "status": status, "summary": summary, "gh_run_url": gh_run_url})
 
 
 def url(i):

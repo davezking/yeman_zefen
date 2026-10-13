@@ -10,6 +10,9 @@ ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
 ACCESS_AUD = ""
 CDN_BASE_URL = "http://localhost:8787/cdn"
 INGEST_SERVICE_CLIENT_ID = ""
+# Ingest workflows are dispatched on this repo/branch. The PAT is a secret: `wrangler secret put GH_DISPATCH_TOKEN`.
+GH_REPO = "davezking/yeman_zefen"
+GH_REF = "main"
 # DEV_ADMIN_EMAIL: set in .dev.vars (gitignored) to skip Access locally. Never set in prod.
 
 [[d1_databases]]
@@ -37,6 +40,8 @@ ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
 ACCESS_AUD = ""
 CDN_BASE_URL = "https://cdn.example.com"
 INGEST_SERVICE_CLIENT_ID = ""
+GH_REPO = "davezking/yeman_zefen"
+GH_REF = "main"
 
 [[env.prod.d1_databases]]
 binding = "DB"

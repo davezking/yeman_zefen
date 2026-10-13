@@ -1,0 +1,53 @@
+name: ingest-watch
+
+# Catches the runs that cannot report for themselves. The `ingest` concurrency group keeps only the newest
+# waiting run and cancels any older waiting one before a single step has executed, so that run's job would stay
+# queued for good. The same goes for a run that is killed outright or never starts. When an ingest run ends
+# without succeeding, this marks its job failed (the job id is in the run's title: "... job 12"). A job that
+# already reported is left as it is, so this is harmless after a run that handled its own failure.
+run-name: Check ingest run ${{ github.event.workflow_run.id }}
+
+on:
+  workflow_run:
+    workflows: [ingest-scrape, ingest-cut]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# Its own group: it must never wait behind the ingest runs it is watching.
+concurrency:
+  group: ingest-watch
+  cancel-in-progress: false
+
+jobs:
+  mark-failed:
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ingest
+    env:
+      API_BASE: ${{ secrets.API_BASE }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ingest/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Mark the job failed
+        env:
+          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          python -m yz.jobs fail --from-run-title "$RUN_TITLE" --run-url "$RUN_URL" \
+            --message "the workflow run ended as $CONCLUSION without reporting a result"

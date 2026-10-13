@@ -14,6 +14,7 @@ export default defineConfig(async () => {
             ACCESS_TEAM_DOMAIN: "https://yz.cloudflareaccess.com",
             ACCESS_AUD: "test-access-aud",
             INGEST_SERVICE_CLIENT_ID: "test-service.client",
+            GH_DISPATCH_TOKEN: "test-gh-token", // a dummy; the GitHub calls are faked (test/githubFake.ts)
           },
         },
       }),

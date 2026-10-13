@@ -9,6 +9,12 @@ export type Bindings = {
   CDN_BASE_URL: string;
   /** Cloudflare Access service-token client id allowed on /admin/ingest/*. */
   INGEST_SERVICE_CLIENT_ID: string;
+  /** Secret. Fine-grained GitHub PAT, Actions read/write on GH_REPO only, used to dispatch the ingest workflows. */
+  GH_DISPATCH_TOKEN?: string;
+  /** `owner/name` of the repository that holds the ingest workflows. */
+  GH_REPO: string;
+  /** Branch (or tag) the dispatched workflows run from. */
+  GH_REF: string;
   /** Dev-only: when ENV=dev, lets a request with no Access header act as this admin email. */
   DEV_ADMIN_EMAIL?: string;
 };
