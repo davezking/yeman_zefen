@@ -4,6 +4,9 @@ clip_maker.py
 =============
 Cuts each song in tracks.csv down to a short "intro" clip for the guessing game.
 
+NOTE: this is the original local, CSV-based tool. The pipeline cuts clips with `python -m yz.cut`
+(10 s CBR 128 kbps, intro and middle, uploaded to R2 and registered with the API). See docs/ops.md.
+
 Reads:  ethiozeima_data/tracks.csv   (made by ethiozeima_scraper.py)
 Writes: ethiozeima_data/clips/<track_id>.mp3
         ethiozeima_data/tracks_with_clips.csv   (adds a clip_path column)

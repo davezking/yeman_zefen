@@ -152,3 +152,42 @@ def test_get_catalog_snapshot_is_a_bodyless_get():
     call = s.calls[0]
     assert (call["method"], call["url"]) == ("GET", "https://api.test/admin/ingest/catalog-snapshot")
     assert call["json"] is None  # no request body on the GET
+
+
+def test_get_clip_targets_by_track_ids_and_by_missing():
+    page = {"tracks": [], "next": None}
+    s = FakeSession(FakeResponse(200, page), FakeResponse(200, page))
+    c = client(s)
+    c.get_clip_targets(track_ids=[3, 1, 2])
+    c.get_clip_targets(missing=True, after=40, limit=25)
+    assert s.calls[0]["params"] == {"limit": 100, "trackIds": "3,1,2"} and s.calls[0]["json"] is None
+    assert s.calls[1]["params"] == {"limit": 25, "missing": "1", "after": 40}
+    assert s.calls[1]["url"] == "https://api.test/admin/ingest/clip-targets"
+
+
+def test_get_clip_targets_needs_exactly_one_selector():
+    c = client(FakeSession())
+    with pytest.raises(ValueError):
+        c.get_clip_targets()
+    with pytest.raises(ValueError):
+        c.get_clip_targets(track_ids=[1], missing=True)
+
+
+def clip(n):
+    return {"trackId": n, "type": "intro", "startMs": 0, "lengthMs": 10_000, "r2Key": f"clips/{n}/intro-v1.mp3", "sha256": "a" * 64, "bytes": 160_000}
+
+
+def test_post_clips_sends_clips_and_flags_and_merges_the_replies():
+    reply = lambda c, u: FakeResponse(200, {"counts": {"created": c, "updated": u, "skipped": 0}, "results": [{"n": c}], "flags": [{"f": c}]})
+    s = FakeSession(reply(100, 0), reply(30, 5))
+    flags = [{"trackId": i, "reason": "short_audio"} for i in range(1, 121)]
+    out = client(s).post_clips(7, [clip(i) for i in range(130)], flags)
+    assert [(len(c["json"]["clips"]), len(c["json"]["flags"])) for c in s.calls] == [(100, 100), (30, 20)]
+    assert s.calls[0]["url"] == "https://api.test/admin/ingest/clips" and s.calls[0]["json"]["jobId"] == 7
+    assert out["counts"] == {"created": 130, "updated": 5, "skipped": 0} and len(out["results"]) == 2 and len(out["flags"]) == 2
+
+
+def test_post_clips_with_only_flags_is_one_request():
+    s = FakeSession(FakeResponse(200, {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": [{"result": "created"}]}))
+    out = client(s).post_clips(7, [], [{"trackId": 1, "reason": "missing_audio", "details": {"cause": "x"}}])
+    assert len(s.calls) == 1 and s.calls[0]["json"]["clips"] == [] and out["flags"] == [{"result": "created"}]

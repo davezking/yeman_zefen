@@ -52,6 +52,7 @@ describe("auth", () => {
     ["POST", "/admin/ingest/clips"],
     ["POST", "/admin/ingest/jobs/1/status"],
     ["GET", "/admin/ingest/catalog-snapshot"],
+    ["GET", "/admin/ingest/clip-targets?missing=1"],
   ] as const;
 
   it("401 without a token, 403 for a human admin token", async () => {
@@ -545,5 +546,170 @@ describe("era assignment on ingest", () => {
     const row = await trackByUrl(1);
     expect(row.releaseYear).toBe(1985);
     expect(row.generationId).toBe(EIGHTIES);
+  });
+});
+
+describe("GET /admin/ingest/clip-targets", () => {
+  const getJson = async (path: string) => json(await svc(path));
+  const track = async (fields: Partial<typeof tracks.$inferInsert> = {}) =>
+    makeTrack((await makeArtist(`አርቲስት ${Math.random()}`)).id, { sourceAudioKey: "source/x.mp3", status: "needs_review", ...fields });
+  const clipRow = (trackId: number, type: "intro" | "middle", fields: Partial<typeof clips.$inferInsert> = {}) =>
+    db(env).insert(clips).values({ trackId, type, startMs: 1000, status: "ready", version: 1, r2Key: `clips/${trackId}/${type}-v1.mp3`, sha256: "a".repeat(64), bytes: 160_000, ...fields });
+
+  it("lists the named tracks with their source key and current clips, and leaves unknown ids out", async () => {
+    const a = await track({ sourceAudioKey: "source/a.mp3", durationMs: 200_000 });
+    const b = await track({ sourceAudioKey: null, status: "rejected" }); // an explicit request ignores status and key
+    await clipRow(a.id, "intro", { startMs: 4200, version: 3, r2Key: `clips/${a.id}/intro-v3.mp3` });
+    const body = await getJson(`/admin/ingest/clip-targets?trackIds=${b.id},${a.id},999999`);
+    expect(body.next).toBeNull();
+    expect(body.tracks.map((t: any) => t.id)).toEqual([a.id, b.id]);
+    expect(body.tracks[0]).toMatchObject({ sourceAudioKey: "source/a.mp3", durationMs: 200_000, status: "needs_review" });
+    expect(body.tracks[0].clips).toEqual([
+      { type: "intro", startMs: 4200, lengthMs: 10_000, r2Key: `clips/${a.id}/intro-v3.mp3`, sha256: "a".repeat(64), bytes: 160_000, version: 3, status: "ready" },
+    ]);
+    expect(body.tracks[1]).toMatchObject({ sourceAudioKey: null, clips: [] });
+  });
+
+  it("missing=1 returns only tracks that are in play, have source audio and lack a ready clip", async () => {
+    const none = await track(); // no clips yet
+    const half = await track(); // intro ready, middle pending (an admin asked for a recut)
+    await clipRow(half.id, "intro");
+    await clipRow(half.id, "middle", { startMs: 77_000, status: "pending" });
+    const done = await track(); // both ready
+    await clipRow(done.id, "intro");
+    await clipRow(done.id, "middle");
+    const noAudio = await track({ sourceAudioKey: null });
+    const rejected = await track({ status: "rejected" });
+    const retired = await track({ status: "retired" });
+    const ingested = await track({ status: "ingested" });
+    const approved = await track({ status: "approved" });
+    const ids = (await getJson("/admin/ingest/clip-targets?missing=1")).tracks.map((t: any) => t.id);
+    expect(ids).toEqual([none.id, half.id, ingested.id, approved.id]);
+    expect([done.id, noAudio.id, rejected.id, retired.id].some((id) => ids.includes(id))).toBe(false);
+
+    const halfOut = (await getJson("/admin/ingest/clip-targets?missing=1")).tracks.find((t: any) => t.id === half.id);
+    expect(halfOut.clips.map((c: any) => [c.type, c.status, c.startMs])).toEqual([["intro", "ready", 1000], ["middle", "pending", 77_000]]);
+  });
+
+  it("pages through missing=1 with the `next` cursor", async () => {
+    const made = [];
+    for (let i = 0; i < 5; i++) made.push((await track()).id);
+    const seen: number[] = [];
+    let after = 0;
+    for (let page = 0; page < 10; page++) {
+      const body = await getJson(`/admin/ingest/clip-targets?missing=1&limit=2&after=${after}`);
+      seen.push(...body.tracks.map((t: any) => t.id));
+      if (body.next === null) break;
+      after = body.next;
+    }
+    expect(seen).toEqual(made);
+  });
+
+  it.each([
+    ["neither trackIds nor missing", "/admin/ingest/clip-targets"],
+    ["both trackIds and missing", "/admin/ingest/clip-targets?trackIds=1&missing=1"],
+    ["a non-numeric id", "/admin/ingest/clip-targets?trackIds=1,a"],
+    ["a zero id", "/admin/ingest/clip-targets?trackIds=0"],
+    ["an empty id list", "/admin/ingest/clip-targets?trackIds="],
+    ["limit 0", "/admin/ingest/clip-targets?missing=1&limit=0"],
+    ["limit over 200", "/admin/ingest/clip-targets?missing=1&limit=201"],
+    ["missing=0", "/admin/ingest/clip-targets?missing=0"],
+    ["an unknown parameter", "/admin/ingest/clip-targets?missing=1&foo=bar"],
+  ])("rejects %s", async (_name, path) => {
+    const res = await svc(path);
+    expect(res.status).toBe(400);
+    expect((await json(res)).error.code).toBe("validation_error");
+  });
+});
+
+describe("POST /admin/ingest/clips: source-audio flags", () => {
+  const flag = (trackId: number, reason: string, details?: Record<string, unknown>) => ({ trackId, reason, ...(details ? { details } : {}) });
+  const items = () => db(env).select().from(reviewItems).orderBy(reviewItems.id);
+
+  it("raises review items, moves an ingested track to needs_review, and is idempotent", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const fresh = await makeTrack(artist.id, { status: "ingested" });
+    const approved = await makeTrack(artist.id, { status: "approved" });
+    const job = await makeJob("cut");
+    const body = { jobId: job.id, flags: [flag(fresh.id, "short_audio", { durationMs: 12_000 }), flag(approved.id, "missing_audio", { cause: "not_in_r2" })] };
+
+    const first = await json(await svc("/admin/ingest/clips", { body }));
+    expect(first.counts).toEqual({ created: 0, updated: 0, skipped: 0 });
+    expect(first.flags.map((f: any) => f.result)).toEqual(["created", "created"]);
+    expect((await items()).map((i) => [i.entityType, i.entityId, i.reason, i.status])).toEqual([
+      ["track", fresh.id, "short_audio", "open"],
+      ["track", approved.id, "missing_audio", "open"],
+    ]);
+    const statuses = await db(env).select({ id: tracks.id, status: tracks.status }).from(tracks);
+    expect(Object.fromEntries(statuses.map((t) => [t.id, t.status]))).toEqual({ [fresh.id]: "needs_review", [approved.id]: "approved" }); // approved is left alone
+
+    const again = await json(await svc("/admin/ingest/clips", { body }));
+    expect(again.flags.map((f: any) => f.result)).toEqual(["skipped", "skipped"]);
+    expect(await count("review_items")).toBe(2);
+  });
+
+  it("treats the same details in a different key order as the same flag", async () => {
+    const track = await makeTrack((await makeArtist("አርቲስት")).id);
+    const job = await makeJob("cut");
+    await svc("/admin/ingest/clips", { body: { jobId: job.id, flags: [flag(track.id, "short_audio", { a: 1, b: 2 })] } });
+    const again = await json(await svc("/admin/ingest/clips", { body: { jobId: job.id, flags: [flag(track.id, "short_audio", { b: 2, a: 1 })] } }));
+    expect(again.flags[0].result).toBe("skipped");
+    expect(await count("review_items")).toBe(1);
+  });
+
+  it("collapses identical flags inside one request", async () => {
+    const track = await makeTrack((await makeArtist("አርቲስት")).id);
+    const job = await makeJob("cut");
+    const res = await json(await svc("/admin/ingest/clips", { body: { jobId: job.id, flags: [flag(track.id, "missing_audio"), flag(track.id, "missing_audio")] } }));
+    expect(res.flags).toHaveLength(1);
+    expect(await count("review_items")).toBe(1);
+  });
+
+  it("takes clips and flags in the same request", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const ok = await makeTrack(artist.id);
+    const short = await makeTrack(artist.id);
+    const job = await makeJob("cut");
+    const res = await json(
+      await svc("/admin/ingest/clips", {
+        body: {
+          jobId: job.id,
+          clips: [{ trackId: short.id, type: "intro", startMs: 0, lengthMs: 10_000, r2Key: "clips/s/intro-v1.mp3", sha256: "a".repeat(64), bytes: 160_000 }],
+          flags: [flag(short.id, "short_audio", { durationMs: 14_000 }), flag(ok.id, "missing_audio")],
+        },
+      }),
+    );
+    expect(res.counts).toEqual({ created: 1, updated: 0, skipped: 0 });
+    expect(res.flags.map((f: any) => f.result)).toEqual(["created", "created"]);
+    expect(await count("clips")).toBe(1);
+    expect(await count("review_items")).toBe(2);
+  });
+
+  it("rejects an unknown track before writing anything", async () => {
+    const track = await makeTrack((await makeArtist("አርቲስት")).id);
+    const job = await makeJob("cut");
+    const res = await svc("/admin/ingest/clips", { body: { jobId: job.id, flags: [flag(track.id, "short_audio"), flag(424242, "missing_audio")] } });
+    expect(res.status).toBe(404);
+    expect((await json(res)).error.code).toBe("track_not_found");
+    expect(await count("review_items")).toBe(0);
+  });
+
+  it.each([
+    ["a reason a cut job may not raise", { jobId: 1, flags: [{ trackId: 1, reason: "era_unknown" }] }],
+    ["a request with neither clips nor flags", { jobId: 1 }],
+    ["an empty clips list and an empty flags list", { jobId: 1, clips: [], flags: [] }],
+    ["an unknown field on a flag", { jobId: 1, flags: [{ trackId: 1, reason: "short_audio", extra: true }] }],
+  ])("rejects %s", async (_name, body) => {
+    const res = await svc("/admin/ingest/clips", { body });
+    expect(res.status).toBe(400);
+  });
+
+  it("applies the same job rules to flags as to clips", async () => {
+    const track = await makeTrack((await makeArtist("አርቲስት")).id);
+    const scrape = await makeJob("scrape");
+    expect((await svc("/admin/ingest/clips", { body: { jobId: scrape.id, flags: [flag(track.id, "short_audio")] } })).status).toBe(409);
+    const done = await makeJob("cut", "succeeded");
+    expect((await svc("/admin/ingest/clips", { body: { jobId: done.id, flags: [flag(track.id, "short_audio")] } })).status).toBe(409);
+    expect(await count("review_items")).toBe(0);
   });
 });
