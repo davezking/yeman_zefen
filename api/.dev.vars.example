@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) for local admin development.
+# Lets a request with no Cloudflare Access header act as this admin email
+# when ENV=dev. The email must also exist in admin_users (run add-admin.ts).
+DEV_ADMIN_EMAIL=""
