@@ -126,7 +126,7 @@ catalog.patch("/tracks/:id", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
   const body = parse(trackPatchSchema, await readJson(c));
-  await requireTrack(d, id);
+  const existing = await requireTrack(d, id);
 
   const set: Partial<typeof tracks.$inferInsert> = { updatedAt: Date.now() };
   if (body.titleAm !== undefined) set.titleAm = body.titleAm;
@@ -136,6 +136,16 @@ catalog.patch("/tracks/:id", async (c) => {
   if (body.artistId !== undefined) {
     await requireArtist(d, body.artistId);
     set.artistId = body.artistId;
+  }
+  // Remember which scraped fields an admin touched so a re-scrape never overwrites them
+  // (generation is covered by generation_overridden).
+  const touched = (["titleAm", "titleLatin", "album", "releaseYear", "artistId"] as const).filter(
+    (f) => body[f] !== undefined,
+  );
+  if (touched.length > 0) {
+    const edited = new Set<string>(JSON.parse(existing.adminEditedFields) as string[]);
+    for (const f of touched) edited.add(f);
+    set.adminEditedFields = JSON.stringify([...edited].sort());
   }
   if (body.generationId !== undefined) {
     if (body.generationId !== null) {

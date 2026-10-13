@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { db } from "../src/db/client";
-import { adminUsers, artists, clips, tracks } from "../src/db/schema";
+import { adminUsers, artists, clips, ingestJobs, tracks } from "../src/db/schema";
 import { __setTestKeyResolver, ACCESS_HEADER } from "../src/lib/accessAuth";
 
 export const TEAM = "https://yz.cloudflareaccess.com";
@@ -67,6 +67,25 @@ export async function api(
   });
 }
 
+/** Call the Worker as the ingest service token (GitHub Actions). */
+export async function svc(path: string, opts: { method?: string; body?: unknown } = {}): Promise<Response> {
+  const jwt = await signAccessJwt({ common_name: SERVICE_ID });
+  return rawRequest(path, {
+    method: opts.method ?? (opts.body === undefined ? "GET" : "POST"),
+    jwt,
+    headers: opts.body === undefined ? undefined : { "content-type": "application/json" },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  });
+}
+
+export async function makeJob(
+  kind: "scrape" | "cut" | "recut" = "scrape",
+  status: "queued" | "running" | "succeeded" | "failed" = "running",
+) {
+  const [row] = await db(env).insert(ingestJobs).values({ kind, status }).returning();
+  return row!;
+}
+
 const now = 1_760_000_000_000;
 
 export async function makeArtist(nameAm: string, nameLatin: string | null = null) {
@@ -98,6 +117,7 @@ export async function resetCatalog(): Promise<void> {
   await env.DB.batch(
     [
       "review_items",
+      "ingest_jobs",
       "pack_tracks",
       "pack_versions",
       "packs",

@@ -84,6 +84,8 @@ export const tracks = sqliteTable(
     sourceUrl: text("source_url"),
     sourceAudioKey: text("source_audio_key"),
     durationMs: integer("duration_ms"),
+    /** JSON array of field names an admin has edited; re-scrapes never overwrite these. */
+    adminEditedFields: text("admin_edited_fields").notNull().default("[]"),
     status: text("status", { enum: TRACK_STATUSES }).notNull().default("ingested"),
     canonicalTrackId: integer("canonical_track_id").references((): AnySQLiteColumn => tracks.id),
     createdAt: integer("created_at").notNull(),
@@ -93,6 +95,8 @@ export const tracks = sqliteTable(
     index("tracks_status_idx").on(t.status),
     index("tracks_artist_id_idx").on(t.artistId),
     index("tracks_generation_id_idx").on(t.generationId),
+    // The ingest upsert key. NULLs are allowed (and distinct) for hand-created tracks.
+    uniqueIndex("tracks_source_url_uq").on(t.sourceUrl),
     check("tracks_status_check", inList("status", TRACK_STATUSES)),
   ],
 );

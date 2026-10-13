@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../env";
 import { requireAdmin, requireService } from "../../lib/accessAuth";
 import { catalog } from "./catalog";
+import { ingestRoutes } from "./ingest";
 
 // Human-authenticated admin routes. The requireAdmin middleware guards every
 // route registered here.
@@ -16,6 +17,7 @@ human.route("/", catalog);
 const ingest = new Hono<AppEnv>();
 ingest.use("*", requireService());
 ingest.get("/whoami", (c) => c.json({ service: c.get("service") }));
+ingest.route("/", ingestRoutes);
 
 // Mount order matters: /ingest is registered before the catch-all human router
 // so ingest requests pass through requireService only, and human requests
