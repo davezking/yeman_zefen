@@ -60,3 +60,38 @@ in `api/.dev.vars` (gitignored; see `.dev.vars.example`) to an email you've also
 added with `add-admin.ts`. When `ENV=dev`, a request with no Access header is
 then treated as that admin. With `DEV_ADMIN_EMAIL` unset, `/admin/*` returns 401
 even in dev. This bypass never applies when `ENV=prod`.
+
+## Running the scraper (`ingest/`)
+
+`python -m yz.scrape` (run from `ingest/`) scrapes ethiozeima.com, uploads each MP3 to the private
+`yz-source` bucket as `source/{sha1(source_url)}.mp3`, and posts track metadata to
+`POST /admin/ingest/tracks` in batches of 100. It reads these environment variables (the
+`ingest-scrape` workflow, P1S2 task 6, will supply them from GitHub secrets):
+
+| Variable | Meaning |
+|---|---|
+| `API_BASE` | Worker base URL, e.g. `https://api.example.com` |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above) |
+| `R2_ENDPOINT` | `https://<account>.r2.cloudflarestorage.com` |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | an R2 API token with read/write on `yz-source` |
+| `JOB_ID` | the `ingest_jobs` row (kind `scrape`) this run reports to |
+| `R2_BUCKET` | optional, defaults to `yz-source` |
+| `SCRAPE_DELAY`, `YZ_USER_AGENT` | optional: seconds between requests (default 2) and the User-Agent |
+
+Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-size N`, `--fresh`.
+
+- **Dry run** (`--dry-run`) needs no credentials. It reads the site, writes the records it would send to
+  `ethiozeima_data/dry-run.jsonl`, and downloads, uploads and posts nothing.
+- **Job status**: `running` at the start, then `succeeded` or `failed` with a summary
+  (`scraped`, `created`, `updated`, `flagged`, `errors`, plus audio counts and up to 20 error messages).
+  A post that cannot be fetched or has no Fidel artist name counts as an error and is skipped; a post
+  with no MP3, or whose download fails, is still sent, flagged `missing_audio`. Storage or API failures
+  fail the whole job.
+- **Re-runs are cheap**: audio already in R2 with the size the site reports is neither downloaded nor
+  re-uploaded, and the API treats a repeated batch as a no-op.
+- **Resume**: after each posted batch the last URL goes to `ethiozeima_data/checkpoint.json`. A re-run after
+  a crash continues after it (the archive is newest first, so posts published in between are picked up
+  by the next full run); `--fresh` ignores it. A run that finishes removes it.
+- **Local testing**: the ingest routes always require a verified Access JWT, and the `DEV_ADMIN_EMAIL`
+  bypass covers human admin routes only, so the scraper cannot post to `wrangler dev` directly.
+  `api/test/ingest.test.ts` covers the API side; `ingest/tests/` covers the scraper with fakes.

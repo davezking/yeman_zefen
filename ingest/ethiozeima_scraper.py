@@ -44,6 +44,7 @@ import os
 import re
 import sys
 import time
+from datetime import date
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -63,9 +64,12 @@ ARTIST_AM_RE = re.compile(r"አርቲስት\s*[:：]\s*([^\n<]+?)(?:አልበም
 TITLE_AM_RE = re.compile(r"ር[አእ]ስ\s*[:：]\s*([^\n<]+)")
 ALBUM_RE = re.compile(r"Album\s*[:：]\s*(.+?)\s*(?:\[\d{4}\]|Song\s*[:：]|$)", re.IGNORECASE)
 
-HEADERS = {
-    "User-Agent": "AmharicMusicGame/1.0 (metadata collection; contact: you@example.com)"
-}
+# Identify ourselves honestly to the site owner. Override with YZ_USER_AGENT if needed.
+USER_AGENT = os.environ.get("YZ_USER_AGENT") or (
+    "YemanZefenBot/1.0 (+https://github.com/davezking/yeman_zefen; "
+    "metadata and audio for a licensed Amharic music game)"
+)
+HEADERS = {"User-Agent": USER_AGENT}
 
 FIELDNAMES = [
     "track_id",
@@ -101,9 +105,36 @@ def get(session, url, retries=4):
     return None
 
 
-def collect_post_urls(session, delay, max_pages):
-    """Walk /page/N/ archive pages and gather unique post permalinks."""
-    found = []
+POST_DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/")
+
+
+def post_date(url):
+    """The publication date encoded in a post permalink, or None."""
+    m = POST_DATE_RE.search(urlparse(url).path)
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def head_size(session, url):
+    """Size in bytes the server reports for `url`, or None if it will not say."""
+    try:
+        r = session.head(url, headers=HEADERS, timeout=30, allow_redirects=True)
+    except requests.RequestException:
+        return None
+    length = r.headers.get("Content-Length", "")
+    return int(length) if r.status_code == 200 and length.isdigit() else None
+
+
+def iter_post_urls(session, delay, max_pages, since=None, sleep=time.sleep):
+    """Walk /page/N/ archive pages lazily and yield unique post permalinks, newest first.
+
+    With `since` (a date), posts older than it are skipped and the walk stops after the first
+    page that holds nothing newer. Being lazy means a caller that only wants a few posts does not
+    fetch every archive page."""
     seen = set()
     page = 1
     while page <= max_pages:
@@ -113,7 +144,7 @@ def collect_post_urls(session, delay, max_pages):
         if r is None:
             break
         soup = BeautifulSoup(r.text, "html.parser")
-        new_on_page = 0
+        links = []
         for a in soup.find_all("a", href=True):
             href = urljoin(BASE_URL, a["href"].split("#")[0])
             if urlparse(href).netloc.endswith("ethiozeima.com") and POST_URL_RE.search(
@@ -121,13 +152,28 @@ def collect_post_urls(session, delay, max_pages):
             ):
                 if href not in seen:
                     seen.add(href)
-                    found.append(href)
-                    new_on_page += 1
-        print(f"  found {new_on_page} new post links (total {len(found)})")
-        if new_on_page == 0:
+                    links.append(href)
+        print(f"  found {len(links)} new post links")
+        if not links:
+            break
+
+        def is_old(href):
+            d = post_date(href)
+            return since is not None and d is not None and d < since
+
+        for href in links:
+            if not is_old(href):
+                yield href
+        if all(is_old(h) for h in links):
             break
         page += 1
-        time.sleep(delay)
+        sleep(delay)
+
+
+def collect_post_urls(session, delay, max_pages):
+    """Walk /page/N/ archive pages and gather unique post permalinks."""
+    found = list(iter_post_urls(session, delay, max_pages))
+    print(f"  total {len(found)} post links")
     return found
 
 
