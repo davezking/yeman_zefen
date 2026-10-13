@@ -388,3 +388,110 @@ describe("shared helpers sanity", () => {
     expect(await db(env).select().from(trackGenres)).toHaveLength(0);
   });
 });
+
+describe("era assignment on ingest", () => {
+  const GOLDEN = 1, EIGHTIES = 2, NINETIES = 3, TWO_THOUSANDS = 4, MODERN = 5;
+
+  const trackByUrl = async (n: number) =>
+    (await db(env).select().from(tracks).where(eq(tracks.sourceUrl, scraped(n).sourceUrl)))[0]!;
+
+  it("puts each boundary year in the right generation", async () => {
+    const cases: [number, number][] = [
+      [1979, GOLDEN], [1980, EIGHTIES], [1989, EIGHTIES], [1990, NINETIES],
+      [2009, TWO_THOUSANDS], [2010, MODERN],
+    ];
+    const job = await makeJob("scrape");
+    const res = await json(
+      await svc("/admin/ingest/tracks", {
+        body: { jobId: job.id, tracks: cases.map(([year], i) => scraped(i + 1, { releaseYear: year })) },
+      }),
+    );
+    expect(res.counts).toEqual({ created: 6, updated: 0, skipped: 0 });
+    for (const [i, [, generation]] of cases.entries()) {
+      expect((await trackByUrl(i + 1)).generationId, `year ${cases[i]![0]}`).toBe(generation);
+    }
+    expect(await count("review_items")).toBe(0);
+  });
+
+  it("leaves era null, flags era_unknown and sets needs_review when the year is missing", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: null })] } });
+    const row = await trackByUrl(1);
+    expect(row.generationId).toBeNull();
+    expect(row.status).toBe("needs_review");
+    const items = await db(env).select().from(reviewItems);
+    expect(items).toMatchObject([{ entityType: "track", entityId: row.id, reason: "era_unknown", status: "open" }]);
+  });
+
+  it("does not add a second era_unknown item when re-sent", async () => {
+    const job = await makeJob("scrape");
+    const body = { jobId: job.id, tracks: [scraped(1, { releaseYear: null })] };
+    await svc("/admin/ingest/tracks", { body });
+    const again = await json(await svc("/admin/ingest/tracks", { body }));
+    expect(again.results[0].result).toBe("skipped");
+    expect(await count("review_items")).toBe(1);
+  });
+
+  it("reassigns the era when the year changes on a track that is not overridden", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } });
+    expect((await trackByUrl(1)).generationId).toBe(GOLDEN);
+    const res = await json(
+      await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1995 })] } }),
+    );
+    expect(res.results[0].result).toBe("updated");
+    expect((await trackByUrl(1)).generationId).toBe(NINETIES);
+  });
+
+  it("never reassigns an admin-overridden track", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } });
+    const before = await trackByUrl(1);
+    await db(env)
+      .update(tracks)
+      .set({ generationId: MODERN, generationOverridden: true })
+      .where(eq(tracks.id, before.id));
+
+    const res = await json(
+      await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } }),
+    );
+    expect(res.results[0].result).toBe("skipped");
+    expect((await trackByUrl(1)).generationId).toBe(MODERN);
+
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1995 })] } });
+    const row = await trackByUrl(1);
+    expect(row.generationId).toBe(MODERN);
+    expect(row.generationOverridden).toBe(true);
+    expect(await count("review_items")).toBe(0);
+  });
+
+  it("keeps the stored era when a re-scrape has no year", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 2015 })] } });
+    const res = await json(
+      await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: null })] } }),
+    );
+    expect(res.results[0].result).toBe("skipped");
+    expect((await trackByUrl(1)).generationId).toBe(MODERN);
+    expect(await count("review_items")).toBe(0);
+  });
+
+  it("derives the era from an admin-edited year, not the rejected scraped one", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } });
+    const before = await trackByUrl(1);
+    // Admin corrects the year to 1985; the re-scrape's year must no longer touch the era.
+    await db(env)
+      .update(tracks)
+      .set({ releaseYear: 1985, generationId: EIGHTIES, adminEditedFields: JSON.stringify(["releaseYear"]) })
+      .where(eq(tracks.id, before.id));
+
+    const res = await json(
+      await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } }),
+    );
+    expect(res.results[0].result).toBe("skipped");
+    const row = await trackByUrl(1);
+    expect(row.releaseYear).toBe(1985);
+    expect(row.generationId).toBe(EIGHTIES);
+  });
+});
