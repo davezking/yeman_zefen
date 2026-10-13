@@ -142,3 +142,13 @@ def test_set_job_status_body():
     assert s.calls[0]["url"] == "https://api.test/admin/ingest/jobs/9/status"
     assert s.calls[0]["json"] == {"status": "running", "ghRunUrl": "https://github.com/o/r/actions/runs/1"}
     assert s.calls[1]["json"] == {"status": "succeeded", "summary": {"scraped": 3}}
+
+
+def test_get_catalog_snapshot_is_a_bodyless_get():
+    snap = {"artists": [], "tracks": []}
+    s = FakeSession(FakeResponse(200, snap))
+    out = client(s).get_catalog_snapshot()
+    assert out == snap
+    call = s.calls[0]
+    assert (call["method"], call["url"]) == ("GET", "https://api.test/admin/ingest/catalog-snapshot")
+    assert call["json"] is None  # no request body on the GET

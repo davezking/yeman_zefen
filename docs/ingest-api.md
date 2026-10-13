@@ -64,7 +64,7 @@ finished job is 409.
 
 ## `GET /admin/ingest/catalog-snapshot`
 
-For client-side dedupe. Positional arrays, named by `columns`:
+For client-side dedupe (`ingest/yz/dedupe.py`). Positional arrays, named by `columns`:
 `artists: [id, name_am, alias_norms[]]`, `tracks: [id, artist_id, title_am, title_latin, duration_ms]`.
 About 240 KB for 2,000 tracks and 400 artists.
 

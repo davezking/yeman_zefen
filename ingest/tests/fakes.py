@@ -36,11 +36,17 @@ class FakeS3:
 class FakeApi:
     """Records what the pipeline sends; `fail_on_post=2` makes the 2nd POST fail."""
 
-    def __init__(self, fail_on_post=None, fail_status_report=False):
+    def __init__(self, fail_on_post=None, fail_status_report=False, snapshot=None):
         self.posts = []
         self.statuses = []
         self.fail_on_post = fail_on_post
         self.fail_status_report = fail_status_report
+        self.snapshot = snapshot or {"artists": [], "tracks": []}
+        self.snapshot_calls = 0
+
+    def get_catalog_snapshot(self):
+        self.snapshot_calls += 1
+        return self.snapshot
 
     def post_tracks(self, job_id, tracks):
         if self.fail_on_post == len(self.posts) + 1:
