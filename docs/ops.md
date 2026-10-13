@@ -61,6 +61,44 @@ added with `add-admin.ts`. When `ENV=dev`, a request with no Access header is
 then treated as that admin. With `DEV_ADMIN_EMAIL` unset, `/admin/*` returns 401
 even in dev. This bypass never applies when `ENV=prod`.
 
+## Cutting clips (`ingest/`)
+
+`python -m yz.cut` (run from `ingest/`, needs ffmpeg and the same environment variables as the scraper, with
+`JOB_ID` a `cut` or `recut` job) turns each track's source audio into its two game clips, uploads them to the
+public `yz-clips` bucket and registers them with the API:
+
+```
+python -m yz.cut --track-ids 1,2,3                           # both clips of these tracks
+python -m yz.cut --all-missing [--limit 50]                  # every clip that is not ready yet
+python -m yz.cut --track-id 7 --type intro --start-ms 41200  # recut one clip from a chosen start
+```
+
+`--type intro|middle` limits any of them to one clip. `R2_CLIPS_BUCKET` (default `yz-clips`) names the bucket;
+the R2 token must be able to read `yz-source` and write `yz-clips`.
+
+- **The clip**: 10 s, MP3 CBR 128 kbps, 44.1 kHz stereo, starting exactly at the start point (the cut is
+  sample-accurate), with a 30 ms fade in and out and no metadata. Same source and start give the same bytes.
+- **Start points**: the registered start is used if the clip exists (an admin's `PATCH /admin/clips/:id`
+  stores their start and sets the clip `pending`, which is what makes `--all-missing` pick it up). Otherwise
+  the intro starts at the first sound (leading silence below -40 dB for 0.3 s is skipped) and the middle at
+  45 % of the source. A default is nudged earlier if it would leave less than 10 s; a start you give is never
+  moved, and one that leaves less than 10 s is an error for that clip.
+- **Keys and versions**: `clips/{trackId}/{type}-v{version}.mp3`, uploaded with
+  `Cache-Control: public, max-age=31536000, immutable`. A clip identical to the registered one is skipped
+  entirely; a different one goes to `version + 1`. Registered objects are never rewritten. See
+  `docs/ingest-api.md` for the rule.
+- **Problems with the source** are reported as review items on the track, in the same call that registers the
+  clips (`flags` on `POST /admin/ingest/clips`): `missing_audio` when the track has no source key or the file
+  is not in `yz-source`, `short_audio` when it is under 25 s. A source of 10 s or more is still cut; a shorter
+  one cannot be, and counts as an error. Re-running does not duplicate the review items.
+- **Length**: every finished clip is measured with ffprobe and must be 10.0 s +/- 30 ms, or it is not
+  uploaded. MP3 is framed in 26.1 ms frames, so ffprobe reports whole frames: encoding exactly 10.000 s gives
+  384 frames = 10.031 s, just outside the tolerance, so the cutter encodes 9.975 s (383 frames = 10.005 s by
+  ffprobe, 9.975 s decoded). The registered `lengthMs` stays the nominal 10000.
+- **Job status** works as for the scraper, with a summary of `tracks`, `created`, `updated`, `unchanged`,
+  `flagged` and `errors`. A track that cannot be cut counts as an error and the run carries on; a storage or
+  API failure fails the job.
+
 ## Running the scraper (`ingest/`)
 
 `python -m yz.scrape` (run from `ingest/`) scrapes ethiozeima.com, uploads each MP3 to the private

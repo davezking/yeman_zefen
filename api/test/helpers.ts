@@ -171,16 +171,16 @@ export function countingDb(real: D1Database) {
 /** Call the app directly with a counting DB (as the ingest service token) and report how many D1 queries it used. */
 export async function svcWithQueryCount(
   path: string,
-  body: unknown,
+  body?: unknown,
 ): Promise<{ response: Response; queries: number }> {
   const { default: app } = await import("../src/index");
   const { db, counter } = countingDb(env.DB);
   const jwt = await signAccessJwt({ common_name: SERVICE_ID });
   const response = await app.fetch(
     new Request(`https://api.test${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", [ACCESS_HEADER]: jwt },
-      body: JSON.stringify(body),
+      method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? { [ACCESS_HEADER]: jwt } : { "content-type": "application/json", [ACCESS_HEADER]: jwt },
+      body: body === undefined ? undefined : JSON.stringify(body),
     }),
     { ...env, DB: db },
   );

@@ -67,7 +67,7 @@ class ApiClient:
 
     # ------------------------------------------------------------- transport
 
-    def _request(self, method: str, path: str, body: dict | None = None) -> dict:
+    def _request(self, method: str, path: str, body: dict | None = None, params: dict | None = None) -> dict:
         """Send JSON, retrying network errors, 408/425/429 and 5xx with exponential backoff.
         Every ingest write is idempotent, so a retry after a lost response is safe."""
         url = f"{self.base_url}{path}"
@@ -77,7 +77,7 @@ class ApiClient:
             try:
                 # No redirects: an invalid Access token is answered with a redirect to a login page.
                 resp = self.session.request(
-                    method, url, json=body if body is not None else None, timeout=self.timeout, allow_redirects=False
+                    method, url, json=body, params=params, timeout=self.timeout, allow_redirects=False
                 )
             except requests.RequestException as exc:
                 last = exc
@@ -125,6 +125,38 @@ class ApiClient:
         for key in merged["counts"]:
             merged["counts"][key] += data.get("counts", {}).get(key, 0)
         merged["results"].extend(data.get("results", []))
+
+    def get_clip_targets(
+        self, *, track_ids: list[int] | None = None, missing: bool = False, after: int = 0, limit: int = 100
+    ) -> dict:
+        """Tracks to cut clips for, with their source key and current clips. Name them with `track_ids`
+        (up to 200) or ask for `missing` (tracks without both clips ready), paged by `after`/`limit`."""
+        if (track_ids is None) == (not missing):
+            raise ValueError("pass exactly one of track_ids or missing=True")
+        params: dict = {"limit": limit}
+        if track_ids is not None:
+            params["trackIds"] = ",".join(str(i) for i in track_ids)
+        else:
+            params.update(missing="1", after=after)
+        return self._request("GET", "/admin/ingest/clip-targets", params=params)
+
+    def post_clips(self, job_id: int, clips: list[dict], flags: list[dict] | None = None) -> dict:
+        """Register clips (and raise `missing_audio` / `short_audio` review items) in requests of at most
+        100 of each. Returns `{ "counts", "results", "flags" }` merged across requests."""
+        flags = flags or []
+        merged: dict = {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": []}
+        for start in range(0, max(len(clips), len(flags)), MAX_BATCH):
+            body = {
+                "jobId": job_id,
+                "clips": clips[start : start + MAX_BATCH],
+                "flags": flags[start : start + MAX_BATCH],
+            }
+            data = self._request("POST", "/admin/ingest/clips", body)
+            for key in merged["counts"]:
+                merged["counts"][key] += data.get("counts", {}).get(key, 0)
+            merged["results"].extend(data.get("results", []))
+            merged["flags"].extend(data.get("flags", []))
+        return merged
 
     def get_catalog_snapshot(self) -> dict:
         """The catalog as `GET /admin/ingest/catalog-snapshot` returns it (for client-side dedupe)."""

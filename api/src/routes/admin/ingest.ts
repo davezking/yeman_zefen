@@ -445,12 +445,24 @@ const clipInput = z.strictObject({
   bytes: z.number().int().min(1),
 });
 
+/** A problem the cutter found with a track's source audio, raised as a review item (see POST /clips). */
+const CLIP_FLAG_REASONS = ["missing_audio", "short_audio"] as const;
+const clipFlagInput = z.strictObject({
+  trackId: z.number().int().positive(),
+  reason: z.enum(CLIP_FLAG_REASONS),
+  details: z.record(z.string(), z.unknown()).nullish(),
+});
+
 const clipsBody = z
   .strictObject({
     jobId: z.number().int().positive(),
-    clips: z.array(clipInput).min(1).max(MAX_BATCH),
+    clips: z.array(clipInput).max(MAX_BATCH).default([]),
+    flags: z.array(clipFlagInput).max(MAX_BATCH).default([]),
   })
   .superRefine((b, ctx) => {
+    if (b.clips.length === 0 && b.flags.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["clips"], message: "send at least one clip or flag" });
+    }
     const seen = new Set<string>();
     b.clips.forEach((cl, i) => {
       const key = `${cl.trackId}:${cl.type}`;
@@ -476,6 +488,23 @@ const UPSERT_CLIPS_SQL = `
      OR clips.length_ms IS NOT excluded.length_ms OR clips.r2_key IS NOT excluded.r2_key
      OR clips.sha256 IS NOT excluded.sha256 OR clips.bytes IS NOT excluded.bytes`;
 
+// Source-audio problems found while cutting. Same de-duplication as track flags: an identical open
+// item (reason + details) is left alone. A track that was ingested clean now needs a human look.
+const INSERT_CLIP_FLAGS_SQL = `
+  INSERT INTO review_items (entity_type, entity_id, reason, details_json, status)
+  SELECT 'track', json_extract(f.value, '$.trackId'), json_extract(f.value, '$.reason'),
+         json_extract(f.value, '$.details'), 'open'
+  FROM json_each(?1) f
+  WHERE NOT EXISTS (
+    SELECT 1 FROM review_items r
+    WHERE r.entity_type = 'track' AND r.entity_id = json_extract(f.value, '$.trackId') AND r.status = 'open'
+      AND r.reason = json_extract(f.value, '$.reason')
+      AND r.details_json IS json_extract(f.value, '$.details'))`;
+
+const BUMP_FLAGGED_TRACKS_SQL = `
+  UPDATE tracks SET status = 'needs_review', updated_at = ?2
+  WHERE status = 'ingested' AND id IN (SELECT json_extract(value, '$.trackId') FROM json_each(?1))`;
+
 type ClipRow = {
   id: number; track_id: number; type: string; start_ms: number; length_ms: number;
   r2_key: string | null; sha256: string | null; bytes: number | null; version: number; status: string;
@@ -485,21 +514,34 @@ ingestRoutes.post("/clips", async (c) => {
   const env = c.env;
   const body = parse(clipsBody, await readJson(c));
   const payload = payloadOrThrow(body.clips);
-  const trackIdsJson = JSON.stringify([...new Set(body.clips.map((cl) => cl.trackId))]);
+
+  // Identical flags in one request collapse to one (same shape the tracks route uses).
+  const flagItems = new Map<string, { trackId: number; reason: string; details: string | null }>();
+  for (const f of body.flags) {
+    const details = f.details ? stableJson(f.details) : null;
+    flagItems.set(`${f.trackId}|${f.reason}|${details ?? ""}`, { trackId: f.trackId, reason: f.reason, details });
+  }
+
+  const allTrackIds = [...new Set([...body.clips.map((cl) => cl.trackId), ...body.flags.map((f) => f.trackId)])];
+  const trackIdsJson = JSON.stringify(allTrackIds);
   const inTrackIds = "IN (SELECT value FROM json_each(?1))";
 
-  // ---- Batch 1: reads (3 queries).
-  const [jobRes, trackRes, clipRes] = await runBatch(env, [
+  // ---- Batch 1: reads (4 queries).
+  const [jobRes, trackRes, clipRes, openRes] = await runBatch(env, [
     env.DB.prepare(JOB_SQL).bind(body.jobId),
     env.DB.prepare(`SELECT id FROM tracks WHERE id ${inTrackIds}`).bind(trackIdsJson),
     env.DB.prepare(
       `SELECT id, track_id, type, start_ms, length_ms, r2_key, sha256, bytes, version, status FROM clips WHERE track_id ${inTrackIds}`,
     ).bind(trackIdsJson),
+    env.DB.prepare(
+      `SELECT entity_id, reason, details_json FROM review_items
+       WHERE entity_type = 'track' AND status = 'open' AND entity_id ${inTrackIds}`,
+    ).bind(trackIdsJson),
   ]);
   assertJobOpen((jobRes!.results as unknown as JobRow[])[0], body.jobId, ["cut", "recut"]);
 
   const found = new Set((trackRes!.results as { id: number }[]).map((t) => t.id));
-  const missing = [...new Set(body.clips.map((cl) => cl.trackId))].filter((id) => !found.has(id));
+  const missing = allTrackIds.filter((id) => !found.has(id));
   if (missing.length > 0) {
     // Nothing has been written yet, so the whole request is rejected cleanly.
     throw new ApiError(404, "track_not_found", `Unknown trackId(s): ${missing.join(", ")}`);
@@ -520,14 +562,36 @@ ingestRoutes.post("/clips", async (c) => {
     outcomes.set(`${cl.trackId}:${cl.type}`, !prev ? "created" : unchanged ? "skipped" : "updated");
   }
 
-  // ---- Batch 2: one set-based upsert, then read back ids and versions (2 queries).
-  const [, afterRes] = await runBatch(env, [
-    env.DB.prepare(UPSERT_CLIPS_SQL).bind(payload),
-    env.DB.prepare(`SELECT id, track_id, type, version FROM clips WHERE track_id ${inTrackIds}`).bind(trackIdsJson),
-  ]);
-  const afterByKey = new Map(
-    (afterRes!.results as { id: number; track_id: number; type: string; version: number }[]).map((cl) => [`${cl.track_id}:${cl.type}`, cl]),
+  const openItems = new Set(
+    (openRes!.results as { entity_id: number; reason: string; details_json: string | null }[]).map(
+      (o) => `${o.entity_id}|${o.reason}|${o.details_json ?? ""}`,
+    ),
   );
+  const flagResults = [...flagItems.entries()].map(([key, f]) => ({
+    trackId: f.trackId,
+    reason: f.reason,
+    result: openItems.has(key) ? ("skipped" as const) : ("created" as const),
+  }));
+  const newFlags = [...flagItems.entries()].filter(([key]) => !openItems.has(key)).map(([, f]) => f);
+
+  // ---- Batch 2: set-based writes, then read back ids and versions (at most 4 queries).
+  const writes: Prepared[] = [];
+  if (body.clips.length > 0) writes.push(env.DB.prepare(UPSERT_CLIPS_SQL).bind(payload));
+  if (newFlags.length > 0) {
+    const flagsPayload = payloadOrThrow(newFlags);
+    writes.push(env.DB.prepare(INSERT_CLIP_FLAGS_SQL).bind(flagsPayload), env.DB.prepare(BUMP_FLAGGED_TRACKS_SQL).bind(flagsPayload, Date.now()));
+  }
+  const clipTrackIdsJson = JSON.stringify([...new Set(body.clips.map((cl) => cl.trackId))]);
+  if (body.clips.length > 0) {
+    writes.push(env.DB.prepare(`SELECT id, track_id, type, version FROM clips WHERE track_id ${inTrackIds}`).bind(clipTrackIdsJson));
+  }
+  const written = writes.length > 0 ? await runBatch(env, writes) : [];
+
+  const afterByKey = new Map<string, { id: number; version: number }>();
+  if (body.clips.length > 0) {
+    const afterRows = written[written.length - 1]!.results as { id: number; track_id: number; type: string; version: number }[];
+    for (const cl of afterRows) afterByKey.set(`${cl.track_id}:${cl.type}`, cl);
+  }
   const results = body.clips.map((cl) => {
     const key = `${cl.trackId}:${cl.type}`;
     const row = afterByKey.get(key);
@@ -535,7 +599,80 @@ ingestRoutes.post("/clips", async (c) => {
   });
   const counts = { created: 0, updated: 0, skipped: 0 };
   for (const r of results) counts[r.result]++;
-  return c.json({ jobId: body.jobId, counts, results });
+  return c.json({ jobId: body.jobId, counts, results, flags: flagResults });
+});
+
+// ------------------------------------------------------------ clip targets
+
+const clipTargetsQuery = z
+  .strictObject({
+    trackIds: z
+      .string()
+      .regex(/^[1-9]\d*(,[1-9]\d*)*$/, "must be a comma-separated list of track ids")
+      .optional(),
+    missing: z.literal("1").optional(),
+    after: z.coerce.number().int().min(0).default(0),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+  })
+  .refine((q) => (q.trackIds === undefined) !== (q.missing === undefined), "send exactly one of trackIds or missing=1")
+  .refine((q) => q.trackIds === undefined || q.trackIds.split(",").length <= 200, "trackIds: at most 200 ids");
+
+/** Tracks the cutter should work on: still in play, with source audio, and not both clips ready. */
+const MISSING_TRACKS_WHERE = `
+  id > ?1 AND status IN ('ingested', 'needs_review', 'approved') AND source_audio_key IS NOT NULL
+  AND (SELECT COUNT(*) FROM clips c WHERE c.track_id = tracks.id AND c.status = 'ready') < ${CLIP_TYPES.length}`;
+
+const CLIP_TARGET_COLUMNS = "track_id, type, start_ms, length_ms, r2_key, sha256, bytes, version, status";
+
+// What the cutter needs to know before it touches anything: where the source audio is, and what each
+// clip currently is (an admin's recut shows up as a pending clip carrying the start they chose).
+ingestRoutes.get("/clip-targets", async (c) => {
+  const env = c.env;
+  const q = parse(clipTargetsQuery, c.req.query(), "query");
+
+  const [trackRes, clipRes] =
+    q.trackIds !== undefined
+      ? await runBatch(env, [
+          env.DB.prepare(
+            "SELECT id, status, source_audio_key, duration_ms FROM tracks WHERE id IN (SELECT value FROM json_each(?1)) ORDER BY id",
+          ).bind(JSON.stringify(q.trackIds.split(",").map(Number))),
+          env.DB.prepare(`SELECT ${CLIP_TARGET_COLUMNS} FROM clips WHERE track_id IN (SELECT value FROM json_each(?1))`).bind(
+            JSON.stringify(q.trackIds.split(",").map(Number)),
+          ),
+        ])
+      : await runBatch(env, [
+          env.DB.prepare(
+            `SELECT id, status, source_audio_key, duration_ms FROM tracks WHERE ${MISSING_TRACKS_WHERE} ORDER BY id LIMIT ?2`,
+          ).bind(q.after, q.limit),
+          env.DB.prepare(
+            `SELECT ${CLIP_TARGET_COLUMNS} FROM clips WHERE track_id IN (SELECT id FROM tracks WHERE ${MISSING_TRACKS_WHERE} ORDER BY id LIMIT ?2)`,
+          ).bind(q.after, q.limit),
+        ]);
+
+  type ClipTargetRow = { track_id: number; type: string; start_ms: number; length_ms: number; r2_key: string | null; sha256: string | null; bytes: number | null; version: number; status: string };
+  const clipsByTrack = new Map<number, ClipTargetRow[]>();
+  for (const cl of clipRes!.results as unknown as ClipTargetRow[]) {
+    clipsByTrack.set(cl.track_id, [...(clipsByTrack.get(cl.track_id) ?? []), cl]);
+  }
+  const tracksOut = (trackRes!.results as { id: number; status: string; source_audio_key: string | null; duration_ms: number | null }[]).map((t) => ({
+    id: t.id,
+    status: t.status,
+    sourceAudioKey: t.source_audio_key,
+    durationMs: t.duration_ms,
+    clips: (clipsByTrack.get(t.id) ?? []).map((cl) => ({
+      type: cl.type,
+      startMs: cl.start_ms,
+      lengthMs: cl.length_ms,
+      r2Key: cl.r2_key,
+      sha256: cl.sha256,
+      bytes: cl.bytes,
+      version: cl.version,
+      status: cl.status,
+    })),
+  }));
+  c.header("Cache-Control", "no-store");
+  // `next` is the cursor for the following page of a missing=1 listing; null once the last page is out.
+  return c.json({ tracks: tracksOut, next: q.missing && tracksOut.length === q.limit ? tracksOut[tracksOut.length - 1]!.id : null });
 });
 
 // ------------------------------------------------------------- job status

@@ -31,6 +31,7 @@ class Config:
     r2_secret_access_key: str
     job_id: int
     r2_bucket: str = "yz-source"
+    r2_clips_bucket: str = "yz-clips"
     gh_run_url: str | None = None
 
     @classmethod
@@ -60,5 +61,6 @@ class Config:
             r2_secret_access_key=env["R2_SECRET_ACCESS_KEY"].strip(),
             job_id=job_id,
             r2_bucket=env.get("R2_BUCKET", "").strip() or "yz-source",
+            r2_clips_bucket=env.get("R2_CLIPS_BUCKET", "").strip() or "yz-clips",
             gh_run_url=run_url,
         )

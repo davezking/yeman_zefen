@@ -79,3 +79,52 @@ def test_from_config_builds_an_s3_client_for_r2():
     store = SourceStore.from_config(Config.from_env(ENV))
     assert store.bucket == "yz-source"
     assert store.client.meta.endpoint_url == "https://acct.r2.cloudflarestorage.com"
+
+
+# ------------------------------------------------------------- clips and downloads
+
+
+def test_download_writes_the_object_to_disk(tmp_path):
+    from yz.storage import SourceStore
+
+    s3 = FakeS3()
+    s3.objects["source/a.mp3"] = b"x" * (3 << 20) + b"tail"  # more than one chunk
+    dest = tmp_path / "a.src"
+    assert SourceStore(s3).download("source/a.mp3", dest) is True
+    assert dest.read_bytes() == s3.objects["source/a.mp3"]
+
+
+def test_download_of_a_missing_object_is_false_and_writes_nothing(tmp_path):
+    from yz.storage import SourceStore
+
+    dest = tmp_path / "gone.src"
+    assert SourceStore(FakeS3()).download("source/gone.mp3", dest) is False
+    assert not dest.exists()
+
+
+def test_download_lets_other_errors_through(tmp_path):
+    from yz.storage import SourceStore
+
+    s3 = FakeS3()
+    s3.fail_with = AccessDenied()
+    with pytest.raises(AccessDenied):
+        SourceStore(s3).download("source/a.mp3", tmp_path / "a.src")
+
+
+def test_clip_upload_is_public_immutable_audio_and_always_writes():
+    from yz.storage import ClipStore
+
+    s3 = FakeS3()
+    store = ClipStore(s3)
+    store.upload("clips/1/intro-v1.mp3", b"aaa")
+    store.upload("clips/1/intro-v1.mp3", b"bbb")  # same key, same size: still written (see ClipStore.upload)
+    assert s3.objects["clips/1/intro-v1.mp3"] == b"bbb" and len(s3.put_calls) == 2
+    assert s3.put_calls[0] == {
+        "Bucket": "yz-clips", "Key": "clips/1/intro-v1.mp3", "ContentType": "audio/mpeg",
+        "CacheControl": "public, max-age=31536000, immutable",
+    }
+
+
+def test_config_reads_the_clips_bucket():
+    assert Config.from_env(ENV).r2_clips_bucket == "yz-clips"
+    assert Config.from_env({**ENV, "R2_CLIPS_BUCKET": "my-clips"}).r2_clips_bucket == "my-clips"

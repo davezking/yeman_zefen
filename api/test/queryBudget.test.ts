@@ -97,6 +97,53 @@ describe("POST /admin/ingest/clips stays within the cap", () => {
   });
 });
 
+describe("clip flags and GET /admin/ingest/clip-targets stay within the cap", () => {
+  const seedTracks = async (n: number) => {
+    const artist = await makeArtist("አርቲስት");
+    const ids: number[] = [];
+    for (let i = 0; i < n; i++) ids.push((await makeTrack(artist.id, { sourceAudioKey: `source/${i}.mp3`, status: "needs_review" })).id);
+    return ids;
+  };
+
+  it("100 flags on 100 tracks cost the same as a handful", async () => {
+    const ids = await seedTracks(100);
+    const job = await makeJob("cut");
+    const flags = (n: number, reason: string) => ids.slice(0, n).map((trackId) => ({ trackId, reason, details: { trackId } }));
+
+    const few = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, flags: flags(3, "short_audio") });
+    const many = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, flags: flags(100, "missing_audio") });
+    expect(few.response.status).toBe(200);
+    expect(many.response.status).toBe(200);
+    expect(many.queries).toBe(few.queries);
+    expect(many.queries).toBeLessThanOrEqual(12);
+
+    const again = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, flags: flags(100, "missing_audio") }); // all skipped
+    expect(again.queries).toBeLessThanOrEqual(many.queries);
+  });
+
+  it("100 clips and 100 flags in one request stay constant too", async () => {
+    const ids = await seedTracks(100);
+    const job = await makeJob("cut");
+    const clips = ids.map((trackId) => ({ trackId, type: "intro", startMs: 0, lengthMs: 10_000, r2Key: `clips/${trackId}/intro-v1.mp3`, sha256: "a".repeat(64), bytes: 160_000 }));
+    const flags = ids.map((trackId) => ({ trackId, reason: "short_audio", details: { trackId } }));
+    const res = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, clips, flags });
+    expect(res.response.status).toBe(200);
+    expect(res.queries).toBe(8);
+  });
+
+  it("listing 10 or 100 tracks (with clips) takes the same two queries", async () => {
+    const ids = await seedTracks(100);
+    const small = await svcWithQueryCount(`/admin/ingest/clip-targets?trackIds=${ids.slice(0, 10).join(",")}`);
+    const large = await svcWithQueryCount(`/admin/ingest/clip-targets?trackIds=${ids.join(",")}`);
+    const missing = await svcWithQueryCount("/admin/ingest/clip-targets?missing=1&limit=100");
+    for (const r of [small, large, missing]) expect(r.response.status).toBe(200);
+    expect((await large.response.json() as any).tracks).toHaveLength(100);
+    expect(small.queries).toBe(2);
+    expect(large.queries).toBe(2);
+    expect(missing.queries).toBe(2);
+  });
+});
+
 // Rows read also count against the daily quota, so per-entity lookups must use an index instead of
 // scanning every open review item.
 describe("review item lookups use the entity index", () => {

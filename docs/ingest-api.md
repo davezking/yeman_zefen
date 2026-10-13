@@ -50,10 +50,36 @@ Rules:
 
 ## `POST /admin/ingest/clips`
 
-Up to 100 clips: `{ jobId, clips: [{ trackId, type, startMs, lengthMs, r2Key, sha256, bytes }] }`
+Up to 100 clips and up to 100 flags, either or both:
+`{ jobId, clips: [{ trackId, type, startMs, lengthMs, r2Key, sha256, bytes }], flags: [{ trackId, reason, details? }] }`
 (`type` is `intro` or `middle`, `sha256` is 64 lowercase hex). Upserts on `(track, type)`,
-sets `status = ready`, and bumps `version` only when something changed. An unknown `trackId`
-rejects the whole request (404) before anything is written.
+sets `status = ready`, and bumps `version` only when something changed (the clip was not `ready`, or its
+start, length, key, checksum or size differ). An unknown `trackId`, in a clip or a flag, rejects the whole
+request (404) before anything is written. The job must be a `cut` or `recut` job.
+
+**Keys and versions.** The version is part of the key, `clips/{trackId}/{type}-v{version}.mp3`, and the API
+assigns it. So a client that registers a changed clip uploads it to `previous version + 1` (`1` for a new
+clip) and sends that key; the API then assigns exactly that version, and the response's `version` lets the
+client check it. A clip that comes out identical to what is registered is neither uploaded nor sent, so
+objects in `yz-clips` are never rewritten and can be cached for a year (`immutable`).
+
+**Flags.** `flags` is how a cut job reports a problem with a track's *source audio* (one call with the clips,
+no separate endpoint). `reason` is `missing_audio` or `short_audio` only; `details` is free-form. Each flag
+becomes an open `review_items` row for the track, and an `ingested` track moves to `needs_review` (an
+`approved` one is left alone). An identical open item (same reason and details, whatever the key order) is
+not duplicated, so re-running a job is safe. The response lists each flag as `created` or `skipped`:
+`{ jobId, counts, results, flags: [{ trackId, reason, result }] }`.
+
+## `GET /admin/ingest/clip-targets`
+
+What the cutter reads before it cuts. Send exactly one of `trackIds=1,2,3` (up to 200) or `missing=1`
+(optionally `after=<id>` and `limit=<1..200, default 100>` to page through).
+
+`{ tracks: [{ id, status, sourceAudioKey, durationMs, clips: [{ type, startMs, lengthMs, r2Key, sha256,
+bytes, version, status }] }], next }`. With `trackIds`, every track that exists is returned, whatever its
+status or source key; unknown ids are left out. With `missing=1`, only tracks that are `ingested`,
+`needs_review` or `approved`, have a `source_audio_key`, and do not have both clips `ready` (so a clip an
+admin moved, which is `pending`, shows up). `next` is the cursor for the following page, `null` on the last.
 
 ## `POST /admin/ingest/jobs/:id/status`
 
@@ -80,7 +106,10 @@ it with `json_each()` in set-based `INSERT ... SELECT` / `UPDATE ... FROM` state
 |---|---|
 | `POST /tracks`, 1, 10 or 100 new records | 15 |
 | `POST /tracks`, 100 re-sent or re-scraped records | 13 |
-| `POST /clips`, any number up to 100 | 5 |
+| `POST /clips`, any number of clips up to 100 | 6 |
+| `POST /clips`, 3 or 100 flags and no clips | 6 |
+| `POST /clips`, 100 clips and 100 flags | 8 |
+| `GET /clip-targets`, any number of tracks | 2 |
 
 `test/queryBudget.test.ts` counts the statements that reach D1 and fails if a request goes over
 30 (tracks) or 12 (clips), or if the cost starts growing with the number of records.

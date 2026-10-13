@@ -13,12 +13,24 @@ class AccessDenied(Exception):
         self.response = {"Error": {"Code": "AccessDenied"}, "ResponseMetadata": {"HTTPStatusCode": 403}}
 
 
+class _Body:
+    """The streaming body get_object returns."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def iter_chunks(self, size):
+        for i in range(0, len(self._data), size):
+            yield self._data[i : i + size]
+
+
 class FakeS3:
     """The two S3 calls SourceStore makes."""
 
     def __init__(self):
         self.objects = {}
         self.puts = []
+        self.put_calls = []
         self.fail_with = None
 
     def head_object(self, Bucket, Key):
@@ -28,9 +40,17 @@ class FakeS3:
             raise NotFound()
         return {"ContentLength": len(self.objects[Key])}
 
-    def put_object(self, Bucket, Key, Body, ContentType):
+    def put_object(self, Bucket, Key, Body, ContentType, **extra):
         self.puts.append((Bucket, Key, ContentType))
+        self.put_calls.append({"Bucket": Bucket, "Key": Key, "ContentType": ContentType, **extra})
         self.objects[Key] = Body
+
+    def get_object(self, Bucket, Key):
+        if self.fail_with:
+            raise self.fail_with
+        if Key not in self.objects:
+            raise NotFound("NoSuchKey")
+        return {"Body": _Body(self.objects[Key])}
 
 
 class FakeApi:
@@ -100,3 +120,58 @@ class FakeSource:
     def fetch_audio(self, mp3_url):
         self.fetched.append(mp3_url)
         return self.audio.get(mp3_url)
+
+
+class FakeClipApi(FakeApi):
+    """The API's side of cutting. Serves clip targets and applies the registration rules the Worker does:
+    a clip is only rewritten, and its version bumped, when it was not ready or something about it changed."""
+
+    def __init__(self, tracks=None, **kw):
+        super().__init__(**kw)
+        # id -> {"status", "sourceAudioKey", "durationMs", "clips": {type: {startMs, lengthMs, r2Key, sha256, bytes, version, status}}}
+        self.tracks = tracks if tracks is not None else {}
+        self.registrations = []  # every post_clips call: (clips, flags)
+        self.open_flags = set()
+
+    def add_track(self, track_id, source_key="source/x.mp3", status="needs_review", clips=None):
+        self.tracks[track_id] = {"status": status, "sourceAudioKey": source_key, "durationMs": None, "clips": clips or {}}
+
+    def _target(self, track_id):
+        t = self.tracks[track_id]
+        return {
+            "id": track_id, "status": t["status"], "sourceAudioKey": t["sourceAudioKey"], "durationMs": t["durationMs"],
+            "clips": [{"type": ty, **c} for ty, c in sorted(t["clips"].items())],
+        }
+
+    def get_clip_targets(self, *, track_ids=None, missing=False, after=0, limit=100):
+        if track_ids is not None:
+            return {"tracks": [self._target(i) for i in sorted(track_ids) if i in self.tracks], "next": None}
+        ids = [
+            i for i, t in sorted(self.tracks.items())
+            if i > after and t["status"] in ("ingested", "needs_review", "approved") and t["sourceAudioKey"]
+            and sum(1 for c in t["clips"].values() if c["status"] == "ready") < 2
+        ][:limit]
+        return {"tracks": [self._target(i) for i in ids], "next": ids[-1] if len(ids) == limit else None}
+
+    def post_clips(self, job_id, clips, flags=None):
+        self.registrations.append((list(clips), list(flags or [])))
+        counts, results, flag_results = {"created": 0, "updated": 0, "skipped": 0}, [], []
+        for c in clips:
+            clip_map = self.tracks[c["trackId"]]["clips"]
+            prev = clip_map.get(c["type"])
+            row = {k: c[k] for k in ("startMs", "lengthMs", "r2Key", "sha256", "bytes")}
+            if prev is None:
+                clip_map[c["type"]] = {**row, "version": 1, "status": "ready"}
+                outcome = "created"
+            elif prev["status"] == "ready" and all(prev[k] == row[k] for k in row):
+                outcome = "skipped"
+            else:
+                clip_map[c["type"]] = {**row, "version": prev["version"] + 1, "status": "ready"}
+                outcome = "updated"
+            counts[outcome] += 1
+            results.append({"trackId": c["trackId"], "type": c["type"], "version": clip_map[c["type"]]["version"], "result": outcome})
+        for f in flags or []:
+            key = (f["trackId"], f["reason"], repr(sorted((f.get("details") or {}).items())))
+            flag_results.append({"trackId": f["trackId"], "reason": f["reason"], "result": "skipped" if key in self.open_flags else "created"})
+            self.open_flags.add(key)
+        return {"counts": counts, "results": results, "flags": flag_results}
