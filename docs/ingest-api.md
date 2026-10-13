@@ -29,8 +29,13 @@ Only `sourceUrl` and `artistAm` are required. Empty strings and `null` mean "no 
 Response: `{ jobId, counts: { created, updated, skipped }, results: [{ sourceUrl, trackId, result, unknownGenres? }] }`.
 
 Rules:
-- **Artist** is matched by normalized `name_am` (via the alias table, then `name_am`); a new
-  artist also gets its canonical name as an alias. Aliases never move from one artist to another.
+- **Artist** is matched by the folded form of `artistAm` (`normalizeFidel`: NFC, whitespace collapsed,
+  and the homophone series ሀ/ሐ/ኀ, ሰ/ሠ, አ/ዐ, ጸ/ፀ folded across all orders), first against the alias
+  table, then against `name_am`. So ጥላሁን ገሠሠ and ጥላሁን ገሰሰ are the same artist. A new artist is
+  stored under the spelling it first arrived with (whitespace cleaned, not folded) and also gets that
+  name as a `canonical` alias whose key is the folded form. Aliases never move from one artist to another.
+  The folded form is only ever a comparison key; `ingest/yz/fidel.py` computes the same one
+  (`docs/fixtures/normalize.json` is run against both).
 - **Track** is upserted on `sourceUrl`. A new track is `needs_review` if it has any flags,
   otherwise `ingested`.
 - **Re-scrapes** fill and refresh scraped fields but never null a value out and never touch a

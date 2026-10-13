@@ -20,7 +20,7 @@ import { artistAliases, artists, CLIP_TYPES, INGEST_KINDS, INGEST_STATUSES, inge
 import type { AppEnv, Bindings } from "../../env";
 import { assignGeneration } from "../../lib/era";
 import { ApiError } from "../../lib/errors";
-import { normalizeAlias, normalizeFidel } from "../../lib/normalize";
+import { cleanText, normalizeAlias, normalizeFidel } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
 export const MAX_BATCH = 100;
@@ -233,7 +233,8 @@ ingestRoutes.post("/tracks", async (c) => {
   const body = parse(tracksBody, await readJson(c));
   const now = Date.now();
 
-  const recs = body.tracks.map((t) => ({ ...t, artistKey: normalizeFidel(t.artistAm) }));
+  // artistKey (homophones folded) is only for matching; artistName keeps the spelling that gets stored.
+  const recs = body.tracks.map((t) => ({ ...t, artistKey: normalizeFidel(t.artistAm), artistName: cleanText(t.artistAm) }));
   const urlsJson = JSON.stringify(recs.map((r) => r.sourceUrl));
   const keys = [...new Set(recs.map((r) => r.artistKey))];
 
@@ -245,12 +246,13 @@ ingestRoutes.post("/tracks", async (c) => {
               generation_overridden, duration_ms, source_audio_key, status, admin_edited_fields
        FROM tracks WHERE source_url IN (SELECT value FROM json_each(?1))`,
     ).bind(urlsJson),
-    // A key is a known artist if it is an alias (the canonical name is stored as one) or a name_am.
+    // An artist is known if the folded key is one of its aliases (the canonical name is stored as one)
+    // or the spelling is exactly its name_am (artists created without a canonical alias).
     env.DB.prepare(
       `SELECT alias_norm AS k, artist_id AS id FROM artist_aliases WHERE alias_norm IN (SELECT value FROM json_each(?1))
        UNION ALL
-       SELECT name_am, id FROM artists WHERE name_am IN (SELECT value FROM json_each(?1))`,
-    ).bind(JSON.stringify(keys)),
+       SELECT name_am, id FROM artists WHERE name_am IN (SELECT value FROM json_each(?2))`,
+    ).bind(JSON.stringify(keys), JSON.stringify([...new Set(recs.map((r) => r.artistName))])),
     env.DB.prepare("SELECT id, slug FROM genres"),
     env.DB.prepare(
       `SELECT track_id, genre_id FROM track_genres
@@ -265,35 +267,42 @@ ingestRoutes.post("/tracks", async (c) => {
   ]);
   assertJobOpen((jobRes!.results as unknown as JobRow[])[0], body.jobId, ["scrape"]);
 
-  // ---- Artists: match by normalized name_am (alias first, then name_am itself).
+  // ---- Artists: match by folded name (alias first, then name_am itself).
   const artistIdByKey = new Map<string, number>();
-  for (const r of artistRes!.results as { k: string; id: number }[]) if (!artistIdByKey.has(r.k)) artistIdByKey.set(r.k, r.id);
+  for (const r of artistRes!.results as { k: string; id: number }[]) {
+    const key = normalizeFidel(r.k); // a no-op for alias_norm, folds a name_am
+    if (!artistIdByKey.has(key)) artistIdByKey.set(key, r.id);
+  }
 
   const groups = new Map<string, typeof recs>();
   for (const r of recs) groups.set(r.artistKey, [...(groups.get(r.artistKey) ?? []), r]);
   const firstLatin = (key: string) => groups.get(key)!.find((r) => r.artistLatin)?.artistLatin ?? null;
+  const firstName = (key: string) => groups.get(key)![0]!.artistName;
 
   // ---- Batch 2 (only when there are brand-new artists): create them and read their ids (3 queries).
   const newKeys = keys.filter((k) => !artistIdByKey.has(k));
   if (newKeys.length > 0) {
-    const newArtistsJson = JSON.stringify(newKeys.map((key) => ({ key, latin: firstLatin(key) })));
+    const newArtistsJson = JSON.stringify(newKeys.map((key) => ({ key, name: firstName(key), latin: firstLatin(key) })));
+    const keyByName = new Map(newKeys.map((key) => [firstName(key), key]));
     const [, , idRes] = await runBatch(env, [
       env.DB.prepare(
         `INSERT INTO artists (name_am, name_latin, created_at, updated_at)
-         SELECT json_extract(a.value, '$.key'), json_extract(a.value, '$.latin'), ?2, ?2
+         SELECT json_extract(a.value, '$.name'), json_extract(a.value, '$.latin'), ?2, ?2
          FROM json_each(?1) a WHERE true ON CONFLICT(name_am) DO NOTHING`,
       ).bind(newArtistsJson, now),
-      // The canonical name is also an alias, so future folding of name_am keeps matching it.
+      // The canonical name is also an alias: its folded key is how later spellings of it are matched.
       env.DB.prepare(
         `INSERT INTO artist_aliases (artist_id, alias, alias_norm, source)
-         SELECT x.id, k.key, k.key, 'canonical'
-         FROM (SELECT json_extract(a.value, '$.key') AS key FROM json_each(?1) a) k
-         JOIN artists x ON x.name_am = k.key
+         SELECT x.id, k.name, k.key, 'canonical'
+         FROM (SELECT json_extract(a.value, '$.key') AS key, json_extract(a.value, '$.name') AS name FROM json_each(?1) a) k
+         JOIN artists x ON x.name_am = k.name
          WHERE true ON CONFLICT(alias_norm) DO NOTHING`,
       ).bind(newArtistsJson),
-      env.DB.prepare("SELECT id, name_am FROM artists WHERE name_am IN (SELECT json_extract(value, '$.key') FROM json_each(?1))").bind(newArtistsJson),
+      env.DB.prepare("SELECT id, name_am FROM artists WHERE name_am IN (SELECT json_extract(value, '$.name') FROM json_each(?1))").bind(newArtistsJson),
     ]);
-    for (const r of idRes!.results as { id: number; name_am: string }[]) artistIdByKey.set(r.name_am, r.id);
+    for (const r of idRes!.results as { id: number; name_am: string }[]) {
+      artistIdByKey.set(keyByName.get(r.name_am) ?? normalizeFidel(r.name_am), r.id);
+    }
   }
   for (const key of keys) {
     if (!artistIdByKey.has(key)) throw new ApiError(500, "internal", `Could not resolve artist for '${key}'`);

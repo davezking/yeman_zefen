@@ -87,7 +87,8 @@ describe("POST /admin/ingest/tracks", () => {
     expect(artist).toMatchObject({ nameAm: "ጥላሁን ገሠሠ", nameLatin: "Tilahun Gessesse" });
 
     const aliasNorms = (await db(env).select().from(artistAliases)).map((a) => a.aliasNorm).sort();
-    expect(aliasNorms).toEqual(["tilahun g.", "tilahun gessesse", "ጥላሁን ገሠሠ", "ጥላሁን ገሰሰ"].sort());
+    // The canonical name and its ሠ/ሰ spelling variant fold to one key, so they share one alias row.
+    expect(aliasNorms).toEqual(["tilahun g.", "tilahun gessesse", "ጥላሁን ገሰሰ"].sort());
 
     const rows = await db(env).select().from(tracks).orderBy(tracks.id);
     expect(rows.map((t) => t.status)).toEqual(["ingested", "needs_review"]); // flags -> needs_review
@@ -386,6 +387,57 @@ describe("shared helpers sanity", () => {
     await makeClip(t1.id, "intro");
     expect(t1.id).not.toBe(t2.id);
     expect(await db(env).select().from(trackGenres)).toHaveLength(0);
+  });
+});
+
+describe("artist spelling on ingest (homophone folding)", () => {
+  const send = async (jobId: number, tracks: unknown[]) => {
+    const res = await svc("/admin/ingest/tracks", { body: { jobId, tracks } });
+    expect(res.status).toBe(200);
+    return json(res);
+  };
+
+  it("stores the spelling it was given and keeps the folded form only as the alias key", async () => {
+    const job = await makeJob("scrape");
+    await send(job.id, [scraped(1, { artistAm: "ጥላሁን ገሠሠ", artistLatin: null, artistAliases: [] })]);
+    const [artist] = await db(env).select().from(artists);
+    expect(artist!.nameAm).toBe("ጥላሁን ገሠሠ"); // not folded to ገሰሰ
+    const [alias] = await db(env).select().from(artistAliases);
+    expect(alias).toMatchObject({ alias: "ጥላሁን ገሠሠ", aliasNorm: "ጥላሁን ገሰሰ", source: "canonical" });
+  });
+
+  it("matches another homophone spelling of the same artist instead of creating a duplicate", async () => {
+    const job = await makeJob("scrape");
+    await send(job.id, [scraped(1, { artistAm: "ጥላሁን ገሠሠ" })]);
+    await send(job.id, [scraped(2, { artistAm: "ጥላሁን ገሰሰ" })]);
+    expect(await count("artists")).toBe(1);
+    const rows = await db(env).select().from(tracks);
+    expect(new Set(rows.map((r) => r.artistId)).size).toBe(1);
+    expect((await db(env).select().from(artists))[0]!.nameAm).toBe("ጥላሁን ገሠሠ"); // first spelling stays
+  });
+
+  it("treats homophone spellings inside one request as one artist, named after the first", async () => {
+    const job = await makeJob("scrape");
+    await send(job.id, [
+      scraped(1, { artistAm: "ዐለማየሁ ዕሸቴ", artistLatin: null, artistAliases: [] }),
+      scraped(2, { artistAm: "አለማየሁ እሸቴ", artistLatin: null, artistAliases: [] }),
+    ]);
+    expect(await count("artists")).toBe(1);
+    expect((await db(env).select().from(artists))[0]!.nameAm).toBe("ዐለማየሁ ዕሸቴ");
+  });
+
+  it("cleans whitespace in the stored name", async () => {
+    const job = await makeJob("scrape");
+    await send(job.id, [scraped(1, { artistAm: "  ጥላሁን   ገሠሠ ", artistLatin: null, artistAliases: [] })]);
+    expect((await db(env).select().from(artists))[0]!.nameAm).toBe("ጥላሁን ገሠሠ");
+  });
+
+  it("still matches an existing artist that has no canonical alias by its exact name", async () => {
+    const artist = await makeArtist("ጥላሁን ገሠሠ"); // created without an alias row
+    const job = await makeJob("scrape");
+    await send(job.id, [scraped(1, { artistAm: "ጥላሁን ገሠሠ" })]);
+    expect(await count("artists")).toBe(1);
+    expect((await db(env).select().from(tracks))[0]!.artistId).toBe(artist.id);
   });
 });
 

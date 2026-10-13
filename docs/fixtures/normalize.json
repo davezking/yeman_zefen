@@ -1,0 +1,49 @@
+{
+  "_comment": "Shared by ingest/tests/test_fidel.py and api/test/normalize.test.ts. The Python and TypeScript normalizers must give identical output on every case (docs/architecture.md section 4). Expected values are written by hand from the spec, not generated from either implementation.",
+  "fidel": [
+    { "name": "empty", "in": "", "out": "" },
+    { "name": "plain name is unchanged", "in": "ሰላም", "out": "ሰላም" },
+    { "name": "HHA series (ሐ) folds to ሀ across all orders", "in": "ሐሑሒሓሔሕሖሗ", "out": "ሀሁሂሃሄህሆሇ" },
+    { "name": "XA series (ኀ) folds to ሀ across all orders", "in": "ኀኁኂኃኄኅኆኇ", "out": "ሀሁሂሃሄህሆሇ" },
+    { "name": "SZA series (ሠ) folds to ሰ across all orders", "in": "ሠሡሢሣሤሥሦሧ", "out": "ሰሱሲሳሴስሶሷ" },
+    { "name": "pharyngeal series (ዐ) folds to አ across all orders", "in": "ዐዑዒዓዔዕዖ", "out": "አኡኢኣኤእኦ" },
+    { "name": "TZA series (ፀ) folds to ጸ across all orders", "in": "ፀፁፂፃፄፅፆፇ", "out": "ጸጹጺጻጼጽጾጿ" },
+    { "name": "artist: Tilahun Gessesse", "in": "ጥላሁን ገሠሠ", "out": "ጥላሁን ገሰሰ" },
+    { "name": "artist: Mahmoud Ahmed", "in": "መሐሙድ አሕመድ", "out": "መሀሙድ አህመድ" },
+    { "name": "artist: Alemayehu Eshete, pharyngeal spellings", "in": "ዐለማየሁ ዕሸቴ", "out": "አለማየሁ እሸቴ" },
+    { "name": "artist: Alemayehu Eshete, already in the folded form", "in": "አለማየሁ እሸቴ", "out": "አለማየሁ እሸቴ" },
+    { "name": "title: Hagere with the other ሀ spellings", "in": "ሐገሬ ኀገሬ ሀገሬ", "out": "ሀገሬ ሀገሬ ሀገሬ" },
+    { "name": "series that are not homophones are left alone", "in": "ሸኸጸጨቀከ", "out": "ሸኸጸጨቀከ" },
+    { "name": "labialized forms outside the series are left alone", "in": "ኈኋቈ", "out": "ኈኋቈ" },
+    { "name": "whitespace is collapsed and trimmed", "in": "  ጥላሁን \t ገሠሠ\n", "out": "ጥላሁን ገሰሰ" },
+    { "name": "no-break and ideographic spaces count as whitespace", "in": "ሰላም\u00a0\u3000ዓለም", "out": "ሰላም ኣለም" },
+    { "name": "a BOM is trimmed", "in": "\ufeffሰላም", "out": "ሰላም" },
+    { "name": "Ethiopic wordspace is not whitespace", "in": "ሰላም፡ዓለም", "out": "ሰላም፡ኣለም" },
+    { "name": "NFC composes combining marks in mixed text", "in": "ሰላም e\u0301", "out": "ሰላም é" }
+  ],
+  "latin": [
+    { "name": "empty", "in": "", "out": "" },
+    { "name": "lowercases", "in": "Tilahun Gessesse", "out": "tilahun gessesse" },
+    { "name": "all caps", "in": "TEDDY AFRO", "out": "teddy afro" },
+    { "name": "collapses and trims whitespace", "in": "  Mulatu   Astatke ", "out": "mulatu astatke" },
+    { "name": "tabs and newlines", "in": "Ephrem\tTamiru\n", "out": "ephrem tamiru" },
+    { "name": "precomposed diacritics", "in": "Mélaku Béyéné", "out": "melaku beyene" },
+    { "name": "decomposed diacritics", "in": "Me\u0301laku", "out": "melaku" },
+    { "name": "straight apostrophe", "in": "Ta'amrat", "out": "taamrat" },
+    { "name": "right single quote", "in": "Ta’amrat", "out": "taamrat" },
+    { "name": "left single quote", "in": "Ta‘amrat", "out": "taamrat" },
+    { "name": "modifier letter apostrophe", "in": "Taʼamrat", "out": "taamrat" },
+    { "name": "modifier letter turned comma", "in": "ʻAbebe", "out": "abebe" },
+    { "name": "backtick", "in": "Ta`amrat", "out": "taamrat" },
+    { "name": "acute accent character", "in": "Ta´amrat", "out": "taamrat" },
+    { "name": "dotted capital I", "in": "İstanbul", "out": "istanbul" },
+    { "name": "sharp s is kept", "in": "Straße", "out": "straße" },
+    { "name": "Fidel is left to the Fidel normalizer", "in": "ጥላሁን Gessesse", "out": "ጥላሁን gessesse" }
+  ],
+  "clean": [
+    { "name": "empty", "in": "", "out": "" },
+    { "name": "keeps the spelling, including homophones", "in": "  ጥላሁን   ገሠሠ ", "out": "ጥላሁን ገሠሠ" },
+    { "name": "keeps case and diacritics, composes them", "in": "Cafe\u0301", "out": "Café" },
+    { "name": "collapses runs of tabs", "in": "A\t\tB", "out": "A B" }
+  ]
+}

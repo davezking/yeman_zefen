@@ -271,7 +271,7 @@ describe("artists", () => {
     expect(survivorTracks.map((t) => t.id).sort()).toEqual([t1.id, t2.id, keep.id].sort());
     const aliases = await db(env).select().from(artistAliases).where(eq(artistAliases.artistId, into.id));
     expect(aliases.map((a) => a.aliasNorm).sort()).toEqual(
-      ["t. gessesse", "tilahun g", "ጥላሁን ገሠሠ", "tilahun gessesse"].sort(),
+      ["t. gessesse", "tilahun g", "ጥላሁን ገሰሰ", "tilahun gessesse"].sort(), // alias keys are folded
     );
 
     // nothing orphaned anywhere
