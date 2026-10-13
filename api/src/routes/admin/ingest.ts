@@ -326,10 +326,12 @@ ingestRoutes.post("/tracks", async (c) => {
     const genreIds = uniqueGenres.filter((g) => genreIdBySlug.has(g)).map((g) => genreIdBySlug.get(g)!);
     const unknownGenres = uniqueGenres.filter((g) => !genreIdBySlug.has(g));
     const existing = existingByUrl.get(rec.sourceUrl);
+    const edited = existing ? new Set<string>(JSON.parse(existing.admin_edited_fields) as string[]) : new Set<string>();
     // An admin override pins the era; ingest never reassigns it.
     const overridden = existing?.generation_overridden === 1;
-    // A missing scraped year means "no value", so the stored year (if any) still decides the era.
-    const year = rec.releaseYear ?? existing?.release_year ?? null;
+    // The era follows the year that will actually be stored: mirrors shouldReplace(), so a missing
+    // or admin-edited scraped year leaves the stored year (if any) to decide.
+    const year = rec.releaseYear !== null && !edited.has("releaseYear") ? rec.releaseYear : (existing?.release_year ?? null);
     const generationId = assignGeneration(year, generations)?.id ?? null;
 
     const flagItems = new Map<string, { reason: string; details: string | null }>();
@@ -348,7 +350,6 @@ ingestRoutes.post("/tracks", async (c) => {
       anyNew = true;
     } else {
       anyExisting = true;
-      const edited = new Set<string>(JSON.parse(existing.admin_edited_fields) as string[]);
       const incoming: Record<ScrapedField, unknown> = {
         titleAm: rec.titleAm, titleLatin: rec.titleLatin, album: rec.album, releaseYear: rec.releaseYear,
         artistId, durationMs: rec.durationMs, sourceAudioKey: rec.sourceAudioKey,

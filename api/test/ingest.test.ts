@@ -475,4 +475,23 @@ describe("era assignment on ingest", () => {
     expect((await trackByUrl(1)).generationId).toBe(MODERN);
     expect(await count("review_items")).toBe(0);
   });
+
+  it("derives the era from an admin-edited year, not the rejected scraped one", async () => {
+    const job = await makeJob("scrape");
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } });
+    const before = await trackByUrl(1);
+    // Admin corrects the year to 1985; the re-scrape's year must no longer touch the era.
+    await db(env)
+      .update(tracks)
+      .set({ releaseYear: 1985, generationId: EIGHTIES, adminEditedFields: JSON.stringify(["releaseYear"]) })
+      .where(eq(tracks.id, before.id));
+
+    const res = await json(
+      await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1, { releaseYear: 1975 })] } }),
+    );
+    expect(res.results[0].result).toBe("skipped");
+    const row = await trackByUrl(1);
+    expect(row.releaseYear).toBe(1985);
+    expect(row.generationId).toBe(EIGHTIES);
+  });
 });
