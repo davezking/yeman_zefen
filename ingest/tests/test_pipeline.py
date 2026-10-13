@@ -246,6 +246,37 @@ def test_a_real_run_needs_api_store_and_job_id(paths):
         Pipeline(FakeSource(1), **paths)
 
 
+# ---------------------------------------------------------------- dedupe
+
+def test_snapshot_is_fetched_once_and_duplicates_are_flagged_against_it(paths):
+    snapshot = {
+        "artists": [[1, "ጥላሁን ገሠሠ", ["tilahun gessesse"]]],
+        "tracks": [[10, 1, "ዘፈን 1", "Zefen 1", 200_000]],
+    }
+    src = FakeSource(posts={url(1): parsed(1), url(2): parsed(2)})  # post 1's "Zefen 1" matches track 10
+    p, api, _ = real_run(src, paths, api=FakeApi(snapshot=snapshot), batch_size=5)
+    p.run()
+    assert api.snapshot_calls == 1  # fetched once per run, not per record or batch
+    posted = {r["sourceUrl"]: r for b in api.posts for r in b}
+    dup = [f for f in posted[url(1)]["flags"] if f["reason"] == "possible_duplicate"]
+    assert dup and dup[0]["details"]["candidates"][0]["id"] == 10
+    assert not any(f["reason"] == "possible_duplicate" for f in posted[url(2)]["flags"])
+
+
+def test_within_batch_duplicate_is_flagged_across_batches(paths):
+    src = FakeSource(posts={
+        url(1): parsed(1, title_latin="Hiwot", title_amharic="ሕይወት"),
+        url(2): parsed(2, title_latin="Hiwot", title_amharic="ሕይወት"),  # same artist + song, later post
+    })
+    p, api, _ = real_run(src, paths, batch_size=1)  # separate batches: the index must persist across them
+    p.run()
+    posted = {r["sourceUrl"]: r for b in api.posts for r in b}
+    assert not any(f["reason"] == "possible_duplicate" for f in posted[url(1)]["flags"])
+    dup = [f for f in posted[url(2)]["flags"] if f["reason"] == "possible_duplicate"]
+    assert dup and dup[0]["details"]["candidates"][0]["sourceUrl"] == url(1)
+    assert p.stats.flagged >= 1
+
+
 # ---------------------------------------------------------------- records
 
 

@@ -93,6 +93,13 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
   from the Latin generated from the Fidel by a normalized edit distance over 0.3 (after ignoring doubled letters,
   q/k and ph/f), it is flagged, so a wrong pairing or a translated title lands in the queue. The source Latin is
   always kept as an alias of the artist.
+- **Duplicate detection** (`yz/dedupe.py`): before posting, a real run fetches `GET /admin/ingest/catalog-snapshot`
+  once and checks each record against it and against earlier records in the same run. It never merges:
+  an exact normalized match (homophones folded) is the same artist, but a fuzzy artist match (edit-distance
+  ratio ≥ 0.85, token-order-insensitive) or a matching track title (≥ 0.9, within the resolved artist) only
+  adds a `possible_duplicate` review item with candidate IDs and scores. Live/remix/cover titles are flagged
+  with a `variant_of` hint; a duration gap over 15% lowers the score. Thresholds are tunable constants at the
+  top of `dedupe.py`. A dry run has no snapshot, so it only finds within-batch duplicates.
 - **Re-runs are cheap**: audio already in R2 with the size the site reports is neither downloaded nor
   re-uploaded, and the API treats a repeated batch as a no-op.
 - **Resume**: after each posted batch the last URL goes to `ethiozeima_data/checkpoint.json`. A re-run after

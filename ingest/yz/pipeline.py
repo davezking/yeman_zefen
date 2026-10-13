@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Protocol
 
 from .api_client import MAX_BATCH
-from .dedupe import flag_duplicates
+from .dedupe import Snapshot, flag_duplicates
 from .normalize import normalize_record
 from .storage import source_key
 from .transliterate import transliterate_record
@@ -149,6 +149,7 @@ class Pipeline:
         self.batch_size = max(1, min(batch_size, MAX_BATCH))
         self.resume = resume
         self.stats = RunStats()
+        self._dedupe = Snapshot()  # catalog + this run's records; replaced at the start of run()
 
     # ------------------------------------------------------------------ run
 
@@ -156,6 +157,9 @@ class Pipeline:
         if not self.dry_run:
             self.api.set_job_status(self.job_id, "running", gh_run_url=self.gh_run_url)
         try:
+            if not self.dry_run:
+                # Fetched inside the try so a snapshot failure marks the job failed, not stuck running.
+                self._dedupe = Snapshot.from_api(self.api.get_catalog_snapshot())
             self._process()
         except Exception as exc:
             log.error("run failed: %s", exc)
@@ -264,7 +268,7 @@ class Pipeline:
     # ----------------------------------------------------------------- flush
 
     def _flush(self, batch: list[dict], last_url: str) -> None:
-        batch = flag_duplicates(batch)
+        batch = flag_duplicates(batch, self._dedupe)
         self.stats.flagged += sum(1 for r in batch if r["flags"])
         if self.dry_run:
             with open(self.out_path, "a", encoding="utf-8") as f:

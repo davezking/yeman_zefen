@@ -67,7 +67,7 @@ class ApiClient:
 
     # ------------------------------------------------------------- transport
 
-    def _request(self, method: str, path: str, body: dict) -> dict:
+    def _request(self, method: str, path: str, body: dict | None = None) -> dict:
         """Send JSON, retrying network errors, 408/425/429 and 5xx with exponential backoff.
         Every ingest write is idempotent, so a retry after a lost response is safe."""
         url = f"{self.base_url}{path}"
@@ -76,7 +76,9 @@ class ApiClient:
             retry_after = 0.0
             try:
                 # No redirects: an invalid Access token is answered with a redirect to a login page.
-                resp = self.session.request(method, url, json=body, timeout=self.timeout, allow_redirects=False)
+                resp = self.session.request(
+                    method, url, json=body if body is not None else None, timeout=self.timeout, allow_redirects=False
+                )
             except requests.RequestException as exc:
                 last = exc
             else:
@@ -123,6 +125,10 @@ class ApiClient:
         for key in merged["counts"]:
             merged["counts"][key] += data.get("counts", {}).get(key, 0)
         merged["results"].extend(data.get("results", []))
+
+    def get_catalog_snapshot(self) -> dict:
+        """The catalog as `GET /admin/ingest/catalog-snapshot` returns it (for client-side dedupe)."""
+        return self._request("GET", "/admin/ingest/catalog-snapshot")
 
     def set_job_status(
         self, job_id: int, status: str, *, summary: dict | None = None, gh_run_url: str | None = None
