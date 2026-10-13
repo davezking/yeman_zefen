@@ -62,7 +62,7 @@ def parsed(i, **over):
     """What the legacy parse_post returns for a well-formed post."""
     post = {
         "artist_latin": "Tilahun Gessesse", "artist_amharic": "ጥላሁን ገሠሠ",
-        "title_latin": f"Song {i}", "title_amharic": f"ዘፈን {i}",
+        "title_latin": f"Zefen {i}", "title_amharic": f"ዘፈን {i}",
         "album": "Greatest Hits", "year": "1975",
         "source_url": url(i), "mp3_url": f"https://ethiozeima.com/audio/song-{i}.mp3",
         "local_audio_path": "", "clip_start_time": "",

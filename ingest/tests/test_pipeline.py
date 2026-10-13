@@ -122,13 +122,50 @@ def test_failed_audio_download_is_flagged_and_counted_but_the_track_is_still_sen
     assert (stats.errors, stats.flagged, s3.puts) == (1, 1, [])
 
 
-def test_post_without_a_fidel_artist_is_skipped_not_sent(paths):
-    src = FakeSource(posts={url(1): parsed(1, artist_amharic=""), url(2): parsed(2)})
+def test_post_with_no_artist_name_at_all_is_skipped_not_sent(paths):
+    src = FakeSource(posts={url(1): parsed(1, artist_amharic="", artist_latin=""), url(2): parsed(2)})
     p, api, _ = real_run(src, paths)
     stats = p.run()
     assert [r["sourceUrl"] for b in api.posts for r in b] == [url(2)]
     assert stats.errors == 1 and "no Fidel artist" in stats.error_samples[0]
     assert api.statuses[-1][0] == "succeeded"
+
+
+def test_post_with_only_a_latin_artist_gets_fidel_generated_and_is_flagged(paths):
+    src = FakeSource(posts={url(1): parsed(1, artist_amharic="")})
+    p, api, _ = real_run(src, paths)
+    stats = p.run()
+    record = api.posts[0][0]
+    assert record["artistAm"] == "ቲላሁን ገሰሰ" and record["artistLatin"] == "Tilahun Gessesse"
+    assert "Tilahun Gessesse" in record["artistAliases"]
+    flag = record["flags"][0]
+    assert flag["reason"] == "translit_uncertain" and flag["details"]["field"] == "artist"
+    assert (stats.flagged, stats.errors) == (1, 0)
+
+
+def test_post_with_only_fidel_gets_latin_generated(paths):
+    src = FakeSource(posts={url(1): parsed(1, artist_latin="", title_latin="")})
+    p, api, _ = real_run(src, paths)
+    stats = p.run()
+    record = api.posts[0][0]
+    assert (record["artistLatin"], record["titleLatin"]) == ("tilahun gesese", "zefen 1") and record["flags"] == []
+    assert stats.flagged == 0
+
+
+def test_mismatched_latin_title_is_flagged_but_still_sent_as_scraped(paths):
+    src = FakeSource(posts={url(1): parsed(1, title_latin="Love Song")})
+    p, api, _ = real_run(src, paths)
+    stats = p.run()
+    record = api.posts[0][0]
+    assert record["titleLatin"] == "Love Song" and record["flags"][0]["details"]["field"] == "title"
+    assert stats.flagged == 1
+
+
+def test_names_are_cleaned_but_not_folded_before_sending(paths):
+    src = FakeSource(posts={url(1): parsed(1, artist_amharic="  ጥላሁን   ገሠሠ ")})
+    p, api, _ = real_run(src, paths)
+    p.run()
+    assert api.posts[0][0]["artistAm"] == "ጥላሁን ገሠሠ"  # spelling kept; the API folds its own key
 
 
 def test_unfetchable_post_is_counted_and_the_run_continues(paths):

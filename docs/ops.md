@@ -87,6 +87,12 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
   A post that cannot be fetched or has no Fidel artist name counts as an error and is skipped; a post
   with no MP3, or whose download fails, is still sent, flagged `missing_audio`. Storage or API failures
   fail the whole job.
+- **Transliteration** (`yz/transliterate.py`): a post with only one script gets the other generated.
+  Fidel -> Latin is deterministic (ሰላም -> `selam`). Latin -> Fidel is a guess with a confidence; below 0.8 the
+  track gets a `translit_uncertain` review item. A post with both scripts is checked too: if the Latin differs
+  from the Latin generated from the Fidel by a normalized edit distance over 0.3 (after ignoring doubled letters,
+  q/k and ph/f), it is flagged, so a wrong pairing or a translated title lands in the queue. The source Latin is
+  always kept as an alias of the artist.
 - **Re-runs are cheap**: audio already in R2 with the size the site reports is neither downloaded nor
   re-uploaded, and the API treats a repeated batch as a no-op.
 - **Resume**: after each posted batch the last URL goes to `ethiozeima_data/checkpoint.json`. A re-run after
