@@ -1,6 +1,7 @@
 // Cloudflare's Free plan allows 50 D1 queries per Worker invocation, and every statement in a
 // batch() counts. These tests pin the ingest endpoints to a query count that does NOT grow with
 // the number of records in the request.
+import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { makeArtist, makeJob, makeTrack, installTestJwks, removeTestJwks, resetCatalog, seedAdmins, svcWithQueryCount } from "./helpers";
 
@@ -93,5 +94,21 @@ describe("POST /admin/ingest/clips stays within the cap", () => {
     const again = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, clips });
     expect((await again.response.json() as any).counts).toEqual({ created: 0, updated: 0, skipped: 100 });
     expect(again.queries).toBeLessThanOrEqual(12);
+  });
+});
+
+// Rows read also count against the daily quota, so per-entity lookups must use an index instead of
+// scanning every open review item.
+describe("review item lookups use the entity index", () => {
+  const plan = async (sql: string) =>
+    (await env.DB.prepare(`EXPLAIN QUERY PLAN ${sql}`).all<{ detail: string }>()).results.map((r) => r.detail).join(" | ");
+
+  it("de-duplication check and a track's open items", async () => {
+    const dedupe = await plan(
+      `SELECT 1 FROM review_items r WHERE r.entity_type = 'track' AND r.entity_id = 5 AND r.status = 'open' AND r.reason = 'era_unknown' AND r.details_json IS NULL`,
+    );
+    expect(dedupe).toMatch(/review_items_entity_idx/);
+    const forTrack = await plan(`SELECT * FROM review_items WHERE entity_type = 'track' AND entity_id = 5 AND status = 'open'`);
+    expect(forTrack).toMatch(/review_items_entity_idx/);
   });
 });

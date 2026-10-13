@@ -1,0 +1,1 @@
+CREATE INDEX `review_items_entity_idx` ON `review_items` (`entity_type`,`entity_id`);
