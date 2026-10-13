@@ -153,6 +153,8 @@ export const reviewItems = sqliteTable(
   },
   (t) => [
     index("review_items_status_reason_idx").on(t.status, t.reason),
+    // Per-entity lookups (ingest de-duplication, a track's open items) must not scan the whole queue.
+    index("review_items_entity_idx").on(t.entityType, t.entityId),
     check("review_items_reason_check", inList("reason", REVIEW_REASONS)),
     check("review_items_status_check", inList("status", REVIEW_STATUSES)),
   ],

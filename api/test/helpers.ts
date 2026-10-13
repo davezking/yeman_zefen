@@ -129,3 +129,60 @@ export async function resetCatalog(): Promise<void> {
     ].map((t) => env.DB.prepare(`DELETE FROM ${t}`)),
   );
 }
+
+/**
+ * Wraps a D1 binding and counts every statement that reaches D1. Cloudflare's Free plan caps
+ * queries per Worker invocation (50), and each statement inside a batch() counts.
+ */
+export function countingDb(real: D1Database) {
+  const counter = { queries: 0 };
+  class CountedStatement {
+    constructor(readonly inner: D1PreparedStatement) {}
+    bind(...values: unknown[]) {
+      return new CountedStatement(this.inner.bind(...values));
+    }
+    run() {
+      counter.queries++;
+      return this.inner.run();
+    }
+    all() {
+      counter.queries++;
+      return this.inner.all();
+    }
+    first(column?: string) {
+      counter.queries++;
+      return column === undefined ? this.inner.first() : this.inner.first(column);
+    }
+    raw(options?: { columnNames?: boolean }) {
+      counter.queries++;
+      return this.inner.raw(options as { columnNames: true });
+    }
+  }
+  const wrapped = {
+    prepare: (query: string) => new CountedStatement(real.prepare(query)),
+    batch: (statements: CountedStatement[]) => {
+      counter.queries += statements.length;
+      return real.batch(statements.map((s) => s.inner));
+    },
+  } as unknown as D1Database;
+  return { db: wrapped, counter };
+}
+
+/** Call the app directly with a counting DB (as the ingest service token) and report how many D1 queries it used. */
+export async function svcWithQueryCount(
+  path: string,
+  body: unknown,
+): Promise<{ response: Response; queries: number }> {
+  const { default: app } = await import("../src/index");
+  const { db, counter } = countingDb(env.DB);
+  const jwt = await signAccessJwt({ common_name: SERVICE_ID });
+  const response = await app.fetch(
+    new Request(`https://api.test${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [ACCESS_HEADER]: jwt },
+      body: JSON.stringify(body),
+    }),
+    { ...env, DB: db },
+  );
+  return { response, queries: counter.queries };
+}

@@ -60,8 +60,22 @@ For client-side dedupe. Positional arrays, named by `columns`:
 `artists: [id, name_am, alias_norms[]]`, `tracks: [id, artist_id, title_am, title_latin, duration_ms]`.
 About 240 KB for 2,000 tracks and 400 artists.
 
-## D1 limits worth remembering
+## D1 query budget (Cloudflare Free plan)
 
-D1 allows 100 bound parameters per statement, so multi-row inserts are chunked, and writes go
-through `env.DB.batch` in chunks of 100 statements. A 100-record request is a handful of
-round trips. If the Free plan's per-invocation query cap ever bites, lower the batch size.
+The Free plan allows **50 D1 queries per Worker invocation**, and **every statement inside a
+`batch()` counts**. So a request must cost the same whether it carries 1 record or 100.
+
+Both write endpoints therefore send their records to D1 as **one JSON bound parameter** and expand
+it with `json_each()` in set-based `INSERT ... SELECT` / `UPDATE ... FROM` statements:
+
+| Request | D1 queries |
+|---|---|
+| `POST /tracks`, 1, 10 or 100 new records | 15 |
+| `POST /tracks`, 100 re-sent or re-scraped records | 13 |
+| `POST /clips`, any number up to 100 | 5 |
+
+`test/queryBudget.test.ts` counts the statements that reach D1 and fails if a request goes over
+30 (tracks) or 12 (clips), or if the cost starts growing with the number of records.
+
+Other D1 limits that shaped this: 100 bound parameters per statement (passing the payload as one
+JSON parameter sidesteps it) and a 2 MB limit per value (requests over 1 MB are rejected with 413).
