@@ -106,6 +106,22 @@ export function requireAdmin(roles: readonly AdminRole[] = ADMIN_ROLES): Middlew
 }
 
 /**
+ * Narrow an already-authenticated admin route to specific roles. Must run after
+ * `requireAdmin()` (which sets the context); with no admin on the context it is a 401,
+ * so it can never grant access on its own.
+ */
+export function requireRole(...roles: readonly AdminRole[]): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    const admin = c.get("admin");
+    if (!admin) throw new ApiError(401, "unauthorized", "Not authenticated");
+    if (!roles.includes(admin.role)) {
+      throw new ApiError(403, "forbidden", `Requires role: ${roles.join(" or ")}`);
+    }
+    await next();
+  };
+}
+
+/**
  * Require the ingest service token. The verified JWT's `common_name` must equal
  * `INGEST_SERVICE_CLIENT_ID`. Human (email) tokens never satisfy this.
  */

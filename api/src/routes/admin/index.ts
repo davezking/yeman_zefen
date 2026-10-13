@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../env";
 import { requireAdmin, requireService } from "../../lib/accessAuth";
+import { catalog } from "./catalog";
 
 // Human-authenticated admin routes. The requireAdmin middleware guards every
 // route registered here.
@@ -9,6 +10,7 @@ human.use("*", requireAdmin());
 
 // Temporary: echoes the authenticated admin. Removed once real admin routes land.
 human.get("/whoami", (c) => c.json({ admin: c.get("admin") }));
+human.route("/", catalog);
 
 // Service-token routes for GitHub Actions ingestion. requireService guards these.
 const ingest = new Hono<AppEnv>();

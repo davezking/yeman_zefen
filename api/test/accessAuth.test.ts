@@ -1,58 +1,19 @@
-import { env, exports } from "cloudflare:workers";
-import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
+import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../src/db/client";
-import { adminUsers } from "../src/db/schema";
-import { __setTestKeyResolver, ACCESS_HEADER } from "../src/lib/accessAuth";
+import { installTestJwks, rawRequest, removeTestJwks, seedAdmins, SERVICE_ID, signAccessJwt } from "./helpers";
 
-const TEAM = "https://yz.cloudflareaccess.com";
-const AUD = "test-access-aud";
-const SERVICE_ID = "test-service.client";
-
-let privateKey: CryptoKey;
-
-type Claims = { email?: string; common_name?: string };
-
-async function token(
-  claims: Claims,
-  opts: { iss?: string; aud?: string; expiresIn?: string | number; kid?: string } = {},
-): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const exp = opts.expiresIn ?? "1h";
-  const jwt = new SignJWT({ ...claims })
-    .setProtectedHeader({ alg: "RS256", kid: opts.kid ?? "test-key" })
-    .setIssuedAt(now)
-    .setIssuer(opts.iss ?? TEAM)
-    .setAudience(opts.aud ?? AUD);
-  if (typeof exp === "number") jwt.setExpirationTime(exp);
-  else jwt.setExpirationTime(exp);
-  return jwt.sign(privateKey);
-}
+const token = signAccessJwt;
 
 function req(path: string, jwt?: string): Promise<Response> {
-  const headers = new Headers();
-  if (jwt) headers.set(ACCESS_HEADER, jwt);
-  return exports.default.fetch(new Request(`https://api.test${path}`, { headers }));
+  return rawRequest(path, { jwt });
 }
 
 beforeAll(async () => {
-  const pair = await generateKeyPair("RS256", { extractable: true });
-  privateKey = pair.privateKey;
-  const jwk = await exportJWK(pair.publicKey);
-  jwk.kid = "test-key";
-  jwk.alg = "RS256";
-  __setTestKeyResolver(createLocalJWKSet({ keys: [jwk] }));
-
-  await db(env)
-    .insert(adminUsers)
-    .values([
-      { email: "admin@yz.test", role: "admin", createdAt: Date.now() },
-      { email: "editor@yz.test", role: "editor", createdAt: Date.now() },
-    ])
-    .onConflictDoNothing();
+  await installTestJwks();
+  await seedAdmins();
 });
 
-afterAll(() => __setTestKeyResolver(null));
+afterAll(() => removeTestJwks());
 
 describe("requireAdmin on /admin/whoami", () => {
   it("accepts a valid admin token", async () => {
