@@ -25,6 +25,7 @@ The architecture doc is `docs/architecture.md`. Read only the section a task nam
 - Timestamps are integer epoch milliseconds, UTC.
 - Errors are always `{ "error": { "code": "snake_case", "message": "..." } }`. Throw `ApiError` from `api/src/lib/errors.ts`.
 - No secrets in code or `wrangler.toml`. Use `wrangler secret put` and `api/.dev.vars` (gitignored).
+- D1 query budget: the Free plan allows 50 D1 queries per request and each statement in a `batch()` counts, so a request's query count must not grow with the number of records. Use set-based SQL (`json_each`) for bulk writes. See `docs/ingest-api.md` and `test/queryBudget.test.ts`.
 - Python: standard library + `requests`/`beautifulsoup4`. Keep the scripts runnable directly.
 
 ## Git workflow
