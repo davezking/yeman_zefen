@@ -18,6 +18,7 @@ import { z } from "zod";
 import { db } from "../../db/client";
 import { artistAliases, artists, CLIP_TYPES, INGEST_KINDS, INGEST_STATUSES, ingestJobs, REVIEW_REASONS, tracks } from "../../db/schema";
 import type { AppEnv, Bindings } from "../../env";
+import { assignGeneration } from "../../lib/era";
 import { ApiError } from "../../lib/errors";
 import { normalizeAlias, normalizeFidel } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
@@ -140,6 +141,8 @@ type TrackRow = {
   title_latin: string | null;
   album: string | null;
   release_year: number | null;
+  generation_id: number | null;
+  generation_overridden: number;
   duration_ms: number | null;
   source_audio_key: string | null;
   status: string;
@@ -158,24 +161,28 @@ const shouldReplace = (field: ScrapedField) => {
   return `(n.${col} IS NOT NULL AND n.${col} IS NOT tracks.${col} AND NOT ${adminEdited(field)})`;
 };
 
+/** Era is derived from release_year, so it follows the year; an admin override pins it. */
+const GENERATION_CHANGED = "(tracks.generation_overridden = 0 AND tracks.generation_id IS NOT n.generation_id)";
+
 const UPDATE_EXISTING_TRACKS_SQL = `
   UPDATE tracks SET
     ${SCRAPED_FIELDS.map((f) => `${COLUMN[f]} = CASE WHEN ${shouldReplace(f)} THEN n.${COLUMN[f]} ELSE tracks.${COLUMN[f]} END`).join(",\n    ")},
+    generation_id = CASE WHEN tracks.generation_overridden = 0 THEN n.generation_id ELSE tracks.generation_id END,
     updated_at = ?2
   FROM (
-    SELECT json_extract(t.value, '$.url') AS url,
+    SELECT json_extract(t.value, '$.url') AS url, json_extract(t.value, '$.generationId') AS generation_id,
       ${SCRAPED_FIELDS.map((f) => `json_extract(t.value, '$.${f}') AS ${COLUMN[f]}`).join(",\n      ")}
     FROM json_each(?1, '$.tracks') t
   ) n
   WHERE tracks.source_url = n.url
-    AND (${SCRAPED_FIELDS.map(shouldReplace).join("\n      OR ")})`;
+    AND (${[...SCRAPED_FIELDS.map(shouldReplace), GENERATION_CHANGED].join("\n      OR ")})`;
 
 const INSERT_NEW_TRACKS_SQL = `
-  INSERT INTO tracks (artist_id, title_am, title_latin, album, release_year, source_url,
+  INSERT INTO tracks (artist_id, title_am, title_latin, album, release_year, generation_id, source_url,
                       source_audio_key, duration_ms, status, created_at, updated_at)
   SELECT json_extract(t.value, '$.artistId'), json_extract(t.value, '$.titleAm'),
          json_extract(t.value, '$.titleLatin'), json_extract(t.value, '$.album'),
-         json_extract(t.value, '$.releaseYear'), json_extract(t.value, '$.url'),
+         json_extract(t.value, '$.releaseYear'), json_extract(t.value, '$.generationId'), json_extract(t.value, '$.url'),
          json_extract(t.value, '$.sourceAudioKey'), json_extract(t.value, '$.durationMs'),
          json_extract(t.value, '$.newStatus'), ?2, ?2
   FROM json_each(?1, '$.tracks') t
@@ -230,12 +237,12 @@ ingestRoutes.post("/tracks", async (c) => {
   const urlsJson = JSON.stringify(recs.map((r) => r.sourceUrl));
   const keys = [...new Set(recs.map((r) => r.artistKey))];
 
-  // ---- Batch 1: every read this request needs (6 queries).
-  const [jobRes, trackRes, artistRes, genreRes, linkRes, openRes] = await runBatch(env, [
+  // ---- Batch 1: every read this request needs (7 queries).
+  const [jobRes, trackRes, artistRes, genreRes, linkRes, openRes, generationRes] = await runBatch(env, [
     env.DB.prepare(JOB_SQL).bind(body.jobId),
     env.DB.prepare(
-      `SELECT id, source_url, artist_id, title_am, title_latin, album, release_year, duration_ms,
-              source_audio_key, status, admin_edited_fields
+      `SELECT id, source_url, artist_id, title_am, title_latin, album, release_year, generation_id,
+              generation_overridden, duration_ms, source_audio_key, status, admin_edited_fields
        FROM tracks WHERE source_url IN (SELECT value FROM json_each(?1))`,
     ).bind(urlsJson),
     // A key is a known artist if it is an alias (the canonical name is stored as one) or a name_am.
@@ -254,6 +261,7 @@ ingestRoutes.post("/tracks", async (c) => {
        WHERE entity_type = 'track' AND status = 'open'
          AND entity_id IN (SELECT id FROM tracks WHERE source_url IN (SELECT value FROM json_each(?1)))`,
     ).bind(urlsJson),
+    env.DB.prepare("SELECT id, year_from AS yearFrom, year_to AS yearTo FROM generations ORDER BY sort"),
   ]);
   assertJobOpen((jobRes!.results as unknown as JobRow[])[0], body.jobId, ["scrape"]);
 
@@ -294,6 +302,7 @@ ingestRoutes.post("/tracks", async (c) => {
   // ---- Work out, in memory, what each record will do (also drives the response).
   const existingByUrl = new Map((trackRes!.results as unknown as TrackRow[]).map((t) => [t.source_url, t]));
   const genreIdBySlug = new Map((genreRes!.results as { id: number; slug: string }[]).map((g) => [g.slug, g.id]));
+  const generations = generationRes!.results as { id: number; yearFrom: number | null; yearTo: number | null }[];
   const linksByTrack = new Map<number, Set<number>>();
   for (const l of linkRes!.results as { track_id: number; genre_id: number }[]) {
     linksByTrack.set(l.track_id, (linksByTrack.get(l.track_id) ?? new Set()).add(l.genre_id));
@@ -316,15 +325,23 @@ ingestRoutes.post("/tracks", async (c) => {
     const uniqueGenres = [...new Set(rec.genres)];
     const genreIds = uniqueGenres.filter((g) => genreIdBySlug.has(g)).map((g) => genreIdBySlug.get(g)!);
     const unknownGenres = uniqueGenres.filter((g) => !genreIdBySlug.has(g));
+    const existing = existingByUrl.get(rec.sourceUrl);
+    // An admin override pins the era; ingest never reassigns it.
+    const overridden = existing?.generation_overridden === 1;
+    // A missing scraped year means "no value", so the stored year (if any) still decides the era.
+    const year = rec.releaseYear ?? existing?.release_year ?? null;
+    const generationId = assignGeneration(year, generations)?.id ?? null;
+
     const flagItems = new Map<string, { reason: string; details: string | null }>();
     for (const f of rec.flags) {
       const details = f.details ? stableJson(f.details) : null;
       flagItems.set(`${f.reason}|${details ?? ""}`, { reason: f.reason, details });
     }
+    // Missing year or no matching era: leave the era null and ask a human to pick one.
+    if (!overridden && generationId === null) flagItems.set("era_unknown|", { reason: "era_unknown", details: null });
     if (genreIds.length > 0) anyGenre = true;
     if (flagItems.size > 0) anyFlag = true;
 
-    const existing = existingByUrl.get(rec.sourceUrl);
     let outcome: Result["result"];
     if (!existing) {
       outcome = "created";
@@ -340,16 +357,18 @@ ingestRoutes.post("/tracks", async (c) => {
       const changed = SCRAPED_FIELDS.some(
         (f) => incoming[f] !== null && !edited.has(f) && existing[COLUMN[f] as keyof TrackRow] !== incoming[f],
       );
+      // Mirrors GENERATION_CHANGED in SQL.
+      const eraChanged = !overridden && existing.generation_id !== generationId;
       const links = linksByTrack.get(existing.id);
       const newGenres = genreIds.some((g) => !links?.has(g));
       const open = openByTrack.get(existing.id);
       const newFlags = [...flagItems.keys()].some((k) => !open?.has(k));
-      outcome = changed || newGenres || newFlags ? "updated" : "skipped";
+      outcome = changed || eraChanged || newGenres || newFlags ? "updated" : "skipped";
     }
 
     payloadTracks.push({
       url: rec.sourceUrl, artistId, titleAm: rec.titleAm, titleLatin: rec.titleLatin, album: rec.album,
-      releaseYear: rec.releaseYear, durationMs: rec.durationMs, sourceAudioKey: rec.sourceAudioKey,
+      releaseYear: rec.releaseYear, generationId, durationMs: rec.durationMs, sourceAudioKey: rec.sourceAudioKey,
       newStatus: flagItems.size > 0 ? "needs_review" : "ingested",
       genreIds, flags: [...flagItems.values()],
     });

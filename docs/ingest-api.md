@@ -36,6 +36,9 @@ Rules:
 - **Re-scrapes** fill and refresh scraped fields but never null a value out and never touch a
   field an admin edited (`tracks.admin_edited_fields`, recorded by `PATCH /admin/tracks/:id`).
   Status is left alone, except `ingested` becomes `needs_review` when a new flag arrives.
+- **Era** is derived from the release year (`api/src/lib/era.ts`), using the stored year when the
+  scrape has none. Tracks with `generation_overridden = 1` are never reassigned. A missing year or
+  one that matches no generation leaves the era null and adds an `era_unknown` review item.
 - **Review items**: one per flag; skipped when an identical (reason + details) item is already open.
 - **Genres** are slugs from the `genres` table; unknown slugs are ignored and echoed back as `unknownGenres`.
 - Sending the same batch again returns `skipped` for every record and changes nothing.
