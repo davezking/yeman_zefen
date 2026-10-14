@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: message screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.55}
+.sun{background:radial-gradient(60% 50% at 50% 50%,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.badge{width:120px;height:120px;border-radius:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 0 rgba(0,0,0,.12),0 0 0 10px rgba(255,255,255,.3),inset 0 16px 20px rgba(255,255,255,.35)}
+.btnY{min-height:58px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:17px;font-weight:800;box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.4),inset 0 2px 0 rgba(255,255,255,.6);width:100%}
+.btnW{min-height:54px;border:0;border-radius:18px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);color:#2B2118;font:inherit;font-size:15px;font-weight:700;box-shadow:0 5px 0 #EDE3D2,0 10px 20px rgba(43,33,24,.08);width:100%}
+.lnk{min-height:48px;border:0;background:transparent;color:#2B2118;font:inherit;font-size:15px;font-weight:600;text-decoration:underline;width:100%}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="height: 360px; flex: none; border-radius: 0 0 44px 44px; box-shadow: 0 14px 30px rgba(255,176,46,.35); position: relative; z-index: 1; display: flex; align-items: center; justify-content: center">
+<div class="badge" aria-hidden="true" style="background: {{L.badgeBg}}"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2B2118" stroke-width="1.8" aria-hidden="true"><path d="{{L.icon}}"></path></svg></div>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 32px 22px 22px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px)">
+<h1 style="margin: 0; font-size: 24px; font-weight: 800; line-height: 1.35">{{L.title}}</h1>
+<p style="margin: 0; font-size: 15px; color: #4A3B2E">{{L.body}}</p>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px">
+<button class="btnY">{{L.primary}}</button>
+<sc-if value="{{L.secondary}}" hint-placeholder-val="{{ true }}"><button class="btnW">{{L.secondary}}</button></sc-if>
+<sc-if value="{{L.link}}" hint-placeholder-val="{{ false }}"><button class="lnk">{{L.link}}</button></sc-if>
+</div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","options":["consent","update","outofsongs"],"default":"consent"},"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const v = this.props.variant || 'consent';
+const ICON = { consent: 'M12 21s-7-4.4-9.3-9A5.2 5.2 0 0112 6.5 5.2 5.2 0 0121.3 12C19 16.6 12 21 12 21z', update: 'M12 3v12M7 10l5 5 5-5M4 17v3h16v-3', outofsongs: 'M17 2l4 4-4 4M3 11V9a3 3 0 013-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 01-3 3H3' };
+const BG = { consent: '#F0563A', update: '#FFFFFF', outofsongs: '#C9B8EC' };
+const T = {
+  consent: { en: { cap: 'after the first finished game', title: 'Ads keep this game free', body: "Next, you'll choose how ads may use your data. You can change this anytime in Settings.", primary: 'Continue', secondary: '', link: '' },
+             am: { cap: 'after the first finished game', title: 'ጨዋታው ነፃ የሆነው በማስታወቂያ ነው', body: 'በመቀጠል ማስታወቂያዎች መረጃዎን እንዴት እንደሚጠቀሙ ይመርጣሉ። ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።', primary: 'ይቀጥሉ', secondary: '', link: '' } },
+  update: { en: { cap: 'Android · below the minimum version', title: 'Time to update', body: "This version can't connect to the game server anymore. Update to use the leaderboard and get new songs.", primary: 'Update on Google Play', secondary: 'Play offline songs', link: '' },
+            am: { cap: 'Android · below the minimum version', title: 'ማዘመን ያስፈልጋል', body: 'ይህ ስሪት ከጨዋታው አገልጋይ ጋር መገናኘት አይችልም። የደረጃ ሰንጠረዡን ለመጠቀምና አዲስ ዘፈኖችን ለማግኘት ያዘምኑ።', primary: 'በGoogle Play ያዘምኑ', secondary: 'ያለ ኢንተርኔት ዘፈኖች ይጫወቱ', link: '' } },
+  outofsongs: { en: { cap: 'offline · all songs played recently', title: "You've played every song here", body: "You're offline, and you've heard all the songs on this phone recently. Download a pack in Settings › Offline play for more.", primary: 'Browse packs', secondary: 'Play them again', link: '' },
+                am: { cap: 'offline · all songs played recently', title: 'እዚህ ያሉትን ዘፈኖች በሙሉ ተጫውተዋል', body: 'ከኢንተርኔት ውጭ ነዎት፤ በዚህ ስልክ ላይ ያሉትን ዘፈኖች በሙሉ በቅርቡ ሰምተዋል። ለተጨማሪ ዘፈኖች በቅንብሮች › ያለ ኢንተርኔት መጫወት ውስጥ ጥቅል ያውርዱ።', primary: 'ጥቅሎችን ይመልከቱ', secondary: 'ዘፈኖቹን እንደገና ይጫወቱ', link: '' } }
+};
+const mk = (l, name) => Object.assign({}, T[v][l], { code: l, cap: name + ' · ' + T[v][l].cap, icon: ICON[v], badgeBg: BG[v] });
+return { langs: [mk('en', 'English'), mk('am', 'Amharic')] };
+}
+}
+</script>
+</body>
+</html>

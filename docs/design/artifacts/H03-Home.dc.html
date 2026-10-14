@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.55}
+.sun{background:radial-gradient(70% 55% at 50% 62%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.tile{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:800;box-shadow:0 3px 0 rgba(0,0,0,.12),inset 0 8px 10px rgba(255,255,255,.38)}
+.row{min-height:64px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 5px 0 #EDE3D2,0 10px 22px rgba(43,33,24,.08);display:flex;align-items:center;gap:12px;padding:8px 14px 8px 10px;font:inherit;color:#2B2118;text-align:left;width:100%}
+.ic{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:inset 0 10px 12px rgba(255,255,255,.38)}
+.sq{width:52px;height:52px;border-radius:18px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 5px 0 #EDE3D2,0 8px 20px rgba(43,33,24,.08);flex:none}
+.sq.on{background:#2B2118;color:#FFC93C;box-shadow:0 5px 0 #120D09}
+.bar{background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,#FFFFFF 45%);border-radius:36px 36px 0 0;box-shadow:0 -10px 26px rgba(255,169,77,.28);padding:14px 26px 20px;display:flex;align-items:center;justify-content:space-between;flex:none}
+.play{min-width:140px;height:62px;border-radius:22px;border:0;font:inherit;font-size:18px;font-weight:800;color:#2B2118;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.45),inset 0 2px 0 rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;gap:8px}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="flex: none; border-radius: 0 0 44px 44px; box-shadow: 0 14px 30px rgba(255,176,46,.35); position: relative; z-index: 1; padding: 30px 20px 26px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 4px" aria-label="{{L.appName}}" role="img"><span class="tile" style="background: #FFFFFF">የ</span><span class="tile" style="background: #7FB5A8">ማ</span><span class="tile" style="background: #FFFFFF">ን</span><span style="width: 6px"></span><span class="tile" style="background: #F0563A">ዘ</span><span class="tile" style="background: #FFFFFF">ፈ</span><span class="tile" style="background: #E3C9A0">ን</span></div>
+<sc-if value="{{L.offline}}" hint-placeholder-val="{{ false }}"><div role="status" style="display: flex; gap: 8px; align-items: center; background: #2B2118; color: #FFF3D1; border-radius: 14px; padding: 8px 12px; font-size: 12px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" aria-hidden="true" style="flex: none"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"></path></svg><span>{{L.banner}}</span></div></sc-if>
+<div style="font-size: 24px; font-weight: 800; line-height: 1.3">{{L.hello}}</div>
+<div style="display: flex; gap: 10px">
+<div style="flex: 1; background: rgba(255,255,255,.7); border-radius: 18px; padding: 10px 14px; display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 600; color: #4A3B2E">{{L.bestLabel}}</span><span style="font-family: 'Poppins', sans-serif; font-size: 22px; font-weight: 800">1,240</span></div>
+<div style="flex: 1; background: rgba(255,255,255,.7); border-radius: 18px; padding: 10px 14px; display: flex; flex-direction: column"><span style="font-size: 12px; font-weight: 600; color: #4A3B2E">{{L.lastLabel}}</span><span style="font-size: 15px; font-weight: 700; line-height: 1.3">{{L.last}}</span></div>
+</div>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 28px 18px 14px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px)">
+<div style="font-size: 15px; font-weight: 800">{{L.more}}</div>
+<sc-for list="{{L.modes}}" as="m" hint-placeholder-count="3">
+<button class="row"><span class="ic" style="background: {{m.color}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B2118" stroke-width="2" aria-hidden="true"><path d="{{m.icon}}"></path></svg></span><span style="flex: 1; display: flex; flex-direction: column; min-width: 0"><span style="font-weight: 700">{{m.name}}</span><span style="font-size: 12px; color: #4A3B2E">{{m.desc}}</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+</sc-for>
+<button class="row" style="background: linear-gradient(180deg, #2E3D39 0%, #2B2118 100%); color: #FFF3D1; box-shadow: 0 5px 0 #120D09, 0 10px 22px rgba(43,33,24,.2)"><span class="ic" style="background: #FFC93C"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B2118" stroke-width="2" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3"></path></svg></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 700">{{L.lb}}</span><span style="font-size: 12px; color: #E3C9A0">{{L.lbSub}}</span></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+</div>
+<nav class="bar">
+<button class="sq on" aria-label="{{L.navHome}}" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg></button>
+<button class="play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>{{L.play}}</button>
+<button class="sq" aria-label="{{L.navSettings}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></button>
+</nav>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","options":["online","offline"],"default":"online"},"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const I = { intro: 'M9 18V5l12-2v13M6 21a3 3 0 100-6 3 3 0 000 6zM18 19a3 3 0 100-6 3 3 0 000 6z', mid: 'M3 12h3l3-8 4 16 3-8h5', era: 'M12 7v5l3 2M12 21a9 9 0 100-18 9 9 0 000 18z' };
+const off = this.props.variant === 'offline';
+const OFF = {
+  en: { cap: 'English · offline · no packs downloaded', banner: "You're offline. You can still play the 25 built-in songs.", last: 'Built-in songs · Intro · Easy', lbSub: 'Needs internet' },
+  am: { cap: 'Amharic · offline · no packs downloaded', banner: 'ከኢንተርኔት ውጭ ነዎት። አብረው የመጡትን 25 ዘፈኖች መጫወት ይችላሉ።', last: 'አብረው የመጡ ዘፈኖች · መግቢያ · ቀላል', lbSub: 'ኢንተርኔት ያስፈልጋል' }
+};
+const fix = (o) => off ? Object.assign(o, OFF[o.code], { offline: true }) : Object.assign(o, { offline: false });
+return { langs: [
+{ code: 'en', cap: 'English · guest · online', appName: 'Yeman Zefen', hello: 'Ready for a song?', bestLabel: 'Your best', lastLabel: 'Play button starts', last: "The '80s · Intro · Easy", more: 'More ways to play', lb: 'Leaderboard', lbSub: 'Sign in to get a rank', navHome: 'Home', navSettings: 'Settings', play: 'Play',
+  modes: [ { name: 'Guess the Intro', desc: 'The opening of the song', color: '#FFC93C', icon: I.intro }, { name: 'Guess from the Middle', desc: 'Harder · +25% points', color: '#F0563A', icon: I.mid }, { name: 'Which Era?', desc: 'Name the generation', color: '#7FB5A8', icon: I.era } ] },
+{ code: 'am', cap: 'Amharic · guest · online', appName: 'የማን ዘፈን', hello: 'ለዘፈን ዝግጁ ነዎት?', bestLabel: 'ምርጥ ውጤትዎ', lastLabel: 'ይጫወቱ የሚጀምረው', last: 'የ80ዎቹ · መግቢያ · ቀላል', more: 'ሌሎች የአጨዋወት መንገዶች', lb: 'የደረጃ ሰንጠረዥ', lbSub: 'ደረጃ ለማግኘት ይግቡ', navHome: 'መነሻ', navSettings: 'ቅንብሮች', play: 'ይጫወቱ',
+  modes: [ { name: 'መግቢያውን ይገምቱ', desc: 'የዘፈኑ መጀመሪያ', color: '#FFC93C', icon: I.intro }, { name: 'ከመሀል ይገምቱ', desc: 'ይከብዳል · +25% ነጥብ', color: '#F0563A', icon: I.mid }, { name: 'የየትኛው ዘመን?', desc: 'ዘመኑን ይለዩ', color: '#7FB5A8', icon: I.era } ] }
+].map(fix) };
+}
+}
+</script>
+</body>
+</html>

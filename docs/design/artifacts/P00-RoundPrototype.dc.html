@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="am">
+<head>
+<meta charset="utf-8">
+<title>Round prototype</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+@keyframes yzspin{to{transform:rotate(360deg)}}
+@keyframes yzpop{0%{transform:scale(.96)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.18);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.55}
+.sun{background:radial-gradient(70% 55% at 50% 62%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.hero{border-radius:0 0 44px 44px;box-shadow:0 14px 30px rgba(255,176,46,.35);position:relative;z-index:1}
+.sq{width:48px;height:48px;border-radius:16px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 4px 0 rgba(0,0,0,.1);flex:none;cursor:pointer}
+.chip{min-height:34px;border-radius:12px;display:inline-flex;align-items:center;padding:0 12px;font-size:13px;font-weight:700;box-shadow:0 3px 0 rgba(0,0,0,.12),inset 0 10px 12px rgba(255,255,255,.38)}
+.ans{min-height:84px;border-radius:20px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:inherit;font-size:16px;font-weight:700;padding:8px 10px;text-align:center;color:#2B2118;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 6px 0 #EDE3D2,0 12px 26px rgba(43,33,24,.10);cursor:pointer;transition:transform .12s, opacity .2s}
+.ans:active{transform:translateY(3px);box-shadow:0 3px 0 #EDE3D2,0 6px 14px rgba(43,33,24,.10)}
+.ans.ok{background:linear-gradient(180deg,#2A8A77 0%,#1D6658 100%);color:#FFFFFF;box-shadow:0 6px 0 #144A40,0 12px 28px rgba(35,120,106,.35);animation:yzpop .3s}
+.ans.bad{background:linear-gradient(180deg,#DC4A30 0%,#B8321B 100%);color:#FFFFFF;box-shadow:0 6px 0 #8A2614,0 12px 28px rgba(210,60,34,.35);animation:yzpop .3s}
+.ans.dim{opacity:.45;cursor:default}
+.ans.gone{opacity:.18;cursor:default;box-shadow:none}
+.mk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700}
+.reel{width:32px;height:32px;border-radius:16px;background:radial-gradient(circle,#FFC93C 0 5px,#FFF3D1 6px 100%);box-shadow:0 0 10px rgba(255,201,60,.6);position:relative}
+.reel::after{content:'';position:absolute;left:14px;top:3px;width:4px;height:9px;border-radius:2px;background:#E3C9A0}
+.reel.spin{animation:yzspin 1.2s linear infinite}
+.btnY{min-height:58px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:17px;font-weight:800;box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.4),inset 0 2px 0 rgba(255,255,255,.6);width:100%;cursor:pointer}
+.lnk{min-height:48px;border:0;background:transparent;color:#2B2118;font:inherit;font-size:15px;font-weight:600;text-decoration:underline;width:100%;cursor:pointer}
+.seg{min-height:44px;padding:0 16px;border-radius:14px;border:0;background:rgba(255,255,255,.6);font-weight:700;font-size:14px;color:#2B2118;cursor:pointer}
+.seg.on{background:#2B2118;color:#FFC93C}
+.tile{width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-family:'Noto Sans Ethiopic',sans-serif;font-size:18px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.12),inset 0 10px 12px rgba(255,255,255,.38)}
+</style>
+</helmet>
+<div style="width: 520px; height: 940px; box-sizing: border-box; padding: 22px 80px 30px; display: flex; flex-direction: column; align-items: center; gap: 16px; background: radial-gradient(60% 40% at 90% 5%, rgba(255,217,94,.5) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%); font-family: 'Poppins', 'Noto Sans Ethiopic', sans-serif">
+<div style="display: flex; gap: 8px; align-items: center">
+<button class="seg {{amOn}}" onClick="{{setAm}}" style="font-family: 'Noto Sans Ethiopic', sans-serif">አማርኛ</button>
+<button class="seg {{enOn}}" onClick="{{setEn}}">English</button>
+<button class="seg" onClick="{{restart}}" aria-label="Restart">↻</button>
+</div>
+
+<div class="ph {{lang}}" lang="{{lang}}">
+
+<sc-if value="{{isGame}}" hint-placeholder-val="{{ true }}">
+<div class="sun hero" style="padding: 10px 18px 20px; display: flex; flex-direction: column; gap: 12px; flex: none">
+<div style="height: 52px; display: flex; align-items: center; gap: 10px">
+<button class="sq" aria-label="{{s.leave}}" onClick="{{restart}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
+<span style="flex: 1; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 700">{{counter}}</span>
+<span style="font-weight: 800; font-size: 14px; min-width: 70px; text-align: right">{{scoreLabel}}</span>
+</div>
+<div style="display: flex; justify-content: center; gap: 8px"><span class="chip" style="background: #F0563A">{{s.era}}</span><span class="chip" style="background: #FFFFFF">{{s.diff}}</span></div>
+<div aria-hidden="true" style="align-self: center; width: 200px; height: 128px; border-radius: 18px; background: linear-gradient(180deg, #4A3B2E 0%, #2B2118 100%); padding: 9px 9px 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; box-shadow: 0 8px 0 rgba(0,0,0,.15), 0 0 0 8px rgba(255,255,255,.3), 0 0 46px rgba(240,86,58,.45)">
+<div style="flex: 1; border-radius: 10px; background: linear-gradient(180deg, #FF8A5C 0%, #E0452A 100%); display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 5px 9px; box-shadow: inset 0 8px 12px rgba(255,255,255,.25)">
+<div style="height: 5px; border-radius: 3px; background: linear-gradient(90deg, #FFC93C, #FFE07A)"></div>
+<div style="height: 42px; border-radius: 21px; background: #2B2118; display: flex; align-items: center; justify-content: space-between; padding: 0 6px">
+<span class="reel {{spinCls}}"></span><span style="flex: 1; height: 12px; margin: 0 6px; border-radius: 3px; background: linear-gradient(180deg, #5A4636, #3B2F25)"></span><span class="reel {{spinCls}}"></span>
+</div>
+</div>
+<div style="height: 16px; margin: 0 32px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #5A4636, #3B2F25)"></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 6px">
+<div role="progressbar" aria-label="{{timeLabel}}" style="flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.55); overflow: hidden"><div style="height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2A8A77, #7FB5A8); width: {{barPct}}"></div></div>
+<span style="background: #FFFFFF; border-radius: 12px; padding: 3px 10px; font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(0,0,0,.1); min-width: 64px; text-align: center">{{timeLabel}}</span>
+</div>
+</div>
+
+<div style="flex: 1; display: flex; flex-direction: column; padding: 26px 16px 16px; margin-top: -12px; gap: 12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px, #FFFFFF 75%, #F3FAF8 100%)">
+<div role="status" style="min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center">
+<sc-if value="{{showQuestion}}" hint-placeholder-val="{{ true }}"><span style="font-size: 20px; font-weight: 800; line-height: 1.4">{{s.q}}</span></sc-if>
+<sc-if value="{{isFeedback}}" hint-placeholder-val="{{ false }}">
+<span style="font-size: 22px; font-weight: 800; color: {{fbColor}}">{{fbHead}}</span>
+<span style="font-size: 13px; font-weight: 600; color: #4A3B2E">{{fbLine}}</span>
+</sc-if>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{answers}}" as="a" hint-placeholder-count="4">
+<button class="ans {{a.cls}}" onClick="{{a.pick}}" aria-label="{{a.label}}"><span>{{a.text}}</span>
+<sc-if value="{{a.ok}}" hint-placeholder-val="{{ false }}"><span class="mk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>{{a.mark}}</span></sc-if>
+<sc-if value="{{a.bad}}" hint-placeholder-val="{{ false }}"><span class="mk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>{{a.mark}}</span></sc-if>
+</button>
+</sc-for>
+</div>
+<div style="margin-top: auto; display: flex; justify-content: center; align-items: center; min-height: 64px">
+<sc-if value="{{showHintBtn}}" hint-placeholder-val="{{ true }}">
+<button class="sq" onClick="{{openHint}}" aria-label="{{s.hintTitle}}" style="width: auto; height: 56px; padding: 0 18px 0 14px; gap: 8px; border-radius: 18px; font: inherit; font-weight: 700; font-size: 14px; box-shadow: 0 5px 0 #EDE3D2, 0 8px 20px rgba(43,33,24,.08)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0012 3z"></path></svg>{{s.hint}}</button>
+</sc-if>
+<sc-if value="{{showHintUsed}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; font-weight: 600; color: #4A3B2E">{{s.hintUsed}}</span></sc-if>
+<sc-if value="{{showTap}}" hint-placeholder-val="{{ false }}"><button class="lnk" onClick="{{skip}}">{{tapLabel}}</button></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isResults}}" hint-placeholder-val="{{ false }}">
+<div class="sun" style="flex: 1; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 24px; gap: 10px">
+<div style="display: flex; gap: 4px"><span class="tile" style="background: #FFFFFF">የ</span><span class="tile" style="background: #7FB5A8">ማ</span><span class="tile" style="background: #FFFFFF">ን</span><span style="width: 6px"></span><span class="tile" style="background: #F0563A">ዘ</span><span class="tile" style="background: #FFFFFF">ፈ</span><span class="tile" style="background: #E3C9A0">ን</span></div>
+<div style="font-size: 15px; font-weight: 600; margin-top: 10px">{{s.done}}</div>
+<div style="font-family: 'Poppins', sans-serif; font-size: 52px; font-weight: 800; line-height: 1">{{finalScore}}</div>
+<div style="font-weight: 700">{{correctLine}}</div>
+<div style="width: 100%; margin-top: 8px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; border-radius: 14px; background: rgba(255,255,255,.6)">
+<span style="font-family: 'Poppins', sans-serif; font-weight: 700; width: 16px">{{r.n}}</span>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{r.color}}" stroke-width="3" aria-hidden="true"><path d="{{r.icon}}"></path></svg>
+<span style="flex: 1; font-weight: 600; font-size: 14px">{{r.text}}</span><span style="font-family: 'Poppins', sans-serif; font-weight: 700">{{r.pts}}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: auto; width: 100%"><button class="btnY" onClick="{{restart}}">{{s.again}}</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isHint}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 5; background: rgba(43,33,24,.45); display: flex; flex-direction: column; justify-content: flex-end">
+<div role="dialog" aria-modal="true" aria-label="{{s.hintTitle}}" style="background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 40%); border-radius: 32px 32px 0 0; padding: 12px 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<div aria-hidden="true" style="width: 40px; height: 4px; border-radius: 2px; background: #E3C9A0; align-self: center"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px"><span style="font-size: 19px; font-weight: 800">{{s.hintTitle}}</span><span style="background: #FFC93C; border-radius: 10px; padding: 2px 10px; font-weight: 700; font-size: 13px; flex: none">{{hintCountdown}}</span></div>
+<div style="font-size: 15px; color: #4A3B2E">{{s.hintTerms}}</div>
+<button class="btnY" onClick="{{watchAd}}">{{s.watch}}</button>
+<button class="lnk" onClick="{{declineHint}}">{{s.no}}</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isAd}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 6; background: linear-gradient(180deg, #2B2118 0%, #1C1510 100%); color: #FFF3D1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center">
+<span style="align-self: flex-end; background: rgba(255,255,255,.15); border-radius: 10px; padding: 3px 10px; font-size: 12px; font-weight: 700">{{adBadge}}</span>
+<div style="width: 260px; height: 300px; border-radius: 24px; border: 2px dashed rgba(255,243,209,.4); display: flex; align-items: center; justify-content: center; font-family: 'Poppins', sans-serif; font-size: 13px; color: rgba(255,243,209,.75)">[AdMob ad]</div>
+<div style="font-size: 16px; font-weight: 700">{{adCaption}}</div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"lang":{"editor":"enum","options":["am","en"],"default":"am"},"$preview":{"width":520,"height":940}}'>
+class Component extends DCLogic {
+  data() {
+    return {
+      artists: [
+        { en: 'Mahmoud Ahmed', am: 'ማሕሙድ አሕመድ' }, { en: 'Tilahun Gessesse', am: 'ጥላሁን ገሠሠ' },
+        { en: 'Aster Aweke', am: 'አስቴር አወቀ' }, { en: 'Muluken Melesse', am: 'ሙሉቀን መለሰ' },
+        { en: 'Bizunesh Bekele', am: 'ብዙነሽ በቀለ' }, { en: 'Alemayehu Eshete', am: 'ዓለማየሁ እሸቴ' }
+      ],
+      rounds: [
+        { opts: [0, 1, 2, 3], c: 0 }, { opts: [1, 3, 5, 0], c: 2 }, { opts: [4, 2, 1, 3], c: 0 },
+        { opts: [3, 0, 4, 5], c: 3 }, { opts: [2, 5, 0, 4], c: 1 }
+      ],
+      str: {
+        en: { era: "The '80s", diff: 'Easy · 10 s', q: 'Who sings this?', pts: ' pts', correct: 'Correct', notThis: 'Not this one', timeUp: "Time's up", answerWas: 'Correct answer: ', speed: 'Speed bonus +', hint: 'Hint', hintTitle: 'Hint: remove 2 answers', hintTerms: "Watch a short ad. This round's points are halved.", watch: 'Watch ad', no: 'No thanks', tap: 'Tap to continue', ad: 'Ad', adInter: 'Ads keep this game free', adReward: 'Your hint is on its way…', done: 'Game complete', again: 'Play again', leave: 'Leave game', paused: 'Paused', sec: ' s', hintUsed: 'Hint used · half points', yourPick: 'Your pick', half: 'Hint used · half points' },
+        am: { era: 'የ80ዎቹ', diff: 'ቀላል · 10 ሰከንድ', q: 'ይህን ዘፈን የዘፈነው ማን ነው?', pts: ' ነጥብ', correct: 'ትክክል', notThis: 'ይህ አይደለም', timeUp: 'ጊዜው አልቋል', answerWas: 'ትክክለኛው መልስ፦ ', speed: 'የፍጥነት ጉርሻ +', hint: 'ፍንጭ', hintTitle: 'ፍንጭ፦ 2 መልሶችን ያስወግዱ', hintTerms: 'አጭር ማስታወቂያ ይመልከቱ። የዚህ ዙር ነጥብ በግማሽ ይቀንሳል።', watch: 'ማስታወቂያ ይመልከቱ', no: 'አይ፣ ይቅር', tap: 'ለመቀጠል ይንኩ', ad: 'ማስታወቂያ', adInter: 'ጨዋታው ነፃ የሆነው በማስታወቂያ ነው', adReward: 'ፍንጭዎ እየመጣ ነው…', done: 'ጨዋታው ተጠናቋል', again: 'እንደገና ይጫወቱ', leave: 'ከጨዋታው ይውጡ', paused: 'ቆሟል', sec: ' ሰከንድ', hintUsed: 'ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ', yourPick: 'የእርስዎ ምርጫ', half: 'ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ' }
+      }
+    };
+  }
+  fresh(lang) {
+    return { lang: lang, round: 0, phase: 'play', remaining: 15000, fbLeft: 0, hintLeft: 0, adLeft: 0, adKind: '', picked: null, hintUsed: false, removed: [], score: 0, lastPts: 0, lastBonus: 0, results: [] };
+  }
+  componentDidMount() {
+    this.setState(this.fresh(this.props.lang || 'am'));
+    this.timer = setInterval(() => this.tick(), 100);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  tick() {
+    const st = this.state;
+    if (!st || !st.phase) return;
+    const R = { remaining: 15000, picked: null, hintUsed: false, removed: [] };
+    if (st.phase === 'play') {
+      const r = st.remaining - 100;
+      if (r <= 0) this.setState({ remaining: 0, phase: 'feedback', picked: -1, fbLeft: 5000, lastPts: 0, lastBonus: 0, results: st.results.concat([{ ok: false, pts: 0 }]) });
+      else this.setState({ remaining: r });
+    } else if (st.phase === 'hint') {
+      const h = st.hintLeft - 100;
+      if (h <= 0) this.setState({ phase: 'play', hintLeft: 0 }); else this.setState({ hintLeft: h });
+    } else if (st.phase === 'ad') {
+      const a = st.adLeft - 100;
+      if (a > 0) { this.setState({ adLeft: a }); return; }
+      if (st.adKind === 'reward') {
+        const q = this.data().rounds[st.round];
+        const wrong = [0, 1, 2, 3].filter((i) => i !== q.c).slice(0, 2);
+        this.setState({ phase: 'play', adLeft: 0, hintUsed: true, removed: wrong });
+      } else {
+        this.setState(Object.assign({ phase: 'play', adLeft: 0, round: st.round + 1 }, R));
+      }
+    } else if (st.phase === 'feedback') {
+      const f = st.fbLeft - 100;
+      if (f <= 0) this.advance(); else this.setState({ fbLeft: f });
+    }
+  }
+  advance() {
+    const st = this.state;
+    const n = st.round + 1;
+    if (n >= this.data().rounds.length) { this.setState({ phase: 'results' }); return; }
+    if (n % 3 === 0) { this.setState({ phase: 'ad', adKind: 'inter', adLeft: 2500 }); return; }
+    this.setState({ round: n, phase: 'play', remaining: 15000, picked: null, hintUsed: false, removed: [] });
+  }
+  pick(i) {
+    const st = this.state;
+    if (st.phase !== 'play' || st.removed.indexOf(i) >= 0) return;
+    const q = this.data().rounds[st.round];
+    const t = 15000 - st.remaining;
+    const ok = i === q.c;
+    const bonus = ok ? Math.round(0.5 * 100 * Math.max(0, 1 - t / 15000)) : 0;
+    let pts = ok ? 100 + bonus : 0;
+    if (st.hintUsed) pts = Math.round(pts / 2);
+    this.setState({ phase: 'feedback', picked: i, fbLeft: ok ? 1000 : 5000, lastPts: pts, lastBonus: bonus, score: st.score + pts, results: st.results.concat([{ ok: ok, pts: pts }]) });
+  }
+  renderVals() {
+    const D = this.data();
+    const st = this.state && this.state.phase ? this.state : this.fresh(this.props.lang || 'am');
+    const L = st.lang;
+    const s = D.str[L];
+    const q = D.rounds[Math.min(st.round, D.rounds.length - 1)];
+    const inFb = st.phase === 'feedback';
+    const answers = q.opts.map((ai, i) => {
+      let cls = '';
+      if (inFb) cls = i === q.c ? 'ok' : (i === st.picked ? 'bad' : 'dim');
+      else if (st.removed.indexOf(i) >= 0) cls = 'gone';
+      const ok = inFb && i === q.c;
+      const bad = inFb && i === st.picked && i !== q.c;
+      return { text: D.artists[ai][L], label: (L === 'am' ? 'መልስ ' : 'Answer ') + (i + 1) + ': ' + D.artists[ai][L], cls: cls, ok: ok, bad: bad, mark: ok ? s.correct : (bad ? s.yourPick : ''), pick: () => this.pick(i) };
+    });
+    const right = st.picked === q.c;
+    let fbHead = '', fbLine = '', fbColor = '#1D6658';
+    if (inFb) {
+      if (st.picked === -1) { fbHead = s.timeUp; fbColor = '#B8321B'; fbLine = s.answerWas + D.artists[q.opts[q.c]][L]; }
+      else if (right) { fbHead = s.correct + ' +' + st.lastPts; fbLine = st.hintUsed ? s.half : s.speed + st.lastBonus; }
+      else { fbHead = s.notThis; fbColor = '#B8321B'; fbLine = s.answerWas + D.artists[q.opts[q.c]][L]; }
+    }
+    const secs = Math.ceil(st.remaining / 1000);
+    const total = D.rounds.length;
+    const nRight = st.results.filter((r) => r.ok).length;
+    const OK = 'M5 12.5l4.5 4.5L19 7', NO = 'M6 6l12 12M18 6L6 18';
+    return {
+      lang: L, s: s,
+      amOn: L === 'am' ? 'on' : '', enOn: L === 'en' ? 'on' : '',
+      setAm: () => this.setState({ lang: 'am' }), setEn: () => this.setState({ lang: 'en' }),
+      restart: () => this.setState(this.fresh(L)),
+      isGame: st.phase !== 'results', isResults: st.phase === 'results',
+      isHint: st.phase === 'hint', isAd: st.phase === 'ad', isFeedback: inFb, showQuestion: !inFb,
+      counter: (Math.min(st.round, total - 1) + 1) + ' / ' + total,
+      scoreLabel: st.score + s.pts,
+      spinCls: st.phase === 'play' ? 'spin' : '',
+      barPct: (st.remaining / 150) + '%',
+      timeLabel: st.phase === 'hint' || (st.phase === 'ad' && st.adKind === 'reward') ? s.paused : secs + s.sec,
+      answers: answers, fbHead: fbHead, fbLine: fbLine, fbColor: fbColor,
+      showHintBtn: st.phase === 'play' && !st.hintUsed, showHintUsed: st.phase === 'play' && st.hintUsed,
+      showTap: inFb && st.fbLeft > 1000,
+      tapLabel: s.tap + ' · ' + Math.ceil(st.fbLeft / 1000) + s.sec,
+      skip: () => { if (this.state.phase === 'feedback') this.advance(); },
+      openHint: () => { if (this.state.phase === 'play' && !this.state.hintUsed) this.setState({ phase: 'hint', hintLeft: 8000 }); },
+      watchAd: () => this.setState({ phase: 'ad', adKind: 'reward', adLeft: 3000 }),
+      declineHint: () => this.setState({ phase: 'play', hintLeft: 0 }),
+      hintCountdown: Math.ceil(st.hintLeft / 1000) + s.sec,
+      adBadge: s.ad + ' · ' + Math.ceil(st.adLeft / 1000),
+      adCaption: st.adKind === 'reward' ? s.adReward : s.adInter,
+      finalScore: st.score + s.pts,
+      correctLine: L === 'am' ? 'ከ' + total + ' ' + nRight + ' ትክክል' : nRight + ' of ' + total + ' right',
+      rows: st.results.map((r, i) => ({ n: i + 1, icon: r.ok ? OK : NO, color: r.ok ? '#1D6658' : '#B8321B', text: D.artists[D.rounds[i].opts[D.rounds[i].c]][L], pts: r.ok ? '+' + r.pts : '0' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

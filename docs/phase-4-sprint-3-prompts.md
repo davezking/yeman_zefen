@@ -26,7 +26,7 @@ Goal: account management, and ads that respect consent rules and never interrupt
 
 **Model:** sonnet — ads involve consent and platform rules where mistakes cause store rejections or policy strikes.
 
-**Context:** FR-19: interstitials no more often than every N rounds (`/v1/config`, default 4), **never during a clip**, plus rewarded ads that grant a hint (remove 2 wrong options; the round's points are halved per `docs/scoring.md`, and the event already carries `hintUsed`). EU and UK diaspora users need consent via Google's UMP SDK before personalized ads. iOS needs an App Tracking Transparency prompt. Ad counts go into the session payload's `ads` object. Use test ad unit IDs in the dev flavor.
+**Context:** FR-19: interstitials no more often than every N rounds (`/v1/config`, default 3), **never during a clip**, plus rewarded ads that grant a hint (remove 2 wrong options; the round's points are halved per `docs/scoring.md`, and the event already carries `hintUsed`). EU and UK diaspora users need consent via Google's UMP SDK before personalized ads. iOS needs an App Tracking Transparency prompt. Ad counts go into the session payload's `ads` object. Use test ad unit IDs in the dev flavor.
 
 **Do this:**
 1. `lib/core/ads/`:

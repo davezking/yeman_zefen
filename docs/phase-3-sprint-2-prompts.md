@@ -10,7 +10,7 @@ Goal: guests can register with Google, email, or Apple without losing history. R
 
 **Model:** haiku — a small endpoint and a cached client fetch.
 
-**Context:** Tunables from the PRD: interstitial frequency (default every 4 rounds), register-prompt threshold (default 5 sessions), and default clip length. Also a minimum supported app version for forced updates.
+**Context:** Tunables from the PRD: interstitial frequency (default every 3 rounds), register-prompt threshold (default 5 sessions), and default clip length. Also a minimum supported app version for forced updates.
 
 **Do this:**
 1. `GET /v1/config` (public) returns `{ interstitialEveryRounds, registerPromptAfterSessions, registerPromptCooldownDays, minAppVersion, defaultClipMs }` from Worker vars, with a 10-minute cache header.

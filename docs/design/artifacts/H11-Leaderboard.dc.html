@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: leaderboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4;background:radial-gradient(80% 35% at 50% 25%,rgba(255,255,255,.4) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 45%,#FFA94D 100%)}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.5}
+.sq{width:48px;height:48px;border-radius:16px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 4px 0 rgba(0,0,0,.1);flex:none}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;background:rgba(255,255,255,.45);border-radius:16px;padding:5px}
+.seg button{min-height:44px;border:0;border-radius:12px;background:transparent;font:inherit;font-size:14px;font-weight:700;color:#4A3B2E}
+.seg button.on{background:#FFFFFF;color:#2B2118;box-shadow:0 3px 0 rgba(0,0,0,.08)}
+.chip{min-height:40px;border-radius:12px;border:0;display:inline-flex;align-items:center;gap:6px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;color:#2B2118;background:#FFFFFF;box-shadow:0 3px 0 rgba(0,0,0,.1)}
+.av{border-radius:18px;border:3px solid #FFFFFF;box-shadow:inset 0 10px 12px rgba(255,255,255,.38)}
+.rw{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;border-radius:16px;background:rgba(255,255,255,.55)}
+.btnY{min-height:48px;border:0;border-radius:16px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:15px;font-weight:800;box-shadow:0 5px 0 #D99418;padding:0 16px;flex:none}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px 8px">
+<button class="sq" aria-label="{{L.back}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
+<h1 style="margin: 0; font-size: 20px; font-weight: 800">{{L.title}}</h1>
+</div>
+<div style="padding: 4px 18px 10px; display: flex; flex-direction: column; gap: 10px">
+<div class="seg" role="tablist"><button class="on" role="tab" aria-selected="true">{{L.week}}</button><button role="tab" aria-selected="false">{{L.all}}</button></div>
+<div><button class="chip">{{L.era}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></div>
+</div>
+<div style="display: flex; justify-content: center; align-items: flex-end; gap: 16px; padding: 4px 16px 14px">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span class="av" style="width: 52px; height: 52px; background: #7FB5A8"></span><span style="font-size: 12px; font-weight: 700">{{L.n2}}</span><span style="background: #FFFFFF; border-radius: 10px; padding: 1px 10px; font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700">9,412</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><svg width="26" height="20" viewBox="0 0 26 20" aria-hidden="true"><path d="M2 6l6 5 5-9 5 9 6-5-2 12H4z" fill="#2B2118"></path></svg><span class="av" style="width: 68px; height: 68px; border-radius: 22px; background: #F0563A"></span><span style="font-size: 13px; font-weight: 800">{{L.n1}}</span><span style="background: #2B2118; color: #FFC93C; border-radius: 10px; padding: 1px 12px; font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 700">9,860</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span class="av" style="width: 52px; height: 52px; background: #E3C9A0"></span><span style="font-size: 12px; font-weight: 700">{{L.n3}}</span><span style="background: #FFFFFF; border-radius: 10px; padding: 1px 10px; font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 700">8,975</span></div>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 16px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 70%, rgba(0,0,0,.2) 100%); mask-image: linear-gradient(180deg, #000 70%, rgba(0,0,0,.2) 100%)">
+<sc-for list="{{L.rows}}" as="r" hint-placeholder-count="5">
+<div class="rw"><span style="font-family: 'Poppins', sans-serif; font-weight: 700; width: 18px">{{r.rank}}</span><span style="width: 30px; height: 30px; border-radius: 10px; background: {{r.color}}"></span><span style="flex: 1; font-weight: 600">{{r.name}}</span><span style="font-family: 'Poppins', sans-serif; font-weight: 700">{{r.pts}}</span></div>
+</sc-for>
+</div>
+<div style="background: linear-gradient(180deg, rgba(255,255,255,.9) 0%, #FFFFFF 45%); border-radius: 32px 32px 0 0; box-shadow: 0 -10px 26px rgba(255,169,77,.3); padding: 16px 18px 22px; display: flex; align-items: center; gap: 12px; margin-top: 10px">
+<div style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 800; font-size: 15px">{{L.gTitle}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.gBody}}</span></div>
+<button class="btnY">{{L.gCta}}</button>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const pts = ['8,630', '8,204', '7,991', '7,640', '7,302'], col = ['#C9B8EC', '#7FB5A8', '#E3C9A0', '#F0563A', '#FFFFFF'];
+const rows = (ns) => ns.map((n, i) => ({ rank: i + 4, name: n, pts: pts[i], color: col[i] }));
+return { langs: [
+{ code: 'en', cap: 'English · guest · this week · sample names', back: 'Back', title: 'Leaderboard', week: 'This week', all: 'All time', era: 'Era: All eras', n1: 'Selam T.', n2: 'Dawit A.', n3: 'Hanna G.', rows: rows(['Yonas M.', 'Meron K.', 'Abel W.', 'Liya B.', 'Kidus H.']), gTitle: 'Want your name up here?', gBody: 'Sign in to rank. Your scores come with you.', gCta: 'Sign in' },
+{ code: 'am', cap: 'Amharic · guest · this week · sample names', back: 'ይመለሱ', title: 'የደረጃ ሰንጠረዥ', week: 'የዚህ ሳምንት', all: 'የምንጊዜም', era: 'ዘመን፦ ሁሉም ዘመኖች', n1: 'ሰላም ት.', n2: 'ዳዊት አ.', n3: 'ሐና ገ.', rows: rows(['ዮናስ መ.', 'ሜሮን ከ.', 'አቤል ወ.', 'ሊያ በ.', 'ቅዱስ ሀ.']), gTitle: 'ስምዎ እዚህ እንዲሰፍር ይፈልጋሉ?', gBody: 'ደረጃ ለማግኘት ይግቡ። ውጤትዎ አይጠፋም።', gCta: 'ይግቡ' }
+] };
+}
+}
+</script>
+</body>
+</html>

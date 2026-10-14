@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: offline play</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.5}
+.sun{background:radial-gradient(70% 55% at 50% 62%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.sq{width:48px;height:48px;border-radius:16px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 4px 0 rgba(0,0,0,.1);flex:none}
+.sec{font-size:13px;font-weight:800;padding:4px 2px 0;flex:none}
+.pk{flex:none;display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 12px;border-radius:18px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 4px 0 #EDE3D2,0 8px 18px rgba(43,33,24,.06)}
+.art{width:44px;height:44px;border-radius:12px;flex:none;box-shadow:inset 0 10px 12px rgba(255,255,255,.38)}
+.act{min-height:40px;min-width:44px;border:0;border-radius:12px;background:linear-gradient(180deg,#FFE07A,#FFB02E);font:inherit;font-size:12px;font-weight:800;color:#2B2118;padding:0 12px;box-shadow:0 3px 0 #D99418;flex:none}
+.act.w{background:#FFFFFF;box-shadow:0 3px 0 #EDE3D2}
+.done{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#1D6658;flex:none}
+.track{display:block;height:6px;border-radius:3px;background:#F1E8DA;overflow:hidden;margin-top:6px}
+.tg{width:46px;height:28px;border-radius:14px;background:linear-gradient(180deg,#2A8A77,#1D6658);position:relative;flex:none;border:0;padding:0}
+.tg span{position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:11px;background:#FFFFFF}
+.err{flex:none;border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(180deg,#FFF1EC 0%,#FFE3DA 100%);box-shadow:0 4px 0 #F4C7B8}
+.btnY{min-height:44px;border:0;border-radius:14px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:14px;font-weight:800;box-shadow:0 4px 0 #D99418;padding:0 16px;align-self:flex-start}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="flex: none; border-radius: 0 0 40px 40px; box-shadow: 0 14px 30px rgba(255,176,46,.35); position: relative; z-index: 1; padding: 12px 18px 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 12px"><button class="sq" aria-label="{{L.back}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button><h1 style="margin: 0; font-size: 20px; font-weight: 800">{{L.title}}</h1></div>
+<p style="margin: 0; font-size: 13px; font-weight: 600; color: #3A2D22">{{L.intro}}</p>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 24px 16px 16px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px); overflow: hidden">
+<div class="pk" style="flex-direction: column; align-items: stretch; gap: 0; padding: 0 12px">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 52px"><span style="flex: 1; font-weight: 700; font-size: 14px">{{L.wifi}}</span><button class="tg" role="switch" aria-checked="true" aria-label="{{L.wifi}}"><span></span></button></div>
+<div style="display: flex; align-items: center; gap: 12px; min-height: 60px; border-top: 1px solid #F1E8DA; padding: 6px 0"><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.mobile}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.mobileSub}}</span></span><button class="tg" role="switch" aria-checked="true" aria-label="{{L.mobile}}"><span></span></button></div>
+</div>
+<div class="sec" style="display: flex; align-items: center; gap: 8px"><span style="flex: 1">{{L.onPhone}}</span><span style="font-weight: 600; color: #4A3B2E">{{L.cache}}</span><button class="act w" style="min-height: 32px; padding: 0 10px">{{L.clear}}</button></div>
+<div class="pk"><span class="art" style="background: #FFC93C"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.b}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.bm}}</span></span><span class="done">{{L.always}}</span></div>
+<div class="pk"><span class="art" style="background: #F0563A"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.p1}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.p1m}}</span></span><span class="done"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>{{L.downloaded}}</span></div>
+<div class="sec">{{L.available}}</div>
+<sc-if value="{{L.isError}}" hint-placeholder-val="{{ false }}">
+<div class="err" role="alert"><div style="display: flex; gap: 12px; align-items: center"><span class="art" style="background: #7FB5A8"></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.p2}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.p2err}}</span></span></div>
+<div style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px; font-weight: 600; color: #8A2614"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true" style="flex: none"><path d="M12 3l10 18H2z"></path><path d="M12 10v4M12 17h.01"></path></svg><span>{{L.errMsg}}</span></div>
+<button class="btnY">{{L.retry}}</button></div>
+</sc-if>
+<sc-if value="{{L.isDefault}}" hint-placeholder-val="{{ true }}">
+<div class="pk"><span class="art" style="background: #7FB5A8"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.p2}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.p2m}}</span><span class="track" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100"><span style="display: block; width: 42%; height: 100%; background: linear-gradient(90deg, #2A8A77, #7FB5A8)"></span></span></span><button class="act w" aria-label="{{L.cancel}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+</sc-if>
+<div class="pk"><span class="art" style="background: #E3C9A0"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 14px">{{L.p3}}</span><span style="font-size: 12px; color: #4A3B2E">{{L.p3m}}</span></span><button class="act">{{L.download}}</button></div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","options":["default","error"],"default":"default"},"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const err = this.props.variant === 'error';
+return { langs: [
+{ code: 'en', cap: err ? 'English · download failed (inline)' : 'English · one pack downloading', isError: err, isDefault: !err, back: 'Back', title: 'Offline play', intro: 'Online, songs load as you play. Download packs to play without internet.', wifi: 'Download packs on Wi-Fi only', mobile: 'Download upcoming songs on mobile data', mobileSub: 'Off saves data: only songs already on your phone play.', cache: 'Cache 31 MB', clear: 'Clear cache', onPhone: 'On this phone', available: 'Available to download', always: 'Always there', downloaded: 'Downloaded', download: 'Download', cancel: 'Cancel', retry: 'Try again', errMsg: 'Download failed. Check your connection and try again.',
+  b: 'Built-in songs', bm: '25 songs · comes with the app', p1: "The '80s", p1m: '40 songs · 12 MB', p2: 'Golden Age', p2m: '42% · 60 songs · 18 MB', p2err: '60 songs · 18 MB', p3: "The '90s", p3m: '45 songs · 14 MB' },
+{ code: 'am', cap: err ? 'Amharic · download failed (inline)' : 'Amharic · one pack downloading', isError: err, isDefault: !err, back: 'ይመለሱ', title: 'ያለ ኢንተርኔት መጫወት', intro: 'ኢንተርኔት ሲኖር ዘፈኖች በሚጫወቱበት ጊዜ ይጫናሉ። ያለ ኢንተርኔት ለመጫወት ጥቅሎችን ያውርዱ።', wifi: 'ጥቅሎችን በዋይፋይ ብቻ ያውርዱ', mobile: 'ቀጣይ ዘፈኖችን በሞባይል ዳታ ያውርዱ', mobileSub: 'ሲጠፋ ዳታ ይቆጥባል፤ በስልክዎ ላይ ያሉ ዘፈኖች ብቻ ይጫወታሉ።', cache: 'ማቆያ 31 ሜባ', clear: 'ማቆያውን ያጽዱ', onPhone: 'በዚህ ስልክ ላይ', available: 'ለማውረድ የሚገኙ', always: 'ሁልጊዜ አለ', downloaded: 'ወርዷል', download: 'ያውርዱ', cancel: 'ይሰርዙ', retry: 'እንደገና ይሞክሩ', errMsg: 'ማውረዱ አልተሳካም። ግንኙነትዎን አረጋግጠው እንደገና ይሞክሩ።',
+  b: 'አብረው የመጡ ዘፈኖች', bm: '25 ዘፈኖች · ከመተግበሪያው ጋር', p1: 'የ80ዎቹ', p1m: '40 ዘፈኖች · 12 ሜባ', p2: 'ወርቃማው ዘመን', p2m: '42% · 60 ዘፈኖች · 18 ሜባ', p2err: '60 ዘፈኖች · 18 ሜባ', p3: 'የ90ዎቹ', p3m: '45 ዘፈኖች · 14 ሜባ' }
+] };
+}
+}
+</script>
+</body>
+</html>
