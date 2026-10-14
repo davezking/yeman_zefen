@@ -31,7 +31,7 @@ jobs:
       - run: npm test
 
   admin:
-    name: admin (typecheck + build)
+    name: admin (typecheck + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,7 +45,11 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
+      # The build refuses to run without an API base (vite.config.ts). Any URL works for a CI build.
       - run: npm run build
+        env:
+          VITE_API_BASE: https://api.example.com
 
   ingest:
     name: ingest (pytest)

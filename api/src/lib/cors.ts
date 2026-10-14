@@ -11,6 +11,8 @@ export function adminCors(): MiddlewareHandler<AppEnv> {
     origin: (origin, c) => (origin === c.env.ADMIN_ORIGIN ? origin : null),
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     allowHeaders: ["Content-Type"],
+    // Lets the SPA show the request id in error notifications, to match them with Worker logs.
+    exposeHeaders: ["X-Request-Id"],
     credentials: true,
     maxAge: 600,
   });

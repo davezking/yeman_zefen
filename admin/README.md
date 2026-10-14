@@ -10,8 +10,9 @@ Worker's `/admin/*` routes with the Cloudflare Access cookie. Hosted on Cloudfla
 |---|---|
 | `npm ci` | Install from the lockfile |
 | `npm run dev` | Dev server on `http://localhost:5173` |
-| `npm run typecheck` | `tsc -b` for the app and the Vite config |
-| `npm run build` | Typecheck, then production build into `dist/` |
+| `npm run typecheck` | `tsc -b` for the app, the tests and the Vite config |
+| `npm test` | Vitest unit tests (`test/`) |
+| `npm run build` | Typecheck, then production build into `dist/`. Needs `VITE_API_BASE` set, and fails without it |
 
 ## Local setup
 
@@ -23,7 +24,9 @@ Worker's `/admin/*` routes with the Cloudflare Access cookie. Hosted on Cloudfla
 ## Layout
 
 - `src/api/client.ts`: typed fetch wrapper. It sends credentials, validates responses with zod, and throws
-  `ApiError` from the Worker's `{ error }` body.
-- `src/queryClient.ts`: shows every failed query or mutation as a Mantine notification.
+  `ApiError` from the Worker's `{ error }` body. Pass JSON as `json` (sets the content type) and anything else, such
+  as FormData, as `body`. Use the `noContent` schema for 204 responses.
+- `src/queryClient.ts`: shows every failed query or mutation as a Mantine notification, with the Worker's request id
+  when there is one.
 - `src/layout/`: the app shell and sidebar. `nav.ts` is the list of routes.
 - `src/pages/`: placeholder pages. Later sprints replace them.
