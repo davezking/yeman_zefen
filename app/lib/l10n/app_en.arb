@@ -1,0 +1,7 @@
+{
+  "@@locale": "en",
+  "appTitle": "Guess the Song",
+  "@appTitle": { "description": "App name shown in the task switcher and on the home screen" },
+  "homeTagline": "Listen to the clip and pick the song.",
+  "playButton": "Play"
+}
