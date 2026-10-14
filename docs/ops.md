@@ -269,3 +269,23 @@ first prod deploy, otherwise the browser gets no `Access-Control-Allow-Origin` h
 
 **Local development:** run `npm run dev` in `api/` (port 8787) and `npm run dev` in `admin/` (port 5173). Use
 `localhost`, not `127.0.0.1`, because `ADMIN_ORIGIN` is `http://localhost:5173`.
+
+### Track editor API
+
+The admin track table and editor (`/tracks`, `/tracks/:id`) use these routes, all behind `requireAdmin` (editors
+and admins alike):
+
+| Route | Purpose |
+|---|---|
+| `GET /admin/tracks` | List, newest first, 50 per page (`cursor`). Filters: `status`, `generationId` (era), `genreId`, `artistId`, `q` (either title). Each row also carries `introStatus` / `middleStatus` (`null` = clip not cut yet) and `openFlagCount`. |
+| `GET /admin/tracks/:id` | Track, artist, aliases, `genreIds`, open review items, and clips. A clip has a `url` only while it is `ready`. |
+| `PATCH /admin/tracks/:id` | Edit titles, album, year, era, artist and `genreIds` (replaces the whole set, at most 10). Send only what changed: every field sent is pinned against re-scrapes. Picking an era pins it; clearing it (`generationId: null`) re-derives it from the year, as does changing the year of an unpinned track. An edit that leaves the era unknown opens an `era_unknown` item (and sends an `ingested` track to `needs_review`); one that makes it known resolves the open item. |
+| `POST /admin/tracks/:id/approve`, `/reject` | `409 clips_not_ready` names the clip that is missing or not ready; `409 invalid_transition` means the status does not allow it. |
+| `GET /admin/generations`, `GET /admin/genres` | The era and genre lists for pickers and filters. |
+| `POST /admin/artists` | Create an artist (and its canonical alias), atomically. `409 artist_exists` names the artist when the spelling folds to a known name or alias, including one created at the same moment. |
+| `POST /admin/review-items/:id/resolve`, `/dismiss` | Close an open item, recording who and when. `409 already_closed` if it is not open. |
+
+**Playing clips locally.** `CDN_BASE_URL` points at `http://localhost:8787/cdn` in dev, and under `wrangler dev` the
+Worker serves `GET /cdn/clips/*` from the local `yz-clips` bucket (with byte ranges, so the player can seek). The
+route answers 404 unless `ENV=dev`: in prod the CDN domain serves the bucket directly. To try the editor with audio,
+put a file at a clip's key: `npx wrangler r2 object put yz-clips/clips/1/intro-v1.mp3 --file clip.mp3 --local`.

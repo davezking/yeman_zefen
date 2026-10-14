@@ -4,6 +4,8 @@ import { requireAdmin, requireService } from "../../lib/accessAuth";
 import { catalog } from "./catalog";
 import { ingestRoutes } from "./ingest";
 import { jobRoutes } from "./jobs";
+import { reviewRoutes } from "./reviewItems";
+import { taxonomy } from "./taxonomy";
 
 // Human-authenticated admin routes. The requireAdmin middleware guards every
 // route registered here.
@@ -14,6 +16,8 @@ human.use("*", requireAdmin());
 human.get("/whoami", (c) => c.json({ admin: c.get("admin") }));
 human.route("/", catalog);
 human.route("/", jobRoutes);
+human.route("/", taxonomy);
+human.route("/", reviewRoutes);
 
 // Service-token routes for GitHub Actions ingestion. requireService guards these.
 const ingest = new Hono<AppEnv>();
