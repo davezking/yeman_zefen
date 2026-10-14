@@ -371,8 +371,9 @@ ingestRoutes.post("/tracks", async (c) => {
       );
       // Mirrors GENERATION_CHANGED in SQL.
       const eraChanged = !overridden && existing.generation_id !== generationId;
+      // Mirrors LINK_GENRES_SQL: genres an admin edited are never re-linked.
       const links = linksByTrack.get(existing.id);
-      const newGenres = genreIds.some((g) => !links?.has(g));
+      const newGenres = !edited.has("genres") && genreIds.some((g) => !links?.has(g));
       const open = openByTrack.get(existing.id);
       const newFlags = [...flagItems.keys()].some((k) => !open?.has(k));
       outcome = changed || eraChanged || newGenres || newFlags ? "updated" : "skipped";

@@ -117,6 +117,15 @@ export function useTrackList(filters: TrackFilters) {
   });
 }
 
+/**
+ * The track that follows `id` in the filtered list, asked of the API (the list is newest first and its cursor is
+ * "ids below this one"). Works when that track is not loaded yet, and when approving just removed `id` from the list.
+ */
+export async function fetchTrackAfter(filters: TrackFilters, id: number): Promise<number | undefined> {
+  const page = await apiFetch(`/admin/tracks${toQuery({ ...filters, cursor: String(id) })}`, trackListSchema);
+  return page.items[0]?.id;
+}
+
 export const useTrack = (id: number) => useQuery({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id) });
 
 /** Resolves once the track's detail is cached, so moving to it never shows a loading state. */

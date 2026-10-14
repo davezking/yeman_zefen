@@ -22,6 +22,7 @@ import { notifications } from "@mantine/notifications";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  fetchTrackAfter,
   useCloseReviewItem,
   useGenerations,
   useGenres,
@@ -37,8 +38,9 @@ import {
 } from "../api/catalog";
 import { ApiError } from "../api/client";
 import { ArtistPicker } from "../components/ArtistPicker";
-import { StatusBadge, trackName } from "../components/TrackBits";
+import { StatusBadge, statusLabel, trackName } from "../components/TrackBits";
 import { filtersFromParams } from "../lib/trackFilters";
+import { mmss } from "../lib/format";
 import { buildPatch, toForm, type FormValues } from "../lib/trackForm";
 
 const REASON_LABEL: Record<string, string> = {
@@ -49,7 +51,6 @@ const REASON_LABEL: Record<string, string> = {
   era_unknown: "Era unknown",
 };
 
-const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${(ms / 1000 % 60).toFixed(1).padStart(4, "0")}`;
 const isHttp = (u: string) => /^https?:\/\//i.test(u);
 
 /**
@@ -101,7 +102,8 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
   const closeItem = useCloseReviewItem(id);
   const prefetch = usePrefetchTrack();
   const ensureTrack = useEnsureTrack();
-  const list = useTrackList(filtersFromParams(sp));
+  const filters = filtersFromParams(sp);
+  const list = useTrackList(filters);
 
   const [values, setValues] = useState<FormValues>(() => toForm(detail));
   const patch = buildPatch(values, detail);
@@ -144,15 +146,22 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
     return true;
   };
 
+  /** The next track after `from` in this filter: from the loaded list when it is there, else from the API. */
+  async function nextAfter(from: number): Promise<number | undefined> {
+    const here = around(from);
+    if (here.next) return here.next;
+    if (here.index >= 0 && !list.hasNextPage) return undefined; // the last track of the whole list
+    // Keep the loaded list growing, so k can come back here.
+    if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+    return fetchTrackAfter(filters, from).catch(() => undefined);
+  }
+
   async function goNext() {
     if (blockedByEdits()) return;
-    const here = around(nav.current.at);
-    if (here.next) return go(here.next);
-    if (here.index >= 0 && list.hasNextPage) {
-      const more = await list.fetchNextPage();
-      const after = more.data?.pages.flatMap((p) => p.items.map((t) => t.id))[here.index + 1];
-      if (after) go(after);
-    }
+    const from = nav.current.at;
+    const next = await nextAfter(from);
+    // Only move if nothing else moved the page while we were asking.
+    if (next && nav.current.at === from) go(next);
   }
   const goPrev = () => {
     const { prev } = around(nav.current.at);
@@ -174,7 +183,6 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
     if (target <= 0 || nav.current.busy === target) return;
     const onScreen = target === id;
     if (onScreen && blockedByEdits()) return;
-    const next = around(target).next;
     nav.current.busy = target;
     if (onScreen) setActionError(null);
     try {
@@ -193,6 +201,8 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
     });
     // Move on to the next track in the list (the last one goes back to the list), unless the admin already moved.
     if (nav.current.at !== target) return;
+    const next = await nextAfter(target);
+    if (nav.current.at !== target) return;
     if (next) go(next);
     else {
       nav.current.at = 0;
@@ -201,11 +211,15 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
     }
   }
 
+  // Shortcuts belong to the page, not to a dialog on top of it (the reject confirmation, a new artist).
+  const page = (fn: () => void) => () => {
+    if (!document.querySelector('[role="dialog"]')) fn();
+  };
   useHotkeys([
-    ["j", () => void goNext()],
-    ["k", goPrev],
-    ["a", () => void act("approve")],
-    ["e", () => titleRef.current?.focus()],
+    ["j", page(() => void goNext())],
+    ["k", page(goPrev)],
+    ["a", page(() => void act("approve"))],
+    ["e", page(() => titleRef.current?.focus())],
   ]);
 
   const status = detail.track.status;
@@ -366,7 +380,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
                   Reject
                 </Button>
               </Group>
-              {!canDecide && <Text size="sm" c="dimmed">This track is {status.replace("_", " ")}, so it can't be approved or rejected here.</Text>}
+              {!canDecide && <Text size="sm" c="dimmed">This track is {statusLabel(status)}, so it can't be approved or rejected here.</Text>}
             </Stack>
           </Card>
         </Stack>

@@ -10,7 +10,9 @@ const label = (a: Artist) => (a.nameLatin ? `${a.nameAm} / ${a.nameLatin}` : a.n
 /** Search-as-you-type artist select, with a way to create an artist that is not in the catalog yet. */
 export function ArtistPicker({ value, onChange }: { value: Artist; onChange: (artist: Artist) => void }) {
   const [search, setSearch] = useState("");
-  const [debounced] = useDebouncedValue(search.trim(), 250);
+  // Mantine puts the chosen option's label in the search box; that is not something the admin typed.
+  const typed = search.trim() === label(value) ? "" : search.trim();
+  const [debounced] = useDebouncedValue(typed, 250);
   const results = useArtistSearch(debounced);
   const [creating, setCreating] = useState(false);
 

@@ -121,3 +121,15 @@ describe("runBulk", () => {
     expect(await runBulk([], async () => undefined, String)).toEqual([]);
   });
 });
+
+describe("mmss", () => {
+  it("formats minutes, seconds and tenths, rounding the whole value once", async () => {
+    const { mmss } = await import("../src/lib/format");
+    expect(mmss(0)).toBe("0:00.0");
+    expect(mmss(12_340)).toBe("0:12.3");
+    expect(mmss(90_000)).toBe("1:30.0");
+    expect(mmss(59_960)).toBe("1:00.0");
+    expect(mmss(119_970)).toBe("2:00.0");
+    expect(mmss(605_049)).toBe("10:05.0");
+  });
+});

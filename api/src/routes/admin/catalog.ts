@@ -21,6 +21,7 @@ import type { AppEnv } from "../../env";
 import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
+import { assignGeneration } from "../../lib/era";
 import { createJob, jobOut } from "../../lib/jobs";
 import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
@@ -164,43 +165,69 @@ catalog.patch("/tracks/:id", async (c) => {
     await requireArtist(d, body.artistId);
     set.artistId = body.artistId;
   }
-  // Remember which scraped fields an admin touched so a re-scrape never overwrites them
-  // (generation is covered by generation_overridden).
-  const touched = (["titleAm", "titleLatin", "album", "releaseYear", "artistId"] as const).filter(
-    (f) => body[f] !== undefined,
-  );
+  // Remember which fields an admin touched so a re-scrape never overwrites them (generation is covered by
+  // generation_overridden). Genres count as one field: ingest stops re-linking scraped genres.
+  const touched = [
+    ...(["titleAm", "titleLatin", "album", "releaseYear", "artistId"] as const).filter((f) => body[f] !== undefined),
+    ...(body.genreIds !== undefined ? ["genres"] : []),
+  ];
   if (touched.length > 0) {
     const edited = new Set<string>(JSON.parse(existing.adminEditedFields) as string[]);
     for (const f of touched) edited.add(f);
     set.adminEditedFields = JSON.stringify([...edited].sort());
   }
-  if (body.generationId !== undefined) {
-    if (body.generationId !== null) {
-      const gen = await d.select({ id: generations.id }).from(generations).where(eq(generations.id, body.generationId)).get();
-      if (!gen) throw new ApiError(404, "not_found", `Generation ${body.generationId} not found`);
-    }
+
+  // Era. A manual pick pins it against auto-assignment. Otherwise it follows the release year, the same rule ingest
+  // uses: re-derive it when the admin clears the pick or changes the year, and flag a year that matches no era.
+  const pinned = body.generationId !== undefined ? body.generationId !== null : existing.generationOverridden;
+  if (body.generationId != null) {
+    const gen = await d.select({ id: generations.id }).from(generations).where(eq(generations.id, body.generationId)).get();
+    if (!gen) throw new ApiError(404, "not_found", `Generation ${body.generationId} not found`);
     set.generationId = body.generationId;
-    // A manual pick pins the generation against auto-assignment; clearing it hands control back.
-    set.generationOverridden = body.generationId !== null;
+    set.generationOverridden = true;
+  } else if (!pinned && (body.generationId === null || body.releaseYear !== undefined)) {
+    const year = body.releaseYear !== undefined ? body.releaseYear : existing.releaseYear;
+    const all = await d
+      .select({ id: generations.id, yearFrom: generations.yearFrom, yearTo: generations.yearTo })
+      .from(generations)
+      .orderBy(generations.sort);
+    set.generationId = assignGeneration(year, all)?.id ?? null;
+    set.generationOverridden = false;
+  }
+  const eraTouched = body.generationId !== undefined || body.releaseYear !== undefined;
+  const eraAfter = set.generationId !== undefined ? set.generationId : existing.generationId;
+  const openEraItem = (and(
+    eq(reviewItems.entityType, "track"),
+    eq(reviewItems.entityId, id),
+    eq(reviewItems.reason, "era_unknown"),
+    eq(reviewItems.status, "open"),
+  )) as SQL;
+  const eraStatements = [];
+  if (eraTouched && eraAfter !== null) {
+    // The era is known now, so an open "era unknown" item is settled by this edit.
+    const who = c.get("admin")?.email ?? null;
+    eraStatements.push(d.update(reviewItems).set({ status: "resolved", resolvedBy: who, resolvedAt: Date.now() }).where(openEraItem));
+  } else if (eraTouched && !pinned) {
+    const hasOpen = await d.select({ id: reviewItems.id }).from(reviewItems).where(openEraItem).get();
+    if (!hasOpen) {
+      eraStatements.push(d.insert(reviewItems).values({ entityType: "track", entityId: id, reason: "era_unknown", status: "open" }));
+      // As in ingest: a clean track that just got flagged needs a human look.
+      if (existing.status === "ingested") set.status = "needs_review";
+    }
   }
 
-  // One atomic batch (at most three statements, however many genres): the edit and the new genre set land together.
   const genreIds = body.genreIds && [...new Set(body.genreIds)];
-  if (genreIds) {
-    if (genreIds.length > 0) {
-      const found = await d.select({ id: genres.id }).from(genres).where(inArray(genres.id, genreIds));
-      const missing = genreIds.filter((g) => !found.some((f) => f.id === g));
-      if (missing.length > 0) throw new ApiError(404, "not_found", `Genre ${missing[0]} not found`);
-    }
-    // Ingest re-links scraped genres on every run, unless the field is marked as hand-edited.
-    const edited = new Set<string>(JSON.parse((set.adminEditedFields ?? existing.adminEditedFields) as string) as string[]);
-    edited.add("genres");
-    set.adminEditedFields = JSON.stringify([...edited].sort());
+  if (genreIds && genreIds.length > 0) {
+    const found = await d.select({ id: genres.id }).from(genres).where(inArray(genres.id, genreIds));
+    const missing = genreIds.filter((g) => !found.some((f) => f.id === g));
+    if (missing.length > 0) throw new ApiError(404, "not_found", `Genre ${missing[0]} not found`);
   }
+  // One atomic batch (a handful of statements, however many genres): everything in the edit lands together.
   await d.batch([
     d.update(tracks).set(set).where(eq(tracks.id, id)),
     ...(genreIds ? [d.delete(trackGenres).where(eq(trackGenres.trackId, id))] : []),
     ...(genreIds?.length ? [d.insert(trackGenres).values(genreIds.map((genreId) => ({ trackId: id, genreId })))] : []),
+    ...eraStatements,
   ]);
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
@@ -312,31 +339,40 @@ catalog.post("/artists", async (c) => {
   const d = db(c.env);
   const body = parse(artistCreateSchema, await readJson(c));
   const nameAm = cleanText(body.nameAm);
+  const nameLatin = body.nameLatin ? cleanText(body.nameLatin) : null;
   const key = normalizeFidel(nameAm);
-  // A spelling that folds to a known artist's name or alias is that artist: point at it instead of duplicating.
-  const known = key ? await d.select().from(artistAliases).where(eq(artistAliases.aliasNorm, key)).get() : undefined;
-  if (known) {
-    const owner = await requireArtist(d, known.artistId);
-    throw new ApiError(409, "artist_exists", `That name matches the existing artist ${owner.nameAm} (id ${owner.id})`);
-  }
   const now = Date.now();
+  // One batch, so the duplicate check and both inserts are atomic: of two editors creating homophone spellings at
+  // once, the second sees the first one's alias. A spelling that folds to a known name or alias is that artist.
+  let results: D1Result[];
   try {
-    const [artist] = await d
-      .insert(artists)
-      .values({ nameAm, nameLatin: body.nameLatin ? cleanText(body.nameLatin) : null, createdAt: now, updatedAt: now })
-      .returning();
-    // As in ingest, the canonical name is also an alias: its folded key is how later spellings are matched.
-    if (key) {
-      await d
-        .insert(artistAliases)
-        .values({ artistId: artist!.id, alias: nameAm, aliasNorm: key, source: "canonical" })
-        .onConflictDoNothing({ target: artistAliases.aliasNorm });
-    }
-    return c.json({ artist }, 201);
+    results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO artists (name_am, name_latin, created_at, updated_at)
+         SELECT ?1, ?2, ?3, ?3 WHERE ?4 = '' OR NOT EXISTS (SELECT 1 FROM artist_aliases WHERE alias_norm = ?4)`,
+      ).bind(nameAm, nameLatin, now, key),
+      // The canonical name is also an alias, as in ingest: its folded key is how later spellings are matched.
+      c.env.DB.prepare(
+        `INSERT INTO artist_aliases (artist_id, alias, alias_norm, source)
+         SELECT id, name_am, ?2, 'canonical' FROM artists
+         WHERE name_am = ?1 AND ?2 <> '' AND NOT EXISTS (SELECT 1 FROM artist_aliases WHERE alias_norm = ?2)`,
+      ).bind(nameAm, key),
+    ]);
   } catch (err) {
     if (isUniqueViolation(err)) throw new ApiError(409, "name_taken", "An artist with that Amharic name already exists");
     throw err;
   }
+  if (results[0]!.meta.changes === 0) {
+    const known = await d.select().from(artistAliases).where(eq(artistAliases.aliasNorm, key)).get();
+    const owner = known ? await d.select().from(artists).where(eq(artists.id, known.artistId)).get() : undefined;
+    throw new ApiError(
+      409,
+      "artist_exists",
+      owner ? `That name matches the existing artist ${owner.nameAm} (id ${owner.id})` : "That name matches an existing artist",
+    );
+  }
+  const artist = await d.select().from(artists).where(eq(artists.nameAm, nameAm)).get();
+  return c.json({ artist }, 201);
 });
 
 const artistPatchSchema = z

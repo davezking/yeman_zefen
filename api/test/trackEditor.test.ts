@@ -151,9 +151,67 @@ describe("track detail and genre edits", () => {
     expect((await json(await api(`/admin/tracks/${track.id}`))).genreIds.sort()).toEqual([ids.tizita, ids.pop].sort());
 
     await api(`/admin/tracks/${track.id}`, { method: "PATCH", body: { genreIds: [ids.pop] } });
-    // The scrape now sees a changed field, so the track is updated as well as re-linked.
-    expect((await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [{ ...record, album: "Hits 2" }] } })).status).toBe(200);
+    // The same record again: the removed genre stays removed, and the run reports nothing changed.
+    const again = await json(await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [record] } }));
+    expect(again.results[0].result).toBe("skipped");
     expect((await json(await api(`/admin/tracks/${track.id}`))).genreIds).toEqual([ids.pop]);
+  });
+});
+
+describe("era follows the release year unless pinned", () => {
+  const openEraItems = async (trackId: number) =>
+    (await json(await api(`/admin/tracks/${trackId}`))).openReviewItems.filter((r: any) => r.reason === "era_unknown");
+
+  it("clearing a pinned era re-derives it from the year", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { releaseYear: 1985, generationId: 4, generationOverridden: true });
+    const body = await json(await api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { generationId: null } }));
+    expect(body.track).toMatchObject({ generationId: 2, generationOverridden: false }); // 1985 is the 1980s
+  });
+
+  it("changing the year moves an unpinned era, but not a pinned one", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const free = await makeTrack(artist.id, { releaseYear: 1985, generationId: 2 });
+    const pinned = await makeTrack(artist.id, { releaseYear: 1985, generationId: 2, generationOverridden: true });
+    expect((await json(await api(`/admin/tracks/${free.id}`, { method: "PATCH", body: { releaseYear: 1995 } }))).track.generationId).toBe(3);
+    expect((await json(await api(`/admin/tracks/${pinned.id}`, { method: "PATCH", body: { releaseYear: 1995 } }))).track).toMatchObject({
+      generationId: 2,
+      generationOverridden: true,
+    });
+  });
+
+  it("no year means no era: flags era_unknown once and sends a clean track to review", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { releaseYear: 1985, generationId: 2, status: "ingested" });
+    const body = await json(await api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { releaseYear: null } }));
+    expect(body.track).toMatchObject({ generationId: null, status: "needs_review" });
+    expect(await openEraItems(t.id)).toHaveLength(1);
+    await api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { generationId: null } });
+    expect(await openEraItems(t.id)).toHaveLength(1); // not duplicated
+  });
+
+  it("an edit that makes the era known resolves the open era_unknown item", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const byYear = await makeTrack(artist.id, { status: "needs_review" });
+    const byPick = await makeTrack(artist.id, { status: "needs_review" });
+    await db(env).insert(reviewItems).values([
+      { entityType: "track", entityId: byYear.id, reason: "era_unknown", status: "open" },
+      { entityType: "track", entityId: byPick.id, reason: "era_unknown", status: "open" },
+    ]);
+    await api(`/admin/tracks/${byYear.id}`, { method: "PATCH", body: { releaseYear: 2003 }, as: "editor" });
+    await api(`/admin/tracks/${byPick.id}`, { method: "PATCH", body: { generationId: 1 } });
+    expect(await openEraItems(byYear.id)).toEqual([]);
+    expect(await openEraItems(byPick.id)).toEqual([]);
+    const closed = await db(env).select().from(reviewItems).where(eq(reviewItems.entityId, byYear.id)).get();
+    expect(closed).toMatchObject({ status: "resolved", resolvedBy: "editor@yz.test" });
+  });
+
+  it("other edits leave the era and its review items alone", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { status: "needs_review" });
+    await db(env).insert(reviewItems).values({ entityType: "track", entityId: t.id, reason: "era_unknown", status: "open" });
+    await api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { titleAm: "አዲስ" } });
+    expect(await openEraItems(t.id)).toHaveLength(1);
   });
 });
 
@@ -184,6 +242,18 @@ describe("POST /admin/artists", () => {
     expect((await json(res)).error.code).toBe("name_taken");
     expect((await api("/admin/artists", { body: { nameAm: "   " } })).status).toBe(400);
     expect((await api("/admin/artists", { body: { nameAm: "ሀ", extra: 1 } })).status).toBe(400);
+  });
+
+  it("of two homophone spellings created at the same moment, exactly one wins", async () => {
+    const [a, b] = await Promise.all([
+      api("/admin/artists", { body: { nameAm: "ጥላሁን ገሠሠ" } }),
+      api("/admin/artists", { body: { nameAm: "ጥላሁን ገሰሰ" } }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+    const rows = await db(env).select().from(artists);
+    expect(rows).toHaveLength(1);
+    const aliases = await db(env).select().from(artistAliases).where(eq(artistAliases.artistId, rows[0]!.id));
+    expect(aliases.map((x) => x.source)).toEqual(["canonical"]);
   });
 
   it("is open to editors", async () => {
@@ -267,8 +337,16 @@ describe("dev CDN stand-in", () => {
     expect(tail.headers.get("content-range")).toBe("bytes 7-9/10");
   });
 
-  it("404s for other buckets' keys, missing clips, and outside dev", async () => {
+  it("416s a range past the end of the file", async () => {
+    const res = await rawRequest(`/cdn/${key}`, { headers: { range: "bytes=50-60" } });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe("bytes */10");
+  });
+
+  it("404s for other buckets' keys, bad paths, missing clips, and outside dev", async () => {
     expect((await rawRequest("/cdn/source/secret.mp3")).status).toBe(404);
+    expect((await rawRequest("/cdn/clips/%E0.mp3")).status).toBe(404); // malformed escape: not a 500
+    expect((await rawRequest("/cdn/clips/%2E%2E/source/x.mp3")).status).toBe(404);
     expect((await rawRequest("/cdn/clips/404/none.mp3")).status).toBe(404);
     const { default: app } = await import("../src/index");
     const prod = await app.fetch(new Request(`https://api.test/cdn/${key}`), { ...env, ENV: "prod" });
