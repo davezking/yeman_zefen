@@ -85,7 +85,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 
 ## Era, genre and difficulty
 
-> **Catalog names differ.** Eras and genres are also seeded in the database (`api/migrations/0001_seed.sql`, admin-editable). The names below are the proposed display names and differ from the seed in places: English "The '80s" vs `1980s` (same for the '90s), and the Amharic spelling of ኢትዮ-ጃዝ / ኢትዮ ጃዝ, ባህላዊ / ባሕላዊ and ሂፕ-ሆፕ / ሂፕ ሆፕ. The Amharic reviewer should pick one spelling, and the seed and this table should then be made to agree, so the app and the admin site show the same names.
+> **Catalog names.** Genres here match the database seed (`api/migrations/0001_seed.sql`), which is the source of truth: the app shows the names that come with the catalog, and these keys are for mock data and fallbacks. Eras still differ in English: the design says "The '80s" and "The '90s", the seed says `1980s` and `1990s`; the Amharic era names match.
 
 | Key | English | Amharic |
 |---|---|---|
@@ -102,10 +102,10 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `genre.title` | Genre (optional) | ዘውግ (አማራጭ) |
 | `genre.any` | Any genre | ማንኛውም ዘውግ |
 | `genre.tizita` | Tizita | ትዝታ |
-| `genre.ethiojazz` | Ethio-jazz | ኢትዮ-ጃዝ |
-| `genre.traditional` | Traditional | ባህላዊ |
+| `genre.ethiojazz` | Ethio-jazz | ኢትዮ ጃዝ |
+| `genre.traditional` | Traditional | ባሕላዊ |
 | `genre.pop` | Pop | ፖፕ |
-| `genre.hiphop` | Hip-hop | ሂፕ-ሆፕ |
+| `genre.hiphop` | Hip-hop | ሂፕ ሆፕ |
 | `difficulty.title` | Clip length | የቅንጭቡ ርዝመት |
 | `difficulty.easy` | Easy · 10 s | ቀላል · 10 ሰከንድ |
 | `difficulty.medium` | Medium · 5 s | መካከለኛ · 5 ሰከንድ |
