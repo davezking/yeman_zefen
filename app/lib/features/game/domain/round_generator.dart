@@ -4,10 +4,13 @@ import 'game_track.dart';
 import 'generated_session.dart';
 import 'session_config.dart';
 
+enum RoundGenerationReason { tooFewTracks, tooFewArtists, noTracksInEra }
+
 /// The installed packs cannot make the session that was asked for.
 class RoundGenerationException implements Exception {
-  const RoundGenerationException(this.message);
+  const RoundGenerationException(this.message, this.reason);
   final String message;
+  final RoundGenerationReason reason;
 
   @override
   String toString() => 'RoundGenerationException: $message';
@@ -45,6 +48,7 @@ class RoundGenerator {
     if (_tracks.length < optionCount) {
       throw RoundGenerationException(
         'need at least $optionCount tracks for 4 options, have ${_tracks.length}',
+        RoundGenerationReason.tooFewTracks,
       );
     }
 
@@ -53,7 +57,10 @@ class RoundGenerator {
         if (config.generationId == 0 || t.generationId == config.generationId) t,
     ];
     if (pool.isEmpty) {
-      throw RoundGenerationException('no installed tracks in era ${config.generationId}');
+      throw RoundGenerationException(
+        'no installed tracks in era ${config.generationId}',
+        RoundGenerationReason.noTracksInEra,
+      );
     }
 
     final artistCount = _tracks.map((t) => t.artistId).toSet().length;
@@ -61,6 +68,7 @@ class RoundGenerator {
     if (config.questions == QuestionMix.artist && !canAskArtist) {
       throw RoundGenerationException(
         'need at least $optionCount artists for artist questions, have $artistCount',
+        RoundGenerationReason.tooFewArtists,
       );
     }
 

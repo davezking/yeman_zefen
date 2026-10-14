@@ -264,7 +264,10 @@ void main() {
   group('when the installed tracks are not enough', () {
     test('fewer than 4 tracks cannot make 4 options', () {
       final tracks = makeTracks({1: (3, 3)});
-      expect(() => generator(tracks).generate(config()), throwsA(isA<RoundGenerationException>()));
+      expect(
+        () => generator(tracks).generate(config()),
+        throwsA(isA<RoundGenerationException>().having((e) => e.reason, 'reason', RoundGenerationReason.tooFewTracks)),
+      );
     });
 
     test('artist questions need 4 artists in total', () {
@@ -273,7 +276,7 @@ void main() {
       expect(
         () => generator(threeArtists + [const GameTrack(id: 99, artistId: 100, generationId: 1)])
             .generate(config(questions: QuestionMix.artist)),
-        throwsA(isA<RoundGenerationException>()),
+        throwsA(isA<RoundGenerationException>().having((e) => e.reason, 'reason', RoundGenerationReason.tooFewArtists)),
       );
     });
 
@@ -289,7 +292,7 @@ void main() {
     test('an era with no tracks cannot be played', () {
       expect(
         () => generator(plenty).generate(config(generationId: 9)),
-        throwsA(isA<RoundGenerationException>()),
+        throwsA(isA<RoundGenerationException>().having((e) => e.reason, 'reason', RoundGenerationReason.noTracksInEra)),
       );
     });
 

@@ -10,6 +10,12 @@ class ClipPlaybackException implements Exception {
   String toString() => 'ClipPlaybackException: $message';
 }
 
+/// A clip was stopped, by a call or by leaving the screen, before its audio
+/// started. Different from a clip that will not play at all.
+class ClipStoppedException extends ClipPlaybackException {
+  const ClipStoppedException() : super('stopped before audio started');
+}
+
 /// One loaded audio slot: a single player that holds one clip at a time.
 /// [ClipPlayer] keeps two of these so the next round's clip can load while the
 /// current one plays. This is the seam that lets that logic be tested without

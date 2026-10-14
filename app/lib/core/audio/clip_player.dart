@@ -147,8 +147,8 @@ class ClipPlayer {
   /// Starts the prepared clip. Completes once audio is actually playing.
   ///
   /// A clip plays once: after it stops, finishes or is interrupted, [prepare]
-  /// it again. Throws [ClipPlaybackException] when it is stopped before audio
-  /// started.
+  /// it again. Throws [ClipStoppedException] when it is stopped before audio
+  /// started, and [ClipPlaybackException] when it will not play.
   Future<ClipStartInfo> play() async {
     final slot = _active;
     if (slot.clip == null) {
@@ -173,7 +173,7 @@ class ClipPlayer {
     if (!identical(_playingSlot, slot)) {
       // stop() or an interruption arrived while starting. Make sure it is silent.
       await slot.voice.stop();
-      throw const ClipPlaybackException('stopped before audio started');
+      throw const ClipStoppedException();
     }
     final latency = watch.elapsed;
     _playStopwatch = Stopwatch()..start();

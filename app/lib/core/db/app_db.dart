@@ -56,12 +56,46 @@ class PendingSessions extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [InstalledPacks, LocalTracks, PendingSessions])
+/// The player's best provisional score for each mode and era (0 = all eras).
+class LocalBests extends Table {
+  TextColumn get mode => text()(); // 'intro' | 'middle'
+  IntColumn get generationId => integer()();
+  IntColumn get bestScore => integer()();
+  IntColumn get achievedAt => integer()(); // epoch ms, UTC
+
+  @override
+  Set<Column> get primaryKey => {mode, generationId};
+}
+
+/// Counters the app keeps for itself, by name. `clip_errors` counts rounds that
+/// were skipped because a clip file was missing or would not play.
+class LocalCounters extends Table {
+  TextColumn get name => text()();
+  IntColumn get count => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {name};
+}
+
+/// The tracks of the last few sessions, so the next one can avoid them. Kept
+/// apart from `pending_sessions`, which is emptied once sessions are uploaded.
+class RecentSessions extends Table {
+  TextColumn get sessionId => text()();
+  IntColumn get playedAt => integer()(); // epoch ms, UTC
+  TextColumn get trackIdsJson => text()();
+
+  @override
+  Set<Column> get primaryKey => {sessionId};
+}
+
+@DriftDatabase(
+  tables: [InstalledPacks, LocalTracks, PendingSessions, LocalBests, LocalCounters, RecentSessions],
+)
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -70,6 +104,11 @@ class AppDb extends _$AppDb {
           if (from < 2) {
             await m.addColumn(localTracks, localTracks.artistId);
             await m.addColumn(localTracks, localTracks.generationId);
+          }
+          if (from < 3) {
+            await m.createTable(localBests);
+            await m.createTable(localCounters);
+            await m.createTable(recentSessions);
           }
         },
       );

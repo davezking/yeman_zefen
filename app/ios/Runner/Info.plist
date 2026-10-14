@@ -47,6 +47,14 @@
         </array>
       </dict>
     </dict>
+    <!-- Plain http to an address on the local network, for a dev API on the same Wi-Fi. Other http stays blocked. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <key>NSAllowsLocalNetworking</key>
+      <true/>
+    </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Lets the app reach the development server on your network.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchStoryboardName</key>

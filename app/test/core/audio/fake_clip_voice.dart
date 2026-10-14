@@ -8,6 +8,10 @@ class FakeClipVoice implements ClipVoice {
   Object? loadError;
   Object? startError;
 
+  /// Runs when a start begins, before the start delay. Lets a test make time
+  /// pass while the audio is still loading.
+  void Function()? onStart;
+
   final loads = <(String, Duration)>[];
 
   /// Loads made while the voice was still playing. just_audio would start
@@ -33,6 +37,7 @@ class FakeClipVoice implements ClipVoice {
 
   @override
   Future<void> start() async {
+    onStart?.call();
     final error = startError;
     if (error != null) throw error;
     await Future<void>.delayed(startDelay);
