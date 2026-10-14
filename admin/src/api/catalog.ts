@@ -52,7 +52,7 @@ export type Clip = z.infer<typeof clipSchema>;
 const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
 export type Artist = z.infer<typeof artistSchema>;
 
-const trackDetailSchema = z.object({
+export const trackDetailSchema = z.object({
   track: z.object({
     id: z.number(),
     artistId: z.number(),
@@ -134,6 +134,12 @@ export function useEnsureTrack() {
   return (id: number) => qc.ensureQueryData({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id) });
 }
 
+/** The track's detail as the server has it now, not as cached: for deciding what to offer after an edit. */
+export function useFreshTrack() {
+  const qc = useQueryClient();
+  return (id: number) => qc.fetchQuery({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id), staleTime: 0 });
+}
+
 export function usePrefetchTrack() {
   const qc = useQueryClient();
   return (id: number) => void qc.prefetchQuery({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id) });
@@ -177,9 +183,11 @@ export interface TrackPatch {
   genreIds?: number[];
 }
 
-export function usePatchTrack(id: number) {
+/** `silent`: the caller shows errors itself, so the global notification is switched off. */
+export function usePatchTrack(id: number, { silent = false }: { silent?: boolean } = {}) {
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: (patch: TrackPatch) =>
       apiFetch(`/admin/tracks/${id}`, trackDetailSchema, { method: "PATCH", json: patch }),
     onSuccess: (detail) => {

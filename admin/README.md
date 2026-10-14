@@ -30,10 +30,10 @@ Worker's `/admin/*` routes with the Cloudflare Access cookie. Hosted on Cloudfla
   when there is one.
 - `src/api/catalog.ts`: schemas and TanStack Query hooks for tracks, artists, eras, genres and review items.
 - `src/layout/`: the app shell and sidebar. `nav.ts` is the list of routes.
-- `src/pages/`: `TracksPage` (table, filters, bulk actions) and `TrackDetailPage` (editor). The other routes are
-  placeholders that later sprints replace.
+- `src/pages/`: `TracksPage` (table, filters, bulk actions), `TrackDetailPage` (editor) and `ReviewPage` (the review
+  queue; its panels are in `src/components/review/`). The other routes are placeholders that later sprints replace.
 - `src/lib/`: logic with tests: the form-to-patch diff (`trackForm.ts`), the filters kept in the URL
-  (`trackFilters.ts`) and the bulk runner (`bulk.ts`).
+  (`trackFilters.ts`), the bulk runner (`bulk.ts`) and review-item details and edits (`review.ts`).
 
 ## Tracks
 
@@ -54,3 +54,10 @@ against re-scrapes. Keyboard shortcuts (they do not fire while you type in a fie
 not ready), the reason shows next to the buttons and you stay on the track.
 
 To try it with data and audio locally, see "Track editor API" in `docs/ops.md`.
+
+## Review queue
+
+`/review` has a tab per flag reason, each with its count and its items oldest first. The panel on the right resolves
+the chosen item (what each one does is in "Review queue API" in `docs/ops.md`). Closing an item moves on to the next
+in the tab, and closing the last open item of a track offers to approve it. Merging artists is for admins; the button
+is disabled for editors.

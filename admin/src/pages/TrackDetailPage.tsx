@@ -32,15 +32,14 @@ import {
   useTrack,
   useTrackAction,
   useTrackList,
-  type Clip,
   type TrackAction,
   type TrackDetail,
 } from "../api/catalog";
 import { ApiError } from "../api/client";
 import { ArtistPicker } from "../components/ArtistPicker";
+import { ClipPlayers } from "../components/ClipPlayers";
 import { StatusBadge, statusLabel, trackName } from "../components/TrackBits";
 import { filtersFromParams } from "../lib/trackFilters";
-import { mmss } from "../lib/format";
 import { buildPatch, toForm, type FormValues } from "../lib/trackForm";
 
 const REASON_LABEL: Record<string, string> = {
@@ -346,9 +345,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           <Card withBorder>
             <Stack gap="sm">
               <Title order={4}>Clips</Title>
-              {(["intro", "middle"] as const).map((type) => (
-                <ClipRow key={type} type={type} clip={detail.clips.find((c) => c.type === type)} />
-              ))}
+              <ClipPlayers clips={detail.clips} />
             </Stack>
           </Card>
 
@@ -429,33 +426,6 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           </Group>
         </Stack>
       </Modal>
-    </Stack>
-  );
-}
-
-function ClipRow({ type, clip }: { type: "intro" | "middle"; clip: Clip | undefined }) {
-  const name = type === "intro" ? "Intro" : "Middle";
-  if (!clip) {
-    return (
-      <Group>
-        <Text fw={500} w={60}>{name}</Text>
-        <Badge color="gray" variant="light">not cut yet</Badge>
-      </Group>
-    );
-  }
-  const color = clip.status === "ready" ? "green" : clip.status === "failed" ? "red" : "yellow";
-  return (
-    <Stack gap={4}>
-      <Group>
-        <Text fw={500} w={60}>{name}</Text>
-        <Badge color={color} variant="light">{clip.status === "pending" ? "pending: cut job" : clip.status}</Badge>
-        <Text size="xs" c="dimmed">starts at {mmss(clip.startMs)}, {(clip.lengthMs / 1000).toFixed(0)} s</Text>
-      </Group>
-      {clip.url ? (
-        <audio controls preload="none" src={clip.url} style={{ width: "100%" }} />
-      ) : (
-        <Text size="sm" c="dimmed">No file to play until the clip is ready.</Text>
-      )}
     </Stack>
   );
 }
