@@ -85,6 +85,8 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 
 ## Era, genre and difficulty
 
+> **Catalog names differ.** Eras and genres are also seeded in the database (`api/migrations/0001_seed.sql`, admin-editable). The names below are the proposed display names and differ from the seed in places: English "The '80s" vs `1980s` (same for the '90s), and the Amharic spelling of ኢትዮ-ጃዝ / ኢትዮ ጃዝ, ባህላዊ / ባሕላዊ and ሂፕ-ሆፕ / ሂፕ ሆፕ. The Amharic reviewer should pick one spelling, and the seed and this table should then be made to agree, so the app and the admin site show the same names.
+
 | Key | English | Amharic |
 |---|---|---|
 | `era.title` | Pick an era | ዘመን ይምረጡ |
@@ -155,7 +157,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `feedback.revealEra` | It's from {era} | የ{era} ዘፈን ነው |
 | `feedback.timeout` | Time's up | ጊዜው አልቋል |
 | `feedback.hintUsed` | Hint used · half points | ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ |
-| `feedback.skipped` | This clip wouldn't play, so we skipped it. | ይህ ቅንጭብ ሊጫወት ስላልቻለ አልፈነዋል። |
+| `feedback.skipped` | We skipped a song that wouldn't load or play. No points lost. | ሊጫን ወይም ሊጫወት ያልቻለ ዘፈን ዘለልን። ነጥብ አልተቀነሰም። |
 
 ## Results
 

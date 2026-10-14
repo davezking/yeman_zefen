@@ -35,5 +35,6 @@ The Step 1 copy deck, the Step 2 wireframes and the Step 3 directions are still 
 
 - **Amharic review** by a native speaker (sprint exit criterion).
 - **No dark theme** was designed. The theme extension should still take one later.
-- **Interstitial frequency:** `/v1/config` defaults to 3 rounds, and the architecture and later sprint prompts are updated to match.
+- **Interstitial frequency:** `/v1/config` defaults to 3 rounds, and the architecture and later sprint prompts are updated to match. This is a decision made in Sprint 1, and it differs from the PRD's FR-19, which says 4. The PRD is left as written.
+- **Era and genre names:** the display names in `copy.md` differ slightly from the database seed (see the note there).
 - **Paused time:** the scoring doc now says that `response_ms` excludes the paused time. The app's scorer must measure it that way when the hint is built.

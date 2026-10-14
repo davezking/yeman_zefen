@@ -118,7 +118,7 @@ Boards are 840 × 900 and hold two 360 × 780 phones: English on the left, Amhar
 
 ## 09 · Sign-in sheet (iOS) — `H12-SignIn`
 
-- Bottom sheet over the dimmed Results screen. Trophy tile + `auth.prompt.title`, `auth.prompt.body`, a teal check line `auth.prompt.carryOver`. Buttons: `auth.apple` (black, Apple logo; iOS only, listed first per Apple guidelines), `auth.google` (white), `auth.email` (white, mail icon), link `auth.notNow`.
+- Bottom sheet over the dimmed Results screen. Trophy tile + `auth.prompt.title`, `auth.prompt.body`, a teal check line `auth.prompt.carryOver`. Buttons: `auth.apple` (black, Apple logo; iOS only; placed first as a design choice, and at least as prominent as the other options, as App Store guideline 4.8 requires), `auth.google` (white), `auth.email` (white, mail icon), link `auth.notNow`.
 - Android shows the same sheet without the Apple button.
 - **Email**: a follow-up sheet with `auth.email.label`, `auth.password.label`, `auth.email.submit`, `auth.email.create`, `auth.email.forgot`, errors `auth.error.*`. Not drawn in hi-fi; use the same sheet, field and button styles.
 - **States**: `auth.signingIn` (buttons disabled, spinner in the pressed one), `auth.signedIn` toast, `auth.linkFailed`.
