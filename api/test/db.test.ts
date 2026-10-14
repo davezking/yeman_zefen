@@ -35,6 +35,7 @@ describe("seed data", () => {
       ["modern", 2010, null],
     ]);
     expect(rows.every((r) => r.nameAm && r.nameEn)).toBe(true);
+    expect(rows.map((r) => r.nameEn)).toEqual(["Golden Age", "The '80s", "The '90s", "The 2000s", "Modern"]);
   });
 
   it("seeds the 5 genres", async () => {

@@ -85,7 +85,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 
 ## Era, genre and difficulty
 
-> **Catalog names.** Genres here match the database seed (`api/migrations/0001_seed.sql`), which is the source of truth: the app shows the names that come with the catalog, and these keys are for mock data and fallbacks. Eras still differ in English: the design says "The '80s" and "The '90s", the seed says `1980s` and `1990s`; the Amharic era names match.
+> **Catalog names.** Eras and genres are also stored in the database (`generations` and `genres`, admin-editable), which is what the app shows once it reads names from the catalog. The two agree: genres use the database's Amharic spellings, and migration `0005_era_display_names` renamed the English eras to "The '80s", "The '90s" and "The 2000s".
 
 | Key | English | Amharic |
 |---|---|---|
