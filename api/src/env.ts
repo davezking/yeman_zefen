@@ -7,6 +7,8 @@ export type Bindings = {
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
   CDN_BASE_URL: string;
+  /** Exact origin of the admin SPA (e.g. https://admin.example.com). The only origin allowed CORS on /admin/*. */
+  ADMIN_ORIGIN: string;
   /** Cloudflare Access service-token client id allowed on /admin/ingest/*. */
   INGEST_SERVICE_CLIENT_ID: string;
   /** Secret. Fine-grained GitHub PAT, Actions read/write on GH_REPO only, used to dispatch the ingest workflows. */
