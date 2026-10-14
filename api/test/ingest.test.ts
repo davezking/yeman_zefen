@@ -230,6 +230,23 @@ describe("POST /admin/ingest/tracks", () => {
   });
 });
 
+describe("re-scraping a track that is out of the catalog", () => {
+  it("opens no review items for a rejected or retired track, and reports it skipped", async () => {
+    const job = await makeJob("scrape");
+    const flagged = (n: number) => scraped(n, { flags: [{ reason: "translit_uncertain", details: { n } }] });
+    await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [scraped(1), scraped(2)] } });
+    const [one, two] = await db(env).select().from(tracks).orderBy(tracks.id);
+    await db(env).update(tracks).set({ status: "rejected" }).where(eq(tracks.id, one!.id));
+    await db(env).update(tracks).set({ status: "retired" }).where(eq(tracks.id, two!.id));
+
+    const res = await json(await svc("/admin/ingest/tracks", { body: { jobId: job.id, tracks: [flagged(1), flagged(2)] } }));
+    expect(res.results.map((r: any) => r.result)).toEqual(["skipped", "skipped"]);
+    expect(await count("review_items")).toBe(0);
+    const statuses = (await db(env).select().from(tracks).orderBy(tracks.id)).map((t) => t.status);
+    expect(statuses).toEqual(["rejected", "retired"]); // and still out
+  });
+});
+
 describe("POST /admin/ingest/clips", () => {
   const sha = (c: string) => c.repeat(64);
   const clipBody = (jobId: number, trackId: number, overrides: Record<string, unknown> = {}) => ({
@@ -626,6 +643,17 @@ describe("GET /admin/ingest/clip-targets", () => {
 describe("POST /admin/ingest/clips: source-audio flags", () => {
   const flag = (trackId: number, reason: string, details?: Record<string, unknown>) => ({ trackId, reason, ...(details ? { details } : {}) });
   const items = () => db(env).select().from(reviewItems).orderBy(reviewItems.id);
+
+  it("never opens items about a rejected or retired track", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const rejected = await makeTrack(artist.id, { status: "rejected" });
+    const retired = await makeTrack(artist.id, { status: "retired" });
+    const job = await makeJob("cut");
+    const body = { jobId: job.id, flags: [flag(rejected.id, "short_audio", { durationMs: 1 }), flag(retired.id, "missing_audio", { cause: "x" })] };
+    const res = await json(await svc("/admin/ingest/clips", { body }));
+    expect(res.flags.map((f: any) => f.result)).toEqual(["skipped", "skipped"]);
+    expect(await items()).toEqual([]);
+  });
 
   it("raises review items, moves an ingested track to needs_review, and is idempotent", async () => {
     const artist = await makeArtist("አርቲስት");

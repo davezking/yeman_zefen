@@ -1,7 +1,7 @@
 import { Alert, Badge, Button, Card, Grid, Group, Loader, NavLink, ScrollArea, Stack, Tabs, Text, Title } from "@mantine/core";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useFreshTrack } from "../api/catalog";
+import { useFreshTrack, type TrackDetail } from "../api/catalog";
 import { useReviewCounts, useReviewList, type ReviewRow } from "../api/review";
 import { useWhoami } from "../api/whoami";
 import { trackName } from "../components/TrackBits";
@@ -33,6 +33,11 @@ export function ReviewPage() {
 
   // Without a tab in the URL, the tab depends on the counts: wait for them rather than fetch a list that may not be shown.
   const tabKnown = isReason(param) || counts.isSuccess || counts.isError;
+  // Once chosen, the tab is written into the URL, so counts that change later (an item closed, a scrape) never move
+  // the admin to another tab mid-review.
+  useEffect(() => {
+    if (!isReason(param) && counts.isSuccess) setSp({ reason }, { replace: true });
+  }, [param, counts.isSuccess, reason, setSp]);
   const list = useReviewList(reason, { enabled: tabKnown });
   // Items closed in this session are hidden at once, not when the list has been fetched again.
   const [closed, setClosed] = useState<ReadonlySet<number>>(new Set());
@@ -45,13 +50,13 @@ export function ReviewPage() {
   // An item was closed: show the next one, and if that was the last open item of its track, offer to approve it.
   // Each close asks the server about its track; only the latest answer may set the offer.
   const offerSeq = useRef(0);
-  async function onClosed(closedRow: ReviewRow) {
+  async function onClosed(closedRow: ReviewRow, closedDetail?: TrackDetail) {
     const seq = ++offerSeq.current;
     const next = itemAfterClosing(items.map((i) => i.id), closedRow.id);
     setClosed((prev) => new Set(prev).add(closedRow.id));
     setChoice(next === undefined ? null : { reason, id: next });
     try {
-      const detail = await fresh(closedRow.track.id);
+      const detail = closedDetail ?? (await fresh(closedRow.track.id));
       if (seq !== offerSeq.current) return; // a later close is in charge of the offer now
       const approvable = detail.track.status === "ingested" || detail.track.status === "needs_review";
       setOffer(detail.openReviewItems.length === 0 && approvable ? { trackId: closedRow.track.id, name: trackName(detail.track) } : null);
@@ -121,7 +126,7 @@ export function ReviewPage() {
             {current && Panel && (
               <Card withBorder>
                 {/* Keyed by the item, so moving to the next one starts from clean state. */}
-                <Panel key={current.id} item={current} isAdmin={whoami.data?.role === "admin"} onClosed={(row) => void onClosed(row)} />
+                <Panel key={current.id} item={current} isAdmin={whoami.data?.role === "admin"} onClosed={(row, detail) => void onClosed(row, detail)} />
               </Card>
             )}
           </Grid.Col>

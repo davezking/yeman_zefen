@@ -316,5 +316,11 @@ A candidate that was scraped in the same batch has only a `sourceUrl` until it i
 linked to: the panel says so. Closing the last open item of a track offers to approve it.
 
 **Taking a track out closes its items.** Rejecting or retiring a track (`/reject`, `/retire`, and mark-duplicate)
-dismisses all of its open review items, recording who did it: a track out of the catalog has nothing left to review,
-and its items would only clutter the queue and the counts.
+dismisses all of its open review items in the same batch, recording who did it: a track out of the catalog has nothing
+left to review. It also stays closed: ingest and the cutter open no new items about a rejected or retired track (a
+re-scrape reports it `skipped`), an era edit on one opens no `era_unknown` item, and the queue and its counts leave such
+tracks out. Mark-duplicate records only the song-duplicate flag (`field: "track"`) as resolved; an artist-duplicate
+flag on the same track is dismissed, since nobody looked at the artists.
+
+**A track others are duplicates of cannot be rejected** (`409 has_duplicates`): that would leave no copy of the song.
+Retiring an approved one is allowed, since that takes the song out on purpose.

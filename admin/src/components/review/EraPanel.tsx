@@ -1,6 +1,6 @@
 import { Alert, Button, Group, NumberInput, Select, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useState } from "react";
-import { useFreshTrack, useGenerations, usePatchTrack } from "../../api/catalog";
+import { useGenerations, usePatchTrack, type TrackDetail } from "../../api/catalog";
 import { ApiError } from "../../api/client";
 import { useCloseItem, useRefreshQueue } from "../../api/review";
 import { eraPatch } from "../../lib/review";
@@ -16,7 +16,6 @@ export function EraPanel({ item, onClosed }: PanelProps) {
   const t = item.track;
   const generations = useGenerations();
   const patchTrack = usePatchTrack(t.id, { silent: true });
-  const fresh = useFreshTrack();
   const refresh = useRefreshQueue();
   const close = useCloseItem();
   const { error, busy, run } = usePanelRun();
@@ -27,20 +26,20 @@ export function EraPanel({ item, onClosed }: PanelProps) {
   const changed = Object.keys(patch).length > 0;
 
   async function save() {
+    let after: TrackDetail | undefined;
     const ok = await run(async () => {
-      await patchTrack.mutateAsync(patch);
-      refresh();
-      // The server closes the item when the era is known afterwards. Ask it, rather than guess.
-      const after = await fresh(t.id);
+      after = await patchTrack.mutateAsync(patch);
+      refresh({ id: t.id, detail: after });
+      // The server closes the item when the era is known afterwards; the track it sends back says whether it did.
       if (after.openReviewItems.some((i) => i.id === item.id)) {
         throw new ApiError(0, "still_unknown", "The era is still unknown. Enter a year, or pick an era.");
       }
     });
-    if (ok) onClosed(item);
+    if (ok) onClosed(item, after);
   }
 
   async function dismiss() {
-    if (await run(() => close.mutateAsync({ id: item.id, action: "dismiss" }))) onClosed(item);
+    if (await run(() => close.mutateAsync({ id: item.id, action: "dismiss", trackId: t.id }))) onClosed(item);
   }
 
   return (

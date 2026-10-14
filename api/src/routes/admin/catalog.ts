@@ -23,6 +23,7 @@ import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
 import { assignGeneration } from "../../lib/era";
+import { isOutOfCatalog } from "../../lib/trackStatus";
 import { createJob, jobOut } from "../../lib/jobs";
 import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
@@ -208,7 +209,7 @@ catalog.patch("/tracks/:id", async (c) => {
     // The era is known now, so an open "era unknown" item is settled by this edit.
     const who = c.get("admin")?.email ?? null;
     eraStatements.push(d.update(reviewItems).set({ status: "resolved", resolvedBy: who, resolvedAt: Date.now() }).where(openEraItem));
-  } else if (eraTouched && !pinned) {
+  } else if (eraTouched && !pinned && !isOutOfCatalog(existing.status)) {
     // The duplicate check runs inside the batch, so two quick saves cannot each open an item.
     eraStatements.push(
       d.insert(reviewItems).select(
@@ -255,8 +256,6 @@ async function transition(
   action: string,
   from: readonly (typeof TRACK_STATUSES)[number][],
   to: (typeof TRACK_STATUSES)[number],
-  /** The admin acting, recorded on the review items a rejection or retirement closes. */
-  who: string | null,
 ) {
   const updated = await d
     .update(tracks)
@@ -267,9 +266,45 @@ async function transition(
     const current = await requireTrack(d, id);
     throw new ApiError(409, "invalid_transition", `Cannot ${action} a track that is ${current.status}`);
   }
-  // A track taken out of the catalog has nothing left to review: its open items would only clutter the queue.
-  if (to === "rejected" || to === "retired") {
-    await d.update(reviewItems).set({ status: "dismissed", resolvedBy: who, resolvedAt: Date.now() }).where(openItemsOf(id));
+}
+
+/**
+ * Take a track out of the catalog (reject or retire). In one batch with the status change, its open review items are
+ * dismissed: nothing about it is left to review. A track that others are marked as duplicates of cannot be rejected,
+ * or every copy of the song would be out; retiring an approved one is allowed, since that takes the song out on purpose.
+ */
+async function takeOut(d: Db, id: number, to: "rejected" | "retired", who: string | null) {
+  const action = to === "rejected" ? "reject" : "retire";
+  const from: (typeof TRACK_STATUSES)[number][] = to === "rejected" ? ["ingested", "needs_review"] : ["approved"];
+  const other = alias(tracks, "other");
+  const noDuplicates = notExists(d.select({ one: sql`1` }).from(other).where(eq(other.canonicalTrackId, id)));
+  const now = Date.now();
+  const [updated] = await d.batch([
+    d
+      .update(tracks)
+      .set({ status: to, updatedAt: now })
+      .where(and(eq(tracks.id, id), inArray(tracks.status, from), to === "rejected" ? noDuplicates : undefined))
+      .returning({ id: tracks.id }),
+    // Only if the update above took effect: the track now has the new status, stamped by this request.
+    d
+      .update(reviewItems)
+      .set({ status: "dismissed", resolvedBy: who, resolvedAt: now })
+      .where(
+        and(
+          openItemsOf(id),
+          exists(d.select({ one: sql`1` }).from(tracks).where(and(eq(tracks.id, id), eq(tracks.status, to), eq(tracks.updatedAt, now)))),
+        ),
+      ),
+  ]);
+  if (updated.length === 0) {
+    const current = await requireTrack(d, id);
+    if (to === "rejected" && from.includes(current.status)) {
+      const dup = await d.select({ id: tracks.id }).from(tracks).where(eq(tracks.canonicalTrackId, id)).get();
+      if (dup) {
+        throw new ApiError(409, "has_duplicates", `Track ${dup.id} is marked as a duplicate of this track; rejecting this one would leave no copy of the song`);
+      }
+    }
+    throw new ApiError(409, "invalid_transition", `Cannot ${action} a track that is ${current.status}`);
   }
 }
 
@@ -296,14 +331,14 @@ catalog.post("/tracks/:id/approve", async (c) => {
     throw new ApiError(409, "clips_not_ready", `Cannot approve: ${problems.join(", ")}`);
   }
 
-  await transition(d, id, "approve", ["ingested", "needs_review"], "approved", c.get("admin")?.email ?? null);
+  await transition(d, id, "approve", ["ingested", "needs_review"], "approved");
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
 catalog.post("/tracks/:id/reject", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
-  await transition(d, id, "reject", ["ingested", "needs_review"], "rejected", c.get("admin")?.email ?? null);
+  await takeOut(d, id, "rejected", c.get("admin")?.email ?? null);
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
@@ -354,7 +389,16 @@ catalog.post("/tracks/:id/mark-duplicate", async (c) => {
     d
       .update(reviewItems)
       .set({ status: "resolved", resolvedBy: who, resolvedAt: now })
-      .where(and(openItemsOf(id), eq(reviewItems.reason, "possible_duplicate"), nowLinked)),
+      .where(
+        and(
+          openItemsOf(id),
+          eq(reviewItems.reason, "possible_duplicate"),
+          // The song-duplicate flag is what this decides. An artist-duplicate flag was not looked at, so it is
+          // dismissed with the rest below rather than recorded as resolved.
+          sql`json_extract(${reviewItems.detailsJson}, '$.field') = 'track'`,
+          nowLinked,
+        ),
+      ),
     d
       .update(reviewItems)
       .set({ status: "dismissed", resolvedBy: who, resolvedAt: now })
@@ -398,7 +442,7 @@ async function duplicateBlocker(d: Db, track: typeof tracks.$inferSelect, canoni
 catalog.post("/tracks/:id/retire", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
-  await transition(d, id, "retire", ["approved"], "retired", c.get("admin")?.email ?? null);
+  await takeOut(d, id, "retired", c.get("admin")?.email ?? null);
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 

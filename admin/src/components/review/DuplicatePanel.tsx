@@ -1,5 +1,6 @@
 import { Alert, Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
 import { useState } from "react";
+import type { TrackDetail } from "../../api/catalog";
 import { trackName } from "../TrackBits";
 import { useArtistDetail, useCloseItem, useMarkDuplicate, useMergeArtist } from "../../api/review";
 import { parseDuplicate, type Candidate, type DuplicateDetails } from "../../lib/review";
@@ -43,10 +44,11 @@ function TrackDuplicates({ item, details, onClosed }: Props) {
 
   const markAs = async (canonicalId: number) => {
     // The server settles this item in the same step as the rejection.
-    if (await run(() => mark.mutateAsync({ trackId: t.id, canonicalTrackId: canonicalId }))) onClosed(item);
+    let after: TrackDetail | undefined;
+    if (await run(async () => (after = await mark.mutateAsync({ trackId: t.id, canonicalTrackId: canonicalId })))) onClosed(item, after);
   };
   const different = async () => {
-    if (await run(() => close.mutateAsync({ id: item.id, action: "dismiss" }))) onClosed(item);
+    if (await run(() => close.mutateAsync({ id: item.id, action: "dismiss", trackId: t.id }))) onClosed(item);
   };
 
   return (
@@ -120,7 +122,7 @@ function ArtistDuplicates({ item, details, isAdmin, onClosed }: Props) {
   const target = useArtistDetail(confirming ?? undefined);
 
   const closeWith = async (action: "resolve" | "dismiss") => {
-    if (await run(() => close.mutateAsync({ id: item.id, action }))) onClosed(item);
+    if (await run(() => close.mutateAsync({ id: item.id, action, trackId: t.id }))) onClosed(item);
   };
   const mergeInto = async (intoId: number) => {
     const ok = await run(async () => {
@@ -129,7 +131,7 @@ function ArtistDuplicates({ item, details, isAdmin, onClosed }: Props) {
         await merge.mutateAsync({ fromId: t.artistId, intoId });
         setMerged(true);
       }
-      await close.mutateAsync({ id: item.id, action: "resolve" });
+      await close.mutateAsync({ id: item.id, action: "resolve", trackId: t.id });
     });
     if (ok) onClosed(item);
   };

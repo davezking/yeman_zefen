@@ -1,6 +1,7 @@
 import { Alert, Anchor, Badge, Button, Group, Stack, Table, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
+import type { TrackDetail } from "../../api/catalog";
 import { useCloseItem, useRetireOrReject, useStartCut } from "../../api/review";
 import { isHttpUrl } from "../../lib/format";
 import { detailRows } from "../../lib/review";
@@ -31,7 +32,7 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
   const closeAfter = async (action: () => Promise<unknown>, resolution: "resolve" | "dismiss" = "resolve") => {
     const ok = await run(async () => {
       await action();
-      await close.mutateAsync({ id: item.id, action: resolution });
+      await close.mutateAsync({ id: item.id, action: resolution, trackId: t.id });
     });
     if (ok) onClosed(item);
   };
@@ -111,7 +112,10 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
         // One request: taking a track out closes all its open items on the server, this one included.
         onConfirm={() =>
           takeOut &&
-          void run(() => retire.mutateAsync({ id: t.id, action: takeOut })).then((ok) => ok && onClosed(item))
+          void (async () => {
+            let after: TrackDetail | undefined;
+            if (await run(async () => (after = await retire.mutateAsync({ id: t.id, action: takeOut })))) onClosed(item, after);
+          })()
         }
       >
         {takeOut === "retire"

@@ -174,6 +174,40 @@ describe("taking a track out closes its review items", () => {
     expect((await json(await api("/admin/review-items/counts"))).counts.era_unknown).toBe(1);
   });
 
+  it("refuses to reject a track that others are duplicates of, but allows retiring one", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const original = await makeTrack(artist.id, { status: "needs_review" });
+    const dup = await makeTrack(artist.id, { status: "needs_review" });
+    expect((await api(`/admin/tracks/${dup.id}/mark-duplicate`, { body: { canonicalTrackId: original.id } })).status).toBe(200);
+    const item = await addItem(original.id, "era_unknown");
+
+    const res = await api(`/admin/tracks/${original.id}/reject`, { method: "POST" });
+    expect(res.status).toBe(409);
+    expect((await json(res)).error.code).toBe("has_duplicates");
+    expect((await db(env).select().from(tracks).where(eq(tracks.id, original.id)).get())!.status).toBe("needs_review");
+    expect((await db(env).select().from(reviewItems).where(eq(reviewItems.id, item.id)).get())!.status).toBe("open");
+
+    await db(env).update(tracks).set({ status: "approved" }).where(eq(tracks.id, original.id));
+    expect((await api(`/admin/tracks/${original.id}/retire`, { method: "POST" })).status).toBe(200);
+  });
+
+  it("an era edit on a rejected track opens no era_unknown item", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { status: "rejected", releaseYear: 1985, generationId: 2 });
+    expect((await api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { releaseYear: null } })).status).toBe(200);
+    expect(await db(env).select().from(reviewItems).where(eq(reviewItems.entityId, t.id))).toEqual([]);
+  });
+
+  it("the queue and its counts leave out tracks that are out of the catalog", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const live = await makeTrack(artist.id, { status: "needs_review" });
+    const out = await makeTrack(artist.id, { status: "rejected" });
+    await addItem(live.id, "era_unknown");
+    await addItem(out.id, "era_unknown"); // e.g. left open before items were closed on rejection
+    expect((await json(await api("/admin/review-items?reason=era_unknown"))).items.map((i: any) => i.track.id)).toEqual([live.id]);
+    expect((await json(await api("/admin/review-items/counts"))).counts.era_unknown).toBe(1);
+  });
+
   it("retiring does the same; approving leaves items alone; a refused move changes nothing", async () => {
     const artist = await makeArtist("አርቲስት");
     const t = await makeTrack(artist.id, { status: "approved" });
@@ -201,6 +235,7 @@ describe("POST /admin/tracks/:id/mark-duplicate", () => {
     await makeClip(dup.id, "intro");
     await makeClip(dup.id, "middle");
     const dupItem = await addItem(dup.id, "possible_duplicate", { details: '{"field":"track","candidates":[{"id":1,"score":0.9}]}' });
+    const artistItem = await addItem(dup.id, "possible_duplicate", { details: '{"field":"artist","candidates":[{"id":1,"score":0.9}]}' });
     const otherItem = await addItem(dup.id, "era_unknown");
 
     const res = await mark(dup.id, original.id, "editor");
@@ -212,6 +247,8 @@ describe("POST /admin/tracks/:id/mark-duplicate", () => {
     const items = await db(env).select().from(reviewItems).where(eq(reviewItems.entityId, dup.id));
     expect(items.find((i) => i.id === dupItem.id)).toMatchObject({ status: "resolved", resolvedBy: "editor@yz.test" });
     expect(items.find((i) => i.id === otherItem.id)).toMatchObject({ status: "dismissed", resolvedBy: "editor@yz.test" });
+    // The artist question was not looked at, so it is dismissed, not recorded as resolved.
+    expect(items.find((i) => i.id === artistItem.id)?.status).toBe("dismissed");
 
     // Nothing is deleted: both tracks, the artist and the duplicate's clips are all still there.
     expect(await db(env).select().from(tracks)).toHaveLength(2);

@@ -15,6 +15,8 @@ const inList = (col: string, values: readonly string[]) =>
   sql.raw(`${col} IN (${values.map((v) => `'${v}'`).join(", ")})`);
 
 export const TRACK_STATUSES = ["ingested", "needs_review", "approved", "rejected", "retired"] as const;
+/** A track with one of these statuses is out of the catalog: nothing about it is left to review. */
+export const OUT_OF_CATALOG = ["rejected", "retired"] as const;
 export const CLIP_TYPES = ["intro", "middle"] as const;
 export const CLIP_STATUSES = ["pending", "ready", "failed"] as const;
 export const REVIEW_REASONS = [

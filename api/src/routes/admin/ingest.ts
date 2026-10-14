@@ -19,6 +19,7 @@ import { db } from "../../db/client";
 import { artistAliases, artists, CLIP_TYPES, INGEST_KINDS, INGEST_STATUSES, ingestJobs, REVIEW_REASONS, tracks } from "../../db/schema";
 import type { AppEnv, Bindings } from "../../env";
 import { assignGeneration } from "../../lib/era";
+import { isOutOfCatalog } from "../../lib/trackStatus";
 import { ApiError } from "../../lib/errors";
 import { insertJob, jobRequest } from "../../lib/jobs";
 import { cleanText, normalizeAlias, normalizeFidel } from "../../lib/normalize";
@@ -212,12 +213,13 @@ const LINK_GENRES_SQL = `
   -- An admin who edited a track's genres owns them: a re-scrape must not bring back a genre they removed.
   WHERE NOT EXISTS (SELECT 1 FROM json_each(t.admin_edited_fields) e WHERE e.value = 'genres')`;
 
+// A rejected or retired track is out of the catalog: a re-scrape must not open items about it again.
 const INSERT_REVIEW_ITEMS_SQL = `
   INSERT INTO review_items (entity_type, entity_id, reason, details_json, status)
   SELECT 'track', t.id, json_extract(f.value, '$.reason'), json_extract(f.value, '$.details'), 'open'
   FROM json_each(?1, '$.tracks') j, json_each(j.value, '$.flags') f
   JOIN tracks t ON t.source_url = json_extract(j.value, '$.url')
-  WHERE NOT EXISTS (
+  WHERE t.status NOT IN ('rejected', 'retired') AND NOT EXISTS (
     SELECT 1 FROM review_items r
     WHERE r.entity_type = 'track' AND r.entity_id = t.id AND r.status = 'open'
       AND r.reason = json_extract(f.value, '$.reason')
@@ -374,8 +376,9 @@ ingestRoutes.post("/tracks", async (c) => {
       // Mirrors LINK_GENRES_SQL: genres an admin edited are never re-linked.
       const links = linksByTrack.get(existing.id);
       const newGenres = !edited.has("genres") && genreIds.some((g) => !links?.has(g));
+      // Mirrors INSERT_REVIEW_ITEMS_SQL: no new items for a track out of the catalog.
       const open = openByTrack.get(existing.id);
-      const newFlags = [...flagItems.keys()].some((k) => !open?.has(k));
+      const newFlags = !isOutOfCatalog(existing.status) && [...flagItems.keys()].some((k) => !open?.has(k));
       outcome = changed || eraChanged || newGenres || newFlags ? "updated" : "skipped";
     }
 
@@ -511,6 +514,8 @@ const INSERT_CLIP_FLAGS_SQL = `
          json_extract(f.value, '$.details'), 'open'
   FROM json_each(?1) f
   WHERE NOT EXISTS (
+    SELECT 1 FROM tracks t WHERE t.id = json_extract(f.value, '$.trackId') AND t.status IN ('rejected', 'retired'))
+  AND NOT EXISTS (
     SELECT 1 FROM review_items r
     WHERE r.entity_type = 'track' AND r.entity_id = json_extract(f.value, '$.trackId') AND r.status = 'open'
       AND r.reason = json_extract(f.value, '$.reason')
@@ -555,7 +560,7 @@ ingestRoutes.post("/clips", async (c) => {
   // ---- Batch 1: reads (4 queries).
   const [jobRes, trackRes, clipRes, openRes] = await runBatch(env, [
     env.DB.prepare(JOB_SQL).bind(body.jobId),
-    env.DB.prepare(`SELECT id, duration_ms, admin_edited_fields FROM tracks WHERE id ${inTrackIds}`).bind(trackIdsJson),
+    env.DB.prepare(`SELECT id, status, duration_ms, admin_edited_fields FROM tracks WHERE id ${inTrackIds}`).bind(trackIdsJson),
     env.DB.prepare(
       `SELECT id, track_id, type, start_ms, length_ms, r2_key, sha256, bytes, version, status FROM clips WHERE track_id ${inTrackIds}`,
     ).bind(trackIdsJson),
@@ -566,7 +571,7 @@ ingestRoutes.post("/clips", async (c) => {
   ]);
   assertJobOpen((jobRes!.results as unknown as JobRow[])[0], body.jobId, ["cut", "recut"]);
 
-  const trackRows = trackRes!.results as { id: number; duration_ms: number | null; admin_edited_fields: string }[];
+  const trackRows = trackRes!.results as { id: number; status: string; duration_ms: number | null; admin_edited_fields: string }[];
   const found = new Set(trackRows.map((t) => t.id));
   const missing = allTrackIds.filter((id) => !found.has(id));
   if (missing.length > 0) {
@@ -594,12 +599,15 @@ ingestRoutes.post("/clips", async (c) => {
       (o) => `${o.entity_id}|${o.reason}|${o.details_json ?? ""}`,
     ),
   );
+  // Mirrors INSERT_CLIP_FLAGS_SQL: already open, or about a track that is out of the catalog, means skipped.
+  const outTracks = new Set(trackRows.filter((t) => isOutOfCatalog(t.status)).map((t) => t.id));
+  const isNewFlag = (key: string, trackId: number) => !openItems.has(key) && !outTracks.has(trackId);
   const flagResults = [...flagItems.entries()].map(([key, f]) => ({
     trackId: f.trackId,
     reason: f.reason,
-    result: openItems.has(key) ? ("skipped" as const) : ("created" as const),
+    result: isNewFlag(key, f.trackId) ? ("created" as const) : ("skipped" as const),
   }));
-  const newFlags = [...flagItems.entries()].filter(([key]) => !openItems.has(key)).map(([, f]) => f);
+  const newFlags = [...flagItems.entries()].filter(([key, f]) => isNewFlag(key, f.trackId)).map(([, f]) => f);
 
   // Mirrors SET_DURATIONS_SQL: changed, and not edited by an admin.
   const trackById = new Map(trackRows.map((t) => [t.id, t]));

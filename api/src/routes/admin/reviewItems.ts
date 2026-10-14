@@ -1,10 +1,10 @@
 // The review queue: list and count review items, and close them. A track's own open items also come back in
 // GET /admin/tracks/:id. Ingest only raises items about tracks, so the queue is the track items.
-import { and, asc, eq, gt, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, notInArray, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
-import { artists, REVIEW_REASONS, REVIEW_STATUSES, reviewItems, tracks } from "../../db/schema";
+import { artists, OUT_OF_CATALOG, REVIEW_REASONS, REVIEW_STATUSES, reviewItems, tracks } from "../../db/schema";
 import type { AppEnv } from "../../env";
 import { ApiError } from "../../lib/errors";
 import { idParam, parse } from "../../lib/validate";
@@ -22,7 +22,12 @@ export type ReviewListFilters = z.infer<typeof listQuerySchema>;
 
 /** Oldest first, keyset-paginated on id. Exported so tests can EXPLAIN the exact SQL. */
 export function reviewListQuery(d: ReturnType<typeof db>, f: ReviewListFilters) {
-  const where: (SQL | undefined)[] = [eq(reviewItems.entityType, "track"), eq(reviewItems.status, f.status)];
+  const where: (SQL | undefined)[] = [
+    eq(reviewItems.entityType, "track"),
+    eq(reviewItems.status, f.status),
+    // A rejected or retired track has nothing left to review.
+    notInArray(tracks.status, [...OUT_OF_CATALOG]),
+  ];
   if (f.reason) where.push(eq(reviewItems.reason, f.reason));
   if (f.cursor) where.push(gt(reviewItems.id, f.cursor));
   return d
@@ -80,7 +85,7 @@ reviewRoutes.get("/review-items/counts", async (c) => {
     // The same joins as the list, so a badge never counts an item the list cannot show.
     .innerJoin(tracks, eq(tracks.id, reviewItems.entityId))
     .innerJoin(artists, eq(artists.id, tracks.artistId))
-    .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open")))
+    .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open"), notInArray(tracks.status, [...OUT_OF_CATALOG])))
     .groupBy(reviewItems.reason);
   const counts = Object.fromEntries(REVIEW_REASONS.map((r) => [r, 0])) as Record<(typeof REVIEW_REASONS)[number], number>;
   for (const r of rows) counts[r.reason] = r.n;

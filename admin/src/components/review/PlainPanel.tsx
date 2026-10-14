@@ -9,7 +9,7 @@ export function PlainPanel({ item, onClosed }: PanelProps) {
   const close = useCloseItem();
   const { error, busy, run } = usePanelRun();
   const closeWith = async (action: "resolve" | "dismiss") => {
-    if (await run(() => close.mutateAsync({ id: item.id, action }))) onClosed(item);
+    if (await run(() => close.mutateAsync({ id: item.id, action, trackId: item.track.id }))) onClosed(item);
   };
   return (
     <Stack>

@@ -48,7 +48,7 @@ export function TranslitPanel(props: PanelProps) {
           });
         }
       }
-      await close.mutateAsync({ id: item.id, action: "resolve" });
+      await close.mutateAsync({ id: item.id, action: "resolve", trackId: t.id });
     });
     if (ok) onClosed(item);
   }

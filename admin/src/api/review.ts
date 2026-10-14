@@ -2,7 +2,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { REASONS, type Reason } from "../lib/review";
-import { artistSchema, TRACK_STATUSES, trackDetailSchema } from "./catalog";
+import { artistSchema, keys, REVIEW_STATUSES, TRACK_STATUSES, trackDetailSchema, type TrackDetail } from "./catalog";
 import { apiFetch } from "./client";
 
 const trackSummarySchema = z.object({
@@ -23,7 +23,7 @@ export type TrackSummary = z.infer<typeof trackSummarySchema>;
 const reviewRowSchema = z.object({
   id: z.number(),
   reason: z.enum(REASONS),
-  status: z.enum(["open", "resolved", "dismissed"]),
+  status: z.enum(REVIEW_STATUSES),
   /** Free-form JSON from the scraper or the cutter; each panel parses the shape it expects. */
   details: z.unknown(),
   track: trackSummarySchema,
@@ -58,13 +58,19 @@ export function useReviewList(reason: Reason, { enabled = true }: { enabled?: bo
   });
 }
 
-/** Refresh everything a change can touch. Closing an item changes the queue, the counts, the track's own items, and possibly the track list. */
+/**
+ * Refresh what a queue action changed: the queue and its counts, the track list, and the one track it was about.
+ * When the server sent the track back, that is stored instead of fetched again. With no track, every cached track
+ * is refreshed (an artist rename or merge touches many).
+ */
 export function useRefreshQueue() {
   const qc = useQueryClient();
-  return () => {
+  return (track?: { id: number; detail?: TrackDetail }) => {
     void qc.invalidateQueries({ queryKey: reviewKeys.all });
-    void qc.invalidateQueries({ queryKey: ["track"] });
     void qc.invalidateQueries({ queryKey: ["tracks"] });
+    if (!track) void qc.invalidateQueries({ queryKey: ["track"] });
+    else if (track.detail) qc.setQueryData(keys.track(track.id), track.detail);
+    else void qc.invalidateQueries({ queryKey: keys.track(track.id) });
   };
 }
 
@@ -74,9 +80,10 @@ export function useCloseItem() {
   const refresh = useRefreshQueue();
   return useMutation({
     meta: { silent: true }, // the panel shows what went wrong, next to the buttons
-    mutationFn: ({ id, action }: { id: number; action: "resolve" | "dismiss" }) =>
+    // `trackId` is the item's track, so only that track is refreshed.
+    mutationFn: ({ id, action }: { id: number; action: "resolve" | "dismiss"; trackId: number }) =>
       apiFetch(`/admin/review-items/${id}/${action}`, itemSchema, { method: "POST" }),
-    onSettled: refresh,
+    onSettled: (_data, _error, { trackId }) => refresh({ id: trackId }),
   });
 }
 
@@ -86,7 +93,7 @@ export function useMarkDuplicate() {
     meta: { silent: true },
     mutationFn: ({ trackId, canonicalTrackId }: { trackId: number; canonicalTrackId: number }) =>
       apiFetch(`/admin/tracks/${trackId}/mark-duplicate`, trackDetailSchema, { method: "POST", json: { canonicalTrackId } }),
-    onSettled: refresh,
+    onSettled: (detail, _error, { trackId }) => refresh({ id: trackId, detail }),
   });
 }
 
@@ -97,7 +104,7 @@ export function useRetireOrReject() {
     meta: { silent: true },
     mutationFn: ({ id, action }: { id: number; action: "retire" | "reject" }) =>
       apiFetch(`/admin/tracks/${id}/${action}`, trackDetailSchema, { method: "POST" }),
-    onSettled: refresh,
+    onSettled: (detail, _error, { id }) => refresh({ id, detail }),
   });
 }
 
@@ -126,7 +133,7 @@ export function usePatchArtist(id: number) {
       apiFetch(`/admin/artists/${id}`, z.object({ artist: artistSchema }), { method: "PATCH", json: patch }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["artist"] });
-      refresh();
+      refresh(); // a new name shows on every track of the artist
     },
   });
 }
@@ -149,7 +156,7 @@ export function useMergeArtist() {
     },
     onSettled: (_data, _error, { fromId }) => {
       void qc.invalidateQueries({ queryKey: ["artist"], predicate: (q) => q.queryKey[1] !== fromId });
-      refresh();
+      refresh(); // the merged artist's tracks all changed hands
     },
   });
 }

@@ -1,6 +1,7 @@
 // Schemas and hooks for the catalog admin API (tracks, artists, eras, genres, review items).
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { REASONS } from "../lib/review";
 import { apiFetch } from "./client";
 
 export const TRACK_STATUSES = ["ingested", "needs_review", "approved", "rejected", "retired"] as const;
@@ -29,13 +30,13 @@ export type TrackRow = z.infer<typeof trackRowSchema>;
 
 const trackListSchema = z.object({ items: z.array(trackRowSchema), nextCursor: z.string().nullable() });
 
-export const REVIEW_REASONS = ["translit_uncertain", "possible_duplicate", "missing_audio", "short_audio", "era_unknown"] as const;
+export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 
 const reviewItemSchema = z.object({
   id: z.number(),
-  reason: z.enum(REVIEW_REASONS),
+  reason: z.enum(REASONS),
   detailsJson: z.string().nullable(),
-  status: z.enum(["open", "resolved", "dismissed"]),
+  status: z.enum(REVIEW_STATUSES),
 });
 export type ReviewItem = z.infer<typeof reviewItemSchema>;
 
