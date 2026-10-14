@@ -88,17 +88,20 @@ function Editor({ trackId, durationMs, clips, url }: { trackId: number; duration
 
   const save = async () => {
     setError(null);
+    const saved: string[] = [];
     for (const change of dirty) {
       try {
         const res = await patch.mutateAsync({ clipId: change.clipId, startMs: change.startMs });
         setJobs((j) => ({ ...j, [change.type as ClipType]: res.job?.id ?? null }));
+        saved.push(change.type);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save");
+        setError(`${change.type}: ${err instanceof Error ? err.message : "Could not save"}`);
       }
     }
-    // Keep showing the edited starts until the track has been re-read, so the labels do not jump back.
+    // Keep showing the edited starts until the track has been re-read, so the labels do not jump back. A clip whose
+    // save failed keeps its edit (and the Save button), so it can be retried without dragging it again.
     await qc.invalidateQueries({ queryKey: keys.track(trackId) });
-    setEdited({});
+    setEdited((e) => Object.fromEntries(Object.entries(e).filter(([type]) => !saved.includes(type))));
   };
 
   return (

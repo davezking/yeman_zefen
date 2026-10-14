@@ -118,7 +118,7 @@ function PublishConfirm({ pack, publishing, error, onClose, onConfirm }: { pack:
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>Cancel</Button>
           <Button color="green" loading={publishing} disabled={!diff.data || diff.data.eligibleCount === 0} onClick={onConfirm}>
-            Publish v{(pack.versions[0]?.version ?? 0) + 1}
+            {diff.data ? `Publish v${diff.data.nextVersion}` : "Publish"}
           </Button>
         </Group>
       </Stack>

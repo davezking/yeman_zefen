@@ -25,7 +25,7 @@ import { ApiError } from "../../lib/errors";
 import { assignGeneration } from "../../lib/era";
 import { isOutOfCatalog } from "../../lib/trackStatus";
 import { createJob, jobOut } from "../../lib/jobs";
-import { presignSourceUrl, SOURCE_URL_TTL_SECONDS } from "../../lib/sourceUrl";
+import { presignSourceUrl } from "../../lib/sourceUrl";
 import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
@@ -157,8 +157,7 @@ const trackPatchSchema = z
 catalog.get("/tracks/:id/source-url", async (c) => {
   const track = await requireTrack(db(c.env), idParam(c));
   if (!track.sourceAudioKey) throw new ApiError(404, "no_source_audio", `Track ${track.id} has no source audio`);
-  const url = await presignSourceUrl(c.env, track.sourceAudioKey);
-  return c.json({ url, expiresAt: Date.now() + SOURCE_URL_TTL_SECONDS * 1000 });
+  return c.json(await presignSourceUrl(c.env, track.sourceAudioKey));
 });
 
 catalog.patch("/tracks/:id", async (c) => {

@@ -23,6 +23,17 @@ export async function readJson(c: Context): Promise<unknown> {
   }
 }
 
+/** Like readJson, but an empty body reads as `{}` (for endpoints whose every field is optional). */
+export async function readOptionalJson(c: Context): Promise<unknown> {
+  const text = await c.req.text();
+  if (text.trim() === "") return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(400, "invalid_json", "Request body must be valid JSON");
+  }
+}
+
 const id = z.coerce.number().int().positive();
 
 /** A positive integer path parameter. */

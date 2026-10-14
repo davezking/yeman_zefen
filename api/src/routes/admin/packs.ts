@@ -5,8 +5,8 @@ import { z } from "zod";
 import type { AppEnv } from "../../env";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
-import { diffAgainstCurrent, publishVersion, requirePack } from "../../lib/packs";
-import { idParam, parse, readJson } from "../../lib/validate";
+import { diffAgainstCurrent, ELIGIBLE_JOINS, eligibleWhere, publishVersion, requirePack } from "../../lib/packs";
+import { idParam, parse, readJson, readOptionalJson } from "../../lib/validate";
 
 export const packRoutes = new Hono<AppEnv>();
 
@@ -45,12 +45,7 @@ packRoutes.post("/packs", async (c) => {
 type VersionRow = { pack_id: number; version: number; manifest_key: string; track_count: number; total_bytes: number; published_at: number; published_by: string | null };
 
 const PACKS_SQL = `
-  SELECT p.*, (SELECT COUNT(*) FROM tracks t
-       JOIN clips ci ON ci.track_id = t.id AND ci.type = 'intro' AND ci.status = 'ready' AND ci.r2_key IS NOT NULL AND ci.sha256 IS NOT NULL AND ci.bytes IS NOT NULL
-       JOIN clips cm ON cm.track_id = t.id AND cm.type = 'middle' AND cm.status = 'ready' AND cm.r2_key IS NOT NULL AND cm.sha256 IS NOT NULL AND cm.bytes IS NOT NULL
-      WHERE t.status = 'approved'
-        AND (p.generation_id IS NULL OR t.generation_id = p.generation_id)
-        AND (p.genre_id IS NULL OR EXISTS (SELECT 1 FROM track_genres g WHERE g.track_id = t.id AND g.genre_id = p.genre_id))) AS eligible_count
+  SELECT p.*, (SELECT COUNT(*) FROM tracks t ${ELIGIBLE_JOINS} WHERE ${eligibleWhere("p.generation_id", "p.genre_id")}) AS eligible_count
   FROM packs p`;
 
 /** Packs (optionally just one) with their version history, newest version first. Two statements, however many packs. */
@@ -96,9 +91,8 @@ const publishSchema = z.strictObject({ trackIds: z.array(z.number().int().positi
 
 packRoutes.post("/packs/:id/versions", async (c) => {
   const pack = await requirePack(c.env, idParam(c));
-  // An empty body means "all eligible tracks".
-  const raw = (await c.req.text()).trim();
-  const body = parse(publishSchema, raw === "" ? {} : await readJson(c));
+  // No body means "all eligible tracks".
+  const body = parse(publishSchema, await readOptionalJson(c));
   const published = await publishVersion(c.env, pack, body.trackIds, c.get("admin")?.email ?? null);
   return c.json({ published }, 201);
 });

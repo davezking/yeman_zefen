@@ -20,6 +20,8 @@ const packSchema = z.object({
   generationId: z.number().nullable(),
   genreId: z.number().nullable(),
   currentVersion: z.number().nullable(),
+  /** The number a publish now would take (the server skips numbers whose manifest already exists). */
+  nextVersion: z.number(),
   eligibleCount: z.number(),
   versions: z.array(versionSchema),
 });
@@ -28,6 +30,8 @@ export type Pack = z.infer<typeof packSchema>;
 const briefTrack = z.object({ id: z.number(), titleAm: z.string().nullable(), titleLatin: z.string().nullable() });
 const diffSchema = z.object({
   currentVersion: z.number().nullable(),
+  /** The number a publish now would take (the server skips numbers whose manifest already exists). */
+  nextVersion: z.number(),
   eligibleCount: z.number(),
   added: z.array(briefTrack),
   removed: z.array(briefTrack),

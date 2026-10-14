@@ -26,7 +26,9 @@ afterEach(() => {
 describe("presignSourceUrl", () => {
   it("signs a path-style GET that lasts 10 minutes", async () => {
     const now = Date.UTC(2026, 9, 14, 12, 0, 0);
-    const url = new URL(await presignSourceUrl({ ...env, ...creds }, "source/12/a b.mp3", now));
+    const signed = await presignSourceUrl({ ...env, ...creds }, "source/12/a b.mp3", now + 750);
+    expect(signed.expiresAt).toBe(now + 600_000);
+    const url = new URL(signed.url);
     expect(url.origin).toBe("https://acct.r2.cloudflarestorage.com");
     expect(url.pathname).toBe("/yz-source/source/12/a%20b.mp3");
     expect(url.searchParams.get("X-Amz-Expires")).toBe(String(SOURCE_URL_TTL_SECONDS));
@@ -42,7 +44,7 @@ describe("GET /admin/tracks/:id/source-url", () => {
   it("returns a signed url and its expiry", async () => {
     Object.assign(mutable, creds);
     const track = await makeTrack((await makeArtist("አርቲስት")).id, { sourceAudioKey: "source/1.mp3" });
-    const before = Date.now();
+    const before = Math.floor(Date.now() / 1000) * 1000;
     const res = await api(`/admin/tracks/${track.id}/source-url`, { method: "GET", as: "editor" });
     expect(res.status).toBe(200);
     const body = await json(res);

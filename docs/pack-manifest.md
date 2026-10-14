@@ -73,7 +73,18 @@ Public, cached for 5 minutes. Only packs with a published version:
 
 - `POST /admin/packs { slug, nameAm, nameEn, generationId?, genreId? }`
 - `GET /admin/packs`: packs with `eligibleCount` and version history.
-- `GET /admin/packs/:id/diff`: tracks a new version would add and remove against the current one.
-- `POST /admin/packs/:id/versions { trackIds? }`: publish. 409 `tracks_not_eligible` / `no_eligible_tracks`.
+- `GET /admin/packs/:id/diff`: tracks a new version would add and remove against the current one, and
+  `nextVersion`, the number it would take.
+- `POST /admin/packs/:id/versions { trackIds? }` (empty body: all eligible tracks): publish.
+  - 409 `tracks_not_eligible` / `no_eligible_tracks`.
+  - 409 `catalog_changed`: a track was rejected or a clip recut while publishing. Nothing is recorded and the
+    manifest is removed again; review the diff and publish again.
+  - 500 `manifest_invalid`: the manifest failed its own schema (usually a bad `CDN_BASE_URL`). Nothing is written.
 
-A publish costs a constant number of D1 statements however large the pack (see `test/packs.test.ts`).
+How a publish stays consistent:
+- The batch that records the version re-checks every member is still eligible with the same clip ids and
+  checksums the manifest lists, in the same transaction.
+- If that check or the batch fails, the manifest just written is deleted, so no unrecorded manifest stays on the CDN.
+- `current_version` only moves forward: a slower publish of a lower number never rolls the live version back.
+
+A publish costs a constant number of D1 statements however large the pack (see `test/queryBudget.test.ts`).

@@ -5,7 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
 import { clips, trackGenres, tracks } from "../src/db/schema";
 import { packManifest } from "../src/lib/packManifest";
-import { api, countingDb, installTestJwks, makeArtist, makeTrack, rawRequest, removeTestJwks, resetCatalog, seedAdmins } from "./helpers";
+import { publishVersion, requirePack } from "../src/lib/packs";
+import { api, installTestJwks, makeArtist, makeTrack, rawRequest, removeTestJwks, resetCatalog, seedAdmins, signAccessJwt } from "./helpers";
 
 beforeAll(async () => {
   await installTestJwks();
@@ -181,15 +182,84 @@ describe("GET /v1/packs", () => {
   });
 });
 
-describe("D1 query budget", () => {
-  it("publishes with a count of queries that does not grow with the pack", async () => {
-    for (let i = 0; i < 40; i++) await eligible();
+describe("publishing safely", () => {
+  /** env whose D1 runs `before` just ahead of the publish batch: a change landing between the read and the write. */
+  const racing = (before: () => Promise<unknown>, fail = false) => {
+    const real = env.DB;
+    const DB = new Proxy(real, {
+      get(target, prop) {
+        if (prop === "batch") {
+          return async (stmts: D1PreparedStatement[]) => {
+            await before();
+            if (fail) throw new Error("D1 overloaded");
+            return target.batch(stmts);
+          };
+        }
+        const v = Reflect.get(target, prop);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    return { ...env, DB } as typeof env;
+  };
+
+  it("writes nothing, and removes its manifest, when a track is rejected mid-publish", async () => {
+    const t = await eligible();
     const pack = await createPack();
-    const counted = countingDb(env.DB);
-    const { publishVersion, requirePack } = await import("../src/lib/packs");
-    const e = { ...env, DB: counted.db } as typeof env;
-    const row = await requirePack(e, pack.id);
-    await publishVersion(e, row, undefined, null);
-    expect(counted.counter.queries).toBeLessThanOrEqual(8);
+    const e = racing(() => db(env).update(tracks).set({ status: "rejected" }).where(eq(tracks.id, t.id)));
+    await expect(publishVersion(e, await requirePack(e, pack.id), undefined, null)).rejects.toMatchObject({ code: "catalog_changed" });
+    expect(await env.CLIPS.head("packs/all/v1/manifest.json")).toBeNull();
+    expect((await env.DB.prepare("SELECT COUNT(*) AS c FROM pack_versions").first<{ c: number }>())!.c).toBe(0);
+    expect((await env.DB.prepare("SELECT current_version FROM packs").first<{ current_version: number | null }>())!.current_version).toBeNull();
+  });
+
+  it("does the same when a clip is recut mid-publish (new checksum)", async () => {
+    const t = await eligible();
+    const pack = await createPack();
+    const e = racing(() => db(env).update(clips).set({ sha256: "f".repeat(64) }).where(eq(clips.trackId, t.id)));
+    await expect(publishVersion(e, await requirePack(e, pack.id), undefined, null)).rejects.toMatchObject({ code: "catalog_changed" });
+    expect(await env.CLIPS.head("packs/all/v1/manifest.json")).toBeNull();
+  });
+
+  it("removes its manifest when the batch fails, so the retry reuses the number", async () => {
+    await eligible();
+    const pack = await createPack();
+    const e = racing(async () => undefined, true);
+    await expect(publishVersion(e, await requirePack(e, pack.id), undefined, null)).rejects.toThrow("D1 overloaded");
+    expect(await env.CLIPS.head("packs/all/v1/manifest.json")).toBeNull();
+    expect((await json(await publish(pack.id))).published.version).toBe(1);
+  });
+
+  it("never moves current_version backwards", async () => {
+    await eligible();
+    const pack = await createPack();
+    await publish(pack.id);
+    // A faster, higher-numbered publish already went live.
+    await env.DB.prepare("UPDATE packs SET current_version = 9 WHERE id = ?1").bind(pack.id).run();
+    expect((await json(await publish(pack.id))).published.version).toBe(2);
+    expect((await env.DB.prepare("SELECT current_version FROM packs").first<{ current_version: number }>())!.current_version).toBe(9);
+  });
+
+  it("answers a structured error when the manifest would be invalid, and writes nothing", async () => {
+    await eligible();
+    const pack = await createPack();
+    const e = { ...env, CDN_BASE_URL: "not a url" } as typeof env;
+    await expect(publishVersion(e, await requirePack(e, pack.id), undefined, null)).rejects.toMatchObject({ status: 500, code: "manifest_invalid" });
+    expect((await env.CLIPS.list({ prefix: "packs/" })).objects).toHaveLength(0);
+  });
+
+  it("tells the confirm step the number it will really publish", async () => {
+    await eligible();
+    const pack = await createPack();
+    await env.CLIPS.put("packs/all/v1/manifest.json", "stray");
+    expect((await json(await api(`/admin/packs/${pack.id}/diff`))).nextVersion).toBe(2);
+    expect((await json(await publish(pack.id))).published.version).toBe(2);
+  });
+
+  it("rejects a body that is not JSON", async () => {
+    const pack = await createPack();
+    const jwt = await signAccessJwt({ email: "admin@yz.test" });
+    const res = await rawRequest(`/admin/packs/${pack.id}/versions`, { method: "POST", jwt, headers: { "content-type": "application/json" }, body: "{nope" });
+    expect(res.status).toBe(400);
+    expect((await json(res)).error.code).toBe("invalid_json");
   });
 });

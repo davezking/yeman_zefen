@@ -6,8 +6,8 @@ import { ApiError } from "./errors";
 
 export const SOURCE_URL_TTL_SECONDS = 600;
 
-/** A GET URL for `key` that stops working after SOURCE_URL_TTL_SECONDS. 503 if the R2 credentials are not set. */
-export async function presignSourceUrl(env: Bindings, key: string, now = Date.now()): Promise<string> {
+/** A GET URL for `key` and the moment it stops working (epoch ms). 503 if the R2 credentials are not set. */
+export async function presignSourceUrl(env: Bindings, key: string, now = Date.now()): Promise<{ url: string; expiresAt: number }> {
   const { R2_ENDPOINT: endpoint, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey } = env;
   if (!endpoint || !accessKeyId || !secretAccessKey) {
     throw new ApiError(503, "source_signing_unconfigured", "R2 credentials are not configured on the Worker");
@@ -17,8 +17,10 @@ export async function presignSourceUrl(env: Bindings, key: string, now = Date.no
   const url = new URL(base);
   url.searchParams.set("X-Amz-Expires", String(SOURCE_URL_TTL_SECONDS));
   const aws = new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: "auto" });
+  // SigV4 dates have whole seconds, so the expiry is counted from the second that was signed.
+  const signedAt = Math.floor(now / 1000) * 1000;
   const signed = await aws.sign(new Request(url, { method: "GET" }), {
-    aws: { signQuery: true, datetime: new Date(now).toISOString().replace(/[:-]|\.\d{3}/g, "") },
+    aws: { signQuery: true, datetime: new Date(signedAt).toISOString().replace(/[:-]|\.\d{3}/g, "") },
   });
-  return signed.url;
+  return { url: signed.url, expiresAt: signedAt + SOURCE_URL_TTL_SECONDS * 1000 };
 }
