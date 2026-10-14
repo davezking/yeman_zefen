@@ -317,7 +317,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 10));
       final stopped = await player.stop();
 
-      await expectLater(starting, throwsA(isA<ClipPlaybackException>()));
+      await expectLater(starting, throwsA(isA<ClipStoppedException>()));
       expect(stopped, isNotNull);
       expect(voices[0].playing, isFalse);
       expect(player.isPlaying, isFalse);
