@@ -20,6 +20,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
+    "wavesurfer.js": "^8.0.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {

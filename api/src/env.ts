@@ -17,6 +17,13 @@ export type Bindings = {
   GH_REPO: string;
   /** Branch (or tag) the dispatched workflows run from. */
   GH_REF: string;
+  /** `https://<account>.r2.cloudflarestorage.com`. With the two secrets below, lets the Worker presign reads of `yz-source`. */
+  R2_ENDPOINT?: string;
+  /** Name of the private source bucket; defaults to `yz-source`. */
+  R2_SOURCE_BUCKET?: string;
+  /** Secrets. An R2 API token that can read `yz-source`: `wrangler secret put R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. */
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
   /** Dev-only: when ENV=dev, lets a request with no Access header act as this admin email. */
   DEV_ADMIN_EMAIL?: string;
 };

@@ -37,6 +37,7 @@ import {
 } from "../api/catalog";
 import { ApiError } from "../api/client";
 import { ArtistPicker } from "../components/ArtistPicker";
+import { ClipEditor } from "../components/ClipEditor";
 import { ClipPlayers } from "../components/ClipPlayers";
 import { StatusBadge, statusLabel, trackName } from "../components/TrackBits";
 import { isHttpUrl } from "../lib/format";
@@ -340,6 +341,8 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
             <Stack gap="sm">
               <Title order={4}>Clips</Title>
               <ClipPlayers clips={detail.clips} />
+              <Title order={5}>Edit start times</Title>
+              <ClipEditor trackId={detail.track.id} durationMs={detail.track.durationMs} clips={detail.clips} />
             </Stack>
           </Card>
 

@@ -1,7 +1,8 @@
 // Ingest jobs for admins: start one (which dispatches its GitHub workflow) and list recent ones.
 // Spec: docs/architecture.md §5 "Jobs".
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 import { db } from "../../db/client";
 import { ingestJobs } from "../../db/schema";
 import type { AppEnv } from "../../env";
@@ -24,7 +25,15 @@ jobRoutes.post("/jobs", async (c) => {
   return c.json({ job: jobOut(job) }, 201);
 });
 
+// GET /admin/jobs?id=: just that job (the clip editor polls it), 404 if there is none.
 jobRoutes.get("/jobs", async (c) => {
+  const idQuery = c.req.query("id");
+  if (idQuery !== undefined) {
+    const id = parse(z.coerce.number().int().positive(), idQuery, "id");
+    const job = await db(c.env).select().from(ingestJobs).where(eq(ingestJobs.id, id)).get();
+    if (!job) throw new ApiError(404, "not_found", `Job ${id} not found`);
+    return c.json({ jobs: [jobOut(job)] });
+  }
   const rows = await db(c.env).select().from(ingestJobs).orderBy(desc(ingestJobs.id)).limit(LIST_LIMIT);
   return c.json({ jobs: rows.map(jobOut) });
 });

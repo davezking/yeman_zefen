@@ -239,3 +239,54 @@ export function useCloseReviewItem(trackId: number) {
     },
   });
 }
+
+// ----------------------------------------------------------------- clip editor
+
+const jobSchema = z.object({
+  id: z.number(),
+  kind: z.string(),
+  status: z.enum(["queued", "running", "succeeded", "failed"]),
+  ghRunUrl: z.string().nullable(),
+  summary: z.unknown(),
+});
+export type Job = z.infer<typeof jobSchema>;
+
+/** A signed URL for the track's private source audio. Short-lived: ask again for each editing session. */
+export function useSourceUrl(trackId: number) {
+  return useQuery({
+    queryKey: ["source-url", trackId],
+    queryFn: () => apiFetch(`/admin/tracks/${trackId}/source-url`, z.object({ url: z.string(), expiresAt: z.number() })),
+    staleTime: 5 * 60_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+/** Move a clip's start. The clip becomes pending and `job` is its recut (null when the job could not be started). */
+export function usePatchClip() {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({ clipId, startMs }: { clipId: number; startMs: number }) =>
+      apiFetch(
+        `/admin/clips/${clipId}`,
+        z.object({ job: jobSchema.nullable(), clip: z.object({ id: z.number(), trackId: z.number() }) }),
+        { method: "PATCH", json: { start_ms: startMs } },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tracks"] });
+    },
+  });
+}
+
+const POLL_MS = 5_000;
+
+/** A job, refreshed every 5 s until it has succeeded or failed. */
+export function useJobPoll(jobId: number | null) {
+  return useQuery({
+    queryKey: ["job", jobId],
+    enabled: jobId !== null,
+    queryFn: async () => (await apiFetch(`/admin/jobs?id=${jobId}`, z.object({ jobs: z.array(jobSchema) }))).jobs[0]!,
+    refetchInterval: (q) => (q.state.data && (q.state.data.status === "succeeded" || q.state.data.status === "failed") ? false : POLL_MS),
+  });
+}

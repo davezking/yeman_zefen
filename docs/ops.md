@@ -244,6 +244,21 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
   bypass covers human admin routes only, so the scraper cannot post to `wrangler dev` directly.
   `api/test/ingest.test.ts` covers the API side; `ingest/tests/` covers the scraper with fakes.
 
+## Clip editor: source audio URLs
+
+`GET /admin/tracks/:id/source-url` returns a presigned, 10-minute read URL for a track's audio in the private
+`yz-source` bucket; the clip editor feeds it to wavesurfer.js. One-time setup:
+
+1. Set the vars `R2_ENDPOINT` (`https://<account>.r2.cloudflarestorage.com`) and, if the bucket is not
+   `yz-source`, `R2_SOURCE_BUCKET`.
+2. `wrangler secret put R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` (per env) with an R2 API token that has
+   read access to `yz-source`. Without them the route answers 503 `source_signing_unconfigured`.
+3. Add a CORS rule on `yz-source` allowing `GET` and `HEAD` (header `Range`) from the admin origin, since the
+   browser fetches the file straight from R2.
+
+Under `wrangler dev` there is no S3 endpoint for the local bucket, so the waveform only loads against real R2
+credentials; the rest of the page works without it.
+
 ## Admin SPA on Cloudflare Pages
 
 The admin SPA (`admin/`) is a static Vite build hosted on Cloudflare Pages at `admin.<domain>`, behind the
