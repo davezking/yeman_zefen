@@ -75,7 +75,7 @@ Goal: the core loop at production quality, with all modes and difficulties, the 
 **Do this:**
 1. Audio failure during a round (file missing, decode error, or under 1 s of audio): skip the round without penalty, mark the clip `broken` locally so it's excluded until it's re-downloaded and verified, and report it via a new `POST /v1/reports/clip { trackId, clipType, error }` that creates a deduplicated `review_items` row (`missing_audio`). Add a rate limit of 10 reports per user per day.
 2. On app start, re-verify clip checksums in the background: pack clips once per pack version, then weekly; cached clips weekly. On a mismatch, re-download just the bad files (a cached clip can simply be dropped). A starter clip that fails is excluded until the next app update.
-3. No network at launch: the app goes straight to home and plays from clips on the device. A prefetch that fails mid-session swaps rounds silently, never blocking. The leaderboard and Settings → Offline play show an offline state with retry.
+3. No network at launch: the app goes straight to home and plays from clips on the device. A prefetch that fails mid-session swaps rounds silently; when no swap is possible, the round shows "next song loading" and is skipped without penalty after 10 s. The leaderboard and Settings → Offline play show an offline state with retry.
 4. Link failures: show a friendly error, keep guest data intact, and offer a retry. Never leave the app signed out.
 5. Offline with every on-device clip played recently: keep playing (repeats are better than nothing) but show the designed "out of songs" note pointing to Settings → Offline play.
 

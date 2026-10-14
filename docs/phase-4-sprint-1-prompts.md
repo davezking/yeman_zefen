@@ -43,14 +43,14 @@ Goal: the real app shell, running on real data, fully bilingual.
    
    Migrate the existing `local_tracks` rows into these tables so installed packs keep working, and make `GameLibrary` read from them.
 3. **Round selection.** Tracks to ask about are those whose clip for the current mode is on the device, plus (when online and prefetch is allowed) tracks from the catalog. Distractors can be any catalog track. Keep the existing rules in `RoundGenerator` (variety, no repeats from `recent_sessions`) and its tests passing.
-4. **Prefetcher** (`app/lib/features/packs/data/clip_prefetcher.dart`): when a session starts, keep the clips for the next 5 rounds downloaded, using `ClipDownloader` and checksum verification. When a round comes up and its clip isn't ready, swap in a track whose clip is on the device, so the round never waits on the network. Respect the "Download upcoming songs on mobile data" setting (default on) using `connectivity_plus`. Download only the clip the mode needs.
+4. **Prefetcher** (`app/lib/features/packs/data/clip_prefetcher.dart`): when a session starts, keep the clips for the next 5 rounds downloaded, using `ClipDownloader` and checksum verification. When a round comes up and its clip isn't ready, swap in a track whose clip is on the device: same era as the session's filter, not already used in this session, and regenerate that round's options with `RoundGenerator`'s rules (distinct artists for artist questions). Only when no such track exists does the round wait, showing the designed "next song loading" state, and it is skipped without penalty if the download fails or takes over 10 s. Respect the "Download upcoming songs on mobile data" setting (default on) using `connectivity_plus`. Download only the clip the mode needs.
 5. **Cache cap.** Clips with source `stream` are capped at 50 MB by default (a setting), evicting the least recently played first after each session. `starter` and `pack` clips are never evicted. Expose `clearStreamCache()` and a storage-usage provider for Settings.
 6. Remove the "install a pack first" gate from the Phase 1 spike's start screen.
-7. Tests: a first launch with no network plays a full session from starter clips; a slow fake downloader causes swaps, not waits; eviction keeps pack and starter clips; the `local_tracks` migration keeps installed packs playable; the data saver on cellular plays only on-device clips.
+7. Tests: a first launch with no network plays a full session from starter clips; a slow fake downloader causes swaps, not waits, when on-device tracks exist for the era; an era with no on-device clips waits, then skips after 10 s; eviction keeps pack and starter clips; the `local_tracks` migration keeps installed packs playable; the data saver on cellular plays only on-device clips.
 
 **Before moving on, check:**
 - A fresh install in airplane mode plays a full session.
-- Online, a 10-round session on a throttled connection (Android emulator network speed "EDGE") never shows a wait between rounds.
+- Online, a 10-round session on a throttled connection (Android emulator network speed "EDGE") never shows a wait between rounds for "all eras".
 - After many sessions, the stream cache stays under its cap and installed packs are untouched.
 - Royalty data is unchanged: each session's `trackIds` lists exactly what was played, whatever the source.
 

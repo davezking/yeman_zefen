@@ -76,7 +76,7 @@ Goal: turn the designs you approved in artifacts (Sprint 1 handoff package in `d
 **Context:** `screens.md` lists the implied states. Components and the screen pattern from parts 1 and 2 exist in `app/lib/prototype/screens/`.
 
 **Do this:**
-1. Add prototype screens for: first launch (what a guest sees before the first round: straight into play from the bundled starter clips, with no download or sign-up prompt), an ad-consent placeholder (where the UMP form appears, and the in-settings privacy options entry), forced update, offline banners and full-screen offline states, out of songs (offline and every clip on the device recently played, with a link to Settings → Offline play), next clip still downloading (a short wait on a slow connection), generic error with retry, and loading skeletons for the leaderboard and the offline-play pack list.
+1. Add prototype screens for: first launch (what a guest sees before the first round: straight into play from the bundled starter clips, with no download or sign-up prompt), an ad-consent placeholder (where the UMP form appears, and the in-settings privacy options entry), forced update, offline banners and full-screen offline states, out of songs (offline and every clip on the device recently played, with a link to Settings → Offline play), next song loading (rare: a slow connection in an era with no songs on the device yet; up to 10 s, then the round is skipped), generic error with retry, and loading skeletons for the leaderboard and the offline-play pack list.
 2. Use only existing components and tokens. If a new component is truly needed, add it to `app/lib/core/widgets/` and the gallery.
 
 **Before moving on, check:**
