@@ -219,3 +219,25 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
 - **Local testing**: the ingest routes always require a verified Access JWT, and the `DEV_ADMIN_EMAIL`
   bypass covers human admin routes only, so the scraper cannot post to `wrangler dev` directly.
   `api/test/ingest.test.ts` covers the API side; `ingest/tests/` covers the scraper with fakes.
+
+## Admin SPA on Cloudflare Pages
+
+The admin SPA (`admin/`) is a static Vite build hosted on Cloudflare Pages at `admin.<domain>`, behind the
+**Admin SPA** Access application (see above).
+
+**Pages project settings** (Workers & Pages → Create → Pages → Connect to Git):
+
+| Setting | Value |
+|---|---|
+| Production branch | `main` |
+| Root directory | `admin` |
+| Build command | `npm ci && npm run build` |
+| Build output directory | `dist` |
+| Environment variable | `VITE_API_BASE=https://api.<domain>` |
+
+**Worker side:** the Worker must allow the admin origin for CORS. `ADMIN_ORIGIN` in `api/wrangler.toml`
+(`[env.prod.vars]`) is set to `https://admin.<domain>`. Replace the `admin.example.com` placeholder before the
+first prod deploy, otherwise the browser gets no `Access-Control-Allow-Origin` header and every admin call fails.
+
+**Local development:** run `npm run dev` in `api/` (port 8787) and `npm run dev` in `admin/` (port 5173). Use
+`localhost`, not `127.0.0.1`, because `ADMIN_ORIGIN` is `http://localhost:5173`.
