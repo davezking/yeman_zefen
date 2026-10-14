@@ -1,11 +1,9 @@
 import { Anchor, Badge, Card, Group, Loader, Stack, Text } from "@mantine/core";
 import { Link } from "react-router-dom";
 import { useGenerations, useTrack } from "../../api/catalog";
-import { mmss } from "../../lib/format";
+import { isHttpUrl, mmss } from "../../lib/format";
 import { ClipPlayers } from "../ClipPlayers";
 import { eraLabel, StatusBadge, trackName } from "../TrackBits";
-
-const isHttp = (u: string) => /^https?:\/\//i.test(u);
 
 /** A track at a glance, with its clips to listen to: the incoming one, or a candidate it may duplicate. */
 export function TrackCard({
@@ -66,7 +64,7 @@ export function TrackCard({
           <Anchor component={Link} to={`/tracks/${t.id}`} size="xs" target="_blank">
             Open in editor
           </Anchor>
-          {t.sourceUrl && isHttp(t.sourceUrl) && (
+          {t.sourceUrl && isHttpUrl(t.sourceUrl) && (
             <Anchor href={t.sourceUrl} target="_blank" rel="noreferrer noopener" size="xs">
               Source
             </Anchor>

@@ -2,6 +2,7 @@ import { Alert, Anchor, Badge, Button, Group, Stack, Table, Text } from "@mantin
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { useCloseItem, useRetireOrReject, useStartCut } from "../../api/review";
+import { isHttpUrl } from "../../lib/format";
 import { detailRows } from "../../lib/review";
 import { ConfirmModal } from "../ConfirmModal";
 import { TrackCard } from "./TrackCard";
@@ -19,6 +20,8 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
   const close = useCloseItem();
   const { error, busy, run } = usePanelRun();
   const [confirming, setConfirming] = useState(false);
+  // The cut job, once started. A retry after a failed close only closes: it must not start a second job.
+  const [cutJob, setCutJob] = useState<number | null>(null);
 
   const rows = detailRows(item.details);
   const cause = rows.find((r) => r.label === "cause")?.value;
@@ -69,12 +72,14 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
           loading={busy}
           onClick={() =>
             void closeAfter(async () => {
+              if (cutJob !== null) return;
               const job = await startCut.mutateAsync(t.id);
+              setCutJob(job.id);
               notifications.show({ color: "green", message: `Cut job ${job.id} started. If the audio is still a problem, it will be flagged again.` });
             })
           }
         >
-          Re-run cut
+          {cutJob === null ? "Re-run cut" : `Cut job ${cutJob} started: close this item`}
         </Button>
         {takeOut && (
           <Button color="red" variant="light" disabled={busy} onClick={() => setConfirming(true)}>
@@ -90,7 +95,7 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
           This track was never approved, so taking it out means rejecting it.
         </Text>
       )}
-      {t.sourceUrl && /^https?:\/\//i.test(t.sourceUrl) && (
+      {t.sourceUrl && isHttpUrl(t.sourceUrl) && (
         <Anchor href={t.sourceUrl} target="_blank" rel="noreferrer noopener" size="sm">
           Open the source page
         </Anchor>
@@ -103,7 +108,11 @@ export function AudioPanel({ item, onClosed }: PanelProps) {
         title={takeOut === "retire" ? "Retire this track?" : "Reject this track?"}
         confirmLabel={takeOut === "retire" ? "Retire" : "Reject"}
         onClose={() => setConfirming(false)}
-        onConfirm={() => takeOut && void closeAfter(() => retire.mutateAsync({ id: t.id, action: takeOut }))}
+        // One request: taking a track out closes all its open items on the server, this one included.
+        onConfirm={() =>
+          takeOut &&
+          void run(() => retire.mutateAsync({ id: t.id, action: takeOut })).then((ok) => ok && onClosed(item))
+        }
       >
         {takeOut === "retire"
           ? "It leaves the game and cannot be approved again."

@@ -124,8 +124,11 @@ function ArtistDuplicates({ item, details, isAdmin, onClosed }: Props) {
   };
   const mergeInto = async (intoId: number) => {
     const ok = await run(async () => {
-      await merge.mutateAsync({ fromId: t.artistId, intoId });
-      setMerged(true);
+      // A retry after a failed close only closes: the artist was already merged away.
+      if (!merged) {
+        await merge.mutateAsync({ fromId: t.artistId, intoId });
+        setMerged(true);
+      }
       await close.mutateAsync({ id: item.id, action: "resolve" });
     });
     if (ok) onClosed(item);

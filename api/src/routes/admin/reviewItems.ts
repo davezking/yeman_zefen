@@ -77,6 +77,9 @@ reviewRoutes.get("/review-items/counts", async (c) => {
   const rows = await db(c.env)
     .select({ reason: reviewItems.reason, n: sql<number>`COUNT(*)` })
     .from(reviewItems)
+    // The same joins as the list, so a badge never counts an item the list cannot show.
+    .innerJoin(tracks, eq(tracks.id, reviewItems.entityId))
+    .innerJoin(artists, eq(artists.id, tracks.artistId))
     .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open")))
     .groupBy(reviewItems.reason);
   const counts = Object.fromEntries(REVIEW_REASONS.map((r) => [r, 0])) as Record<(typeof REVIEW_REASONS)[number], number>;

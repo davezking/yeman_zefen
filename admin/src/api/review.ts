@@ -2,7 +2,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { REASONS, type Reason } from "../lib/review";
-import { TRACK_STATUSES, trackDetailSchema } from "./catalog";
+import { artistSchema, TRACK_STATUSES, trackDetailSchema } from "./catalog";
 import { apiFetch } from "./client";
 
 const trackSummarySchema = z.object({
@@ -46,8 +46,10 @@ export function useReviewCounts() {
   });
 }
 
-export function useReviewList(reason: Reason) {
+/** `enabled: false` while the tab is not known yet, so no list is fetched for a tab that will not be shown. */
+export function useReviewList(reason: Reason, { enabled = true }: { enabled?: boolean } = {}) {
   return useInfiniteQuery({
+    enabled,
     queryKey: reviewKeys.list(reason),
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
@@ -100,8 +102,6 @@ export function useRetireOrReject() {
 }
 
 // ---------------------------------------------------------------- artists
-
-const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
 
 const artistDetailSchema = z.object({
   artist: artistSchema,

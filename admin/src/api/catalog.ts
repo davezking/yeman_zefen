@@ -49,7 +49,7 @@ const clipSchema = z.object({
 });
 export type Clip = z.infer<typeof clipSchema>;
 
-const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
+export const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
 export type Artist = z.infer<typeof artistSchema>;
 
 export const trackDetailSchema = z.object({

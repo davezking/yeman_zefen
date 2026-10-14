@@ -138,12 +138,50 @@ describe("GET /admin/review-items/counts", () => {
     });
   });
 
+  it("counts only items the list can show (an item whose track is gone is not counted)", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id);
+    await addItem(t.id, "era_unknown");
+    await addItem(999_999, "era_unknown"); // no such track
+    expect((await json(await api("/admin/review-items/counts"))).counts.era_unknown).toBe(1);
+    expect((await json(await api("/admin/review-items?reason=era_unknown"))).items).toHaveLength(1);
+  });
+
   it("drops an item from the count once it is closed", async () => {
     const artist = await makeArtist("አርቲስት");
     const t = await makeTrack(artist.id);
     const item = await addItem(t.id, "missing_audio");
     await api(`/admin/review-items/${item.id}/resolve`, { method: "POST" });
     expect((await json(await api("/admin/review-items/counts"))).counts.missing_audio).toBe(0);
+  });
+});
+
+describe("taking a track out closes its review items", () => {
+  it("rejecting dismisses every open item of the track, and only of that track", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { status: "needs_review" });
+    const other = await makeTrack(artist.id, { status: "needs_review" });
+    await addItem(t.id, "era_unknown");
+    await addItem(t.id, "missing_audio");
+    await addItem(t.id, "short_audio", { status: "resolved" });
+    const keep = await addItem(other.id, "era_unknown");
+
+    expect((await api(`/admin/tracks/${t.id}/reject`, { method: "POST", as: "editor" })).status).toBe(200);
+    const items = await db(env).select().from(reviewItems).where(eq(reviewItems.entityId, t.id));
+    expect(items.map((i) => i.status).sort()).toEqual(["dismissed", "dismissed", "resolved"]);
+    expect(items.filter((i) => i.status === "dismissed").every((i) => i.resolvedBy === "editor@yz.test")).toBe(true);
+    expect((await db(env).select().from(reviewItems).where(eq(reviewItems.id, keep.id)).get())!.status).toBe("open");
+    expect((await json(await api("/admin/review-items/counts"))).counts.era_unknown).toBe(1);
+  });
+
+  it("retiring does the same; approving leaves items alone; a refused move changes nothing", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { status: "approved" });
+    const item = await addItem(t.id, "missing_audio");
+    expect((await api(`/admin/tracks/${t.id}/reject`, { method: "POST" })).status).toBe(409); // approved: not rejectable
+    expect((await db(env).select().from(reviewItems).where(eq(reviewItems.id, item.id)).get())!.status).toBe("open");
+    expect((await api(`/admin/tracks/${t.id}/retire`, { method: "POST" })).status).toBe(200);
+    expect((await db(env).select().from(reviewItems).where(eq(reviewItems.id, item.id)).get())!.status).toBe("dismissed");
   });
 });
 
@@ -170,10 +208,10 @@ describe("POST /admin/tracks/:id/mark-duplicate", () => {
     const body = await json(res);
     expect(body.track).toMatchObject({ id: dup.id, status: "rejected", canonicalTrackId: original.id });
 
-    // The duplicate item is settled by this call, who and when included. Other items are left alone.
+    // The duplicate item is settled by this decision; the track's other items no longer matter (it is out).
     const items = await db(env).select().from(reviewItems).where(eq(reviewItems.entityId, dup.id));
     expect(items.find((i) => i.id === dupItem.id)).toMatchObject({ status: "resolved", resolvedBy: "editor@yz.test" });
-    expect(items.find((i) => i.id === otherItem.id)?.status).toBe("open");
+    expect(items.find((i) => i.id === otherItem.id)).toMatchObject({ status: "dismissed", resolvedBy: "editor@yz.test" });
 
     // Nothing is deleted: both tracks, the artist and the duplicate's clips are all still there.
     expect(await db(env).select().from(tracks)).toHaveLength(2);
@@ -210,6 +248,44 @@ describe("POST /admin/tracks/:id/mark-duplicate", () => {
       expect(res.status, status).toBe(409);
       expect((await json(res)).error.code).toBe("invalid_transition");
     }
+  });
+
+  it("409s when the original is rejected or retired", async () => {
+    const { original, dup } = await pair();
+    for (const status of ["rejected", "retired"] as const) {
+      await db(env).update(tracks).set({ status }).where(eq(tracks.id, original.id));
+      const res = await mark(dup.id, original.id);
+      expect(res.status, status).toBe(409);
+      expect((await json(res)).error.code).toBe("canonical_not_usable");
+    }
+    // An original that is not reviewed yet is fine: both may be new.
+    await db(env).update(tracks).set({ status: "ingested" }).where(eq(tracks.id, original.id));
+    expect((await mark(dup.id, original.id)).status).toBe(200);
+  });
+
+  it("two admins at once cannot make a chain or a cycle", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const [x, y, z] = await Promise.all([1, 2, 3].map(() => makeTrack(artist.id, { status: "needs_review" })));
+    // X→Y and Y→Z at the same moment: one of them must lose, or X→Y→Z would be a chain.
+    const chain = await Promise.all([mark(x!.id, y!.id), mark(y!.id, z!.id)]);
+    expect(chain.map((r) => r.status).sort()).toEqual([200, 409]);
+
+    const [p, q] = await Promise.all([1, 2].map(() => makeTrack(artist.id, { status: "needs_review" })));
+    const cycle = await Promise.all([mark(p!.id, q!.id), mark(q!.id, p!.id)]);
+    expect(cycle.map((r) => r.status).sort()).toEqual([200, 409]);
+
+    // Whatever the order, every link points at a track that is not itself a duplicate.
+    const all = await db(env).select().from(tracks);
+    for (const t of all.filter((t) => t.canonicalTrackId !== null)) {
+      expect(all.find((o) => o.id === t.canonicalTrackId)!.canonicalTrackId, `track ${t.id}`).toBeNull();
+    }
+  });
+
+  it("looks up 'is anything a duplicate of this track' with an index", async () => {
+    const plan = (await env.DB.prepare("EXPLAIN QUERY PLAN SELECT id FROM tracks WHERE canonical_track_id = ?").bind(1).all<{ detail: string }>())
+      .results.map((r) => r.detail)
+      .join("\n");
+    expect(plan).toMatch(/tracks_canonical_track_id_idx/);
   });
 
   it("keeps links one level deep: no chains, no cycles", async () => {

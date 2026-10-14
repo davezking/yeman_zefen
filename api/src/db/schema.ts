@@ -97,6 +97,8 @@ export const tracks = sqliteTable(
     index("tracks_generation_id_idx").on(t.generationId),
     // The ingest upsert key. NULLs are allowed (and distinct) for hand-created tracks.
     uniqueIndex("tracks_source_url_uq").on(t.sourceUrl),
+    // "Is any track a duplicate of this one?" (mark-duplicate keeps links one level deep).
+    index("tracks_canonical_track_id_idx").on(t.canonicalTrackId),
     check("tracks_status_check", inList("status", TRACK_STATUSES)),
   ],
 );

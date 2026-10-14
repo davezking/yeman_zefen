@@ -300,7 +300,7 @@ Only items about tracks are listed: that is all the pipeline raises.
 | `GET /admin/review-items` | Oldest first (by id), 50 per page (`cursor`). Filters: `reason`, `status` (`open` by default). Each item has its `track` (titles, artist names, year, era, status, length, source) and its `details` parsed from JSON (`null` if it is not JSON). |
 | `GET /admin/review-items/counts` | Open items per reason, `0` for reasons with none. |
 | `POST /admin/review-items/:id/resolve`, `/dismiss` | Close an open item. *Resolve* means the problem was dealt with; *dismiss* means it was not a problem. |
-| `POST /admin/tracks/:id/mark-duplicate` `{ canonicalTrackId }` | Reject the track and link it to the canonical one (`tracks.canonical_track_id`). Nothing is deleted, and its open `possible_duplicate` items are resolved in the same step. Only `ingested` or `needs_review` tracks. Links stay one level deep: `409 canonical_is_duplicate` if the target is itself a duplicate, `409 has_duplicates` if other tracks point at this one. |
+| `POST /admin/tracks/:id/mark-duplicate` `{ canonicalTrackId }` | Reject the track and link it to the canonical one (`tracks.canonical_track_id`). Nothing is deleted. In the same step its open `possible_duplicate` items are resolved and its other open items dismissed. Only `ingested` or `needs_review` tracks, and the canonical track must be `ingested`, `needs_review` or `approved` (`409 canonical_not_usable`). Links stay one level deep: `409 canonical_is_duplicate` if the target is itself a duplicate, `409 has_duplicates` if other tracks point at this one. These rules are also guards in the update itself, so two admins at once cannot make a chain or a cycle. |
 
 What each tab shows, from the flag's `details` (written by `ingest/yz/`):
 
@@ -310,7 +310,11 @@ What each tab shows, from the flag's `details` (written by `ingest/yz/`):
 | `possible_duplicate`, `field: "track"` | `{ field, candidates: [{ id \| sourceUrl, score, durationDiff? }], variant_of? }` | The incoming track beside each candidate, with players. *Same song* marks it as a duplicate (above); *different* dismisses. |
 | `possible_duplicate`, `field: "artist"` | same, with artist candidates | *Same artist* merges the track's artist into the candidate (`POST /admin/artists/:id/merge`, **admins only**), then resolves. *Different* dismisses. |
 | `era_unknown` | none | A year and/or an era. Saving settles the item through `PATCH /admin/tracks/:id`. |
-| `missing_audio`, `short_audio` | free-form (`cause`, `key`, `durationMs`) | *Re-run cut* starts a `cut` job for the track and resolves the item (a cut that still fails raises a new one). Retire (approved track) or reject (any other: the status machine has no retire for them) takes the track out. *Dismiss* when the audio is fine. |
+| `missing_audio`, `short_audio` | free-form (`cause`, `key`, `durationMs`) | *Re-run cut* starts a `cut` job for the track and resolves the item (a cut that still fails raises a new one). Retire (approved track) or reject (any other: the status machine has no retire for them) takes the track out, which closes its items. *Dismiss* when the audio is fine. |
 
 A candidate that was scraped in the same batch has only a `sourceUrl` until it is ingested, so it cannot be merged or
 linked to: the panel says so. Closing the last open item of a track offers to approve it.
+
+**Taking a track out closes its items.** Rejecting or retiring a track (`/reject`, `/retire`, and mark-duplicate)
+dismisses all of its open review items, recording who did it: a track out of the catalog has nothing left to review,
+and its items would only clutter the queue and the counts.

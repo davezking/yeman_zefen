@@ -39,18 +39,12 @@ import { ApiError } from "../api/client";
 import { ArtistPicker } from "../components/ArtistPicker";
 import { ClipPlayers } from "../components/ClipPlayers";
 import { StatusBadge, statusLabel, trackName } from "../components/TrackBits";
+import { isHttpUrl } from "../lib/format";
+import { REASON_LABEL } from "../lib/review";
 import { filtersFromParams } from "../lib/trackFilters";
 import { buildPatch, toForm, type FormValues } from "../lib/trackForm";
 
-const REASON_LABEL: Record<string, string> = {
-  translit_uncertain: "Transliteration uncertain",
-  possible_duplicate: "Possible duplicate",
-  missing_audio: "Missing audio",
-  short_audio: "Short audio",
-  era_unknown: "Era unknown",
-};
 
-const isHttp = (u: string) => /^https?:\/\//i.test(u);
 
 /**
  * Where the page is heading, shared by every track's editor. A key pressed after we start moving but before the
@@ -330,7 +324,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           {detail.track.sourceUrl && (
             <Text size="sm">
               Source:{" "}
-              {isHttp(detail.track.sourceUrl) ? (
+              {isHttpUrl(detail.track.sourceUrl) ? (
                 <Anchor href={detail.track.sourceUrl} target="_blank" rel="noreferrer noopener">
                   {detail.track.sourceUrl}
                 </Anchor>
@@ -357,7 +351,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
                 <Stack key={item.id} gap={4}>
                   <Group justify="space-between">
                     <Badge color="orange" variant="light">
-                      {REASON_LABEL[item.reason] ?? item.reason}
+                      {REASON_LABEL[item.reason]}
                     </Badge>
                     <Group gap="xs">
                       <Button

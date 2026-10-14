@@ -1,0 +1,1 @@
+CREATE INDEX `tracks_canonical_track_id_idx` ON `tracks` (`canonical_track_id`);

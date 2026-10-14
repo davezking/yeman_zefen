@@ -4,9 +4,10 @@ import { z } from "zod";
 export const REASONS = ["translit_uncertain", "possible_duplicate", "era_unknown", "missing_audio", "short_audio"] as const;
 export type Reason = (typeof REASONS)[number];
 
+/** One label per reason, used for the queue's tabs and for a track's open items. */
 export const REASON_LABEL: Record<Reason, string> = {
-  translit_uncertain: "Transliteration",
-  possible_duplicate: "Duplicates",
+  translit_uncertain: "Spelling uncertain",
+  possible_duplicate: "Possible duplicate",
   era_unknown: "Era unknown",
   missing_audio: "Missing audio",
   short_audio: "Short audio",

@@ -1,5 +1,5 @@
 import { Alert, Badge, Button, Card, Grid, Group, Loader, NavLink, ScrollArea, Stack, Tabs, Text, Title } from "@mantine/core";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useFreshTrack } from "../api/catalog";
 import { useReviewCounts, useReviewList, type ReviewRow } from "../api/review";
@@ -31,7 +31,9 @@ export function ReviewPage() {
   const param = sp.get("reason");
   const reason: Reason = isReason(param) ? param : (REASONS.find((r) => (counts.data?.[r] ?? 0) > 0) ?? REASONS[0]);
 
-  const list = useReviewList(reason);
+  // Without a tab in the URL, the tab depends on the counts: wait for them rather than fetch a list that may not be shown.
+  const tabKnown = isReason(param) || counts.isSuccess || counts.isError;
+  const list = useReviewList(reason, { enabled: tabKnown });
   // Items closed in this session are hidden at once, not when the list has been fetched again.
   const [closed, setClosed] = useState<ReadonlySet<number>>(new Set());
   const items = (list.data?.pages.flatMap((p) => p.items) ?? []).filter((i) => !closed.has(i.id));
@@ -41,16 +43,20 @@ export function ReviewPage() {
   const [offer, setOffer] = useState<{ trackId: number; name: string } | null>(null);
 
   // An item was closed: show the next one, and if that was the last open item of its track, offer to approve it.
+  // Each close asks the server about its track; only the latest answer may set the offer.
+  const offerSeq = useRef(0);
   async function onClosed(closedRow: ReviewRow) {
+    const seq = ++offerSeq.current;
     const next = itemAfterClosing(items.map((i) => i.id), closedRow.id);
     setClosed((prev) => new Set(prev).add(closedRow.id));
     setChoice(next === undefined ? null : { reason, id: next });
     try {
       const detail = await fresh(closedRow.track.id);
+      if (seq !== offerSeq.current) return; // a later close is in charge of the offer now
       const approvable = detail.track.status === "ingested" || detail.track.status === "needs_review";
       setOffer(detail.openReviewItems.length === 0 && approvable ? { trackId: closedRow.track.id, name: trackName(detail.track) } : null);
     } catch {
-      setOffer(null); // the track page shows its own error; the queue just moves on
+      if (seq === offerSeq.current) setOffer(null); // the queue just moves on
     }
   }
 
@@ -81,7 +87,7 @@ export function ReviewPage() {
       {offer && <ApproveOffer key={offer.trackId} trackId={offer.trackId} name={offer.name} onDone={() => setOffer(null)} />}
 
       {list.isError && <Alert color="red">Could not load this tab.</Alert>}
-      {list.isPending && <Loader size="sm" />}
+      {(list.isPending || !tabKnown) && <Loader size="sm" />}
       {list.isSuccess && items.length === 0 && (
         <Card withBorder>
           <Text c="dimmed">Nothing to review under "{REASON_LABEL[reason]}".</Text>
