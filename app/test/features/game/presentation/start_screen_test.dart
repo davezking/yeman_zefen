@@ -42,7 +42,7 @@ void main() {
     expect(h.location, '/play');
   });
 
-  testWidgets('offers every difficulty with its clip length, and all five eras', (tester) async {
+  testWidgets('offers every difficulty with its clip length, and all five eras when all are installed', (tester) async {
     await pumpScreens(tester, location: '/start');
 
     expect(find.text('Easy · 10 s'), findsOneWidget);
@@ -54,6 +54,35 @@ void main() {
     for (final era in ['All eras', 'Golden Age', '1980s', '1990s', '2000s', 'Modern']) {
       expect(find.text(era), findsWidgets, reason: era);
     }
+  });
+
+  testWidgets('offers only the eras that have installed songs', (tester) async {
+    await pumpScreens(tester, location: '/start', eras: {2, 5});
+    await tester.pump();
+
+    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.pumpAndSettle();
+    for (final era in ['All eras', '1980s', 'Modern']) {
+      expect(find.text(era), findsWidgets, reason: era);
+    }
+    for (final era in ['Golden Age', '1990s', '2000s']) {
+      expect(find.text(era), findsNothing, reason: era);
+    }
+  });
+
+  testWidgets('offers only all eras when nothing is installed', (tester) async {
+    final h = await pumpScreens(tester, location: '/start', eras: const {});
+    await tester.pump();
+
+    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.pumpAndSettle();
+    expect(find.text('Golden Age'), findsNothing);
+    await tester.tap(find.text('All eras').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    expect(h.session.startedWith!.generationId, 0);
   });
 
   testWidgets('shows the best score for the chosen mode and era', (tester) async {

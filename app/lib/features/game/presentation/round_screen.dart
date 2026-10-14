@@ -145,7 +145,11 @@ class _RoundBody extends ConsumerWidget {
             height: 8,
             child: answering
                 // A new key restarts the bar when the round is replayed after a call.
-                ? _CountdownBar(key: ValueKey('${round.number}-${round.attempt}'), windowMs: round.windowMs)
+                ? _CountdownBar(
+                    key: ValueKey('${round.number}-${round.attempt}'),
+                    windowMs: round.windowMs,
+                    remainingMs: round.remainingMs,
+                  )
                 : null,
           ),
           const SizedBox(height: 16),
@@ -153,7 +157,7 @@ class _RoundBody extends ConsumerWidget {
           if (round.phase == RoundPhase.interrupted)
             Expanded(
               child: _Message(
-                text: 'Interrupted. The round starts again when you resume.',
+                text: 'Paused. The clip plays again when you resume. The time you already used still counts.',
                 action: FilledButton(
                   onPressed: ref.read(sessionControllerProvider.notifier).resume,
                   child: const Text('Resume'),
@@ -243,18 +247,20 @@ class _Feedback extends StatelessWidget {
   }
 }
 
-/// A bar that empties over the answer window. It only shows the time; the
-/// session controller owns the real timer.
+/// A bar that empties over the answer window. After a pause it starts part
+/// empty, at the time that was left. It only shows the time; the session
+/// controller owns the real timer.
 class _CountdownBar extends StatelessWidget {
-  const _CountdownBar({super.key, required this.windowMs});
+  const _CountdownBar({super.key, required this.windowMs, required this.remainingMs});
 
   final int windowMs;
+  final int remainingMs;
 
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1, end: 0),
-      duration: Duration(milliseconds: windowMs),
+      tween: Tween(begin: remainingMs / windowMs, end: 0),
+      duration: Duration(milliseconds: remainingMs),
       builder: (context, value, _) => LinearProgressIndicator(key: const Key('countdown'), value: value),
     );
   }

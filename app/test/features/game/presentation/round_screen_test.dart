@@ -61,6 +61,17 @@ void main() {
     expect(value(), closeTo(0, 0.05));
   });
 
+  testWidgets('after a pause the bar starts at the time that was left', (tester) async {
+    await pumpScreens(tester, location: '/play', state: playing(roundView(attempt: 2, remainingMs: 4000)));
+    double value() => tester.widget<LinearProgressIndicator>(find.byKey(const Key('countdown'))).value!;
+
+    expect(value(), closeTo(0.4, 0.01));
+    await tester.pump(const Duration(seconds: 2));
+    expect(value(), closeTo(0.2, 0.05));
+    await tester.pump(const Duration(seconds: 2));
+    expect(value(), closeTo(0, 0.05));
+  });
+
   testWidgets('asks who sings it for an artist question', (tester) async {
     await pumpScreens(tester, location: '/play', state: playing(roundView(kind: QuestionKind.artist)));
     expect(find.text('Who sings this?'), findsOneWidget);
@@ -134,7 +145,8 @@ void main() {
     testWidgets('offers to resume and hides the options', (tester) async {
       final h = await pumpScreens(tester, location: '/play', state: playing(roundView(phase: RoundPhase.interrupted)));
 
-      expect(find.textContaining('Interrupted'), findsOneWidget);
+      expect(find.textContaining('Paused'), findsOneWidget);
+      expect(find.textContaining('time you already used still counts'), findsOneWidget);
       expect(find.byKey(const Key('option-11')), findsNothing);
 
       await tester.tap(find.text('Resume'));

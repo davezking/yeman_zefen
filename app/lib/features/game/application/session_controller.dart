@@ -29,6 +29,13 @@ final bestScoreProvider = FutureProvider.autoDispose.family<int?, (GameMode, int
   return ref.watch(sessionStoreProvider).bestScore(key.$1, key.$2);
 });
 
+/// The eras that have installed songs, for the start screen's era list.
+final installedErasProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
+  final base = await ref.watch(supportDirectoryProvider.future);
+  final library = await loadGameLibrary(ref.watch(appDbProvider), base);
+  return library.eras;
+});
+
 class _Cancelled implements Exception {
   const _Cancelled();
 }
@@ -48,7 +55,10 @@ class _TimedOut extends _Outcome {
 }
 
 class _Interrupted extends _Outcome {
-  const _Interrupted();
+  const _Interrupted(this.atMs);
+
+  /// The monotonic time of the interruption.
+  final int atMs;
 }
 
 class _Abandoned extends _Outcome {
@@ -60,6 +70,11 @@ class _Abandoned extends _Outcome {
 ///
 /// A round's response time starts when [ClipPlayer.play] returns, which is when
 /// audio is actually playing, not when the screen was built.
+///
+/// A round paused by a call or by the app going to the background plays its
+/// clip again on resume, but the clock does not start over: the time used
+/// before the pause still counts, and the window only has what was left. So
+/// pausing gains a second listen and nothing else.
 class SessionController extends Notifier<SessionState> {
   static const _scorer = Scorer();
 
@@ -73,7 +88,13 @@ class SessionController extends Notifier<SessionState> {
   Timer? _windowTimer;
   Timer? _feedbackTimer;
   StreamSubscription<ClipStopInfo>? _interruptedSub;
+
+  /// When the round's clock started, moved back by the time used before a
+  /// pause, so `now - _roundStartedMs` is the whole response time.
   var _roundStartedMs = 0;
+
+  /// The app is in the background. The next clip waits for Resume.
+  var _backgrounded = false;
 
   @override
   SessionState build() {
@@ -122,14 +143,19 @@ class SessionController extends Notifier<SessionState> {
 
   /// The app went to the background. The round pauses as it does after a call,
   /// so a clip does not keep playing, and the window does not run out, unseen.
+  /// Between rounds, or while a clip loads, the next clip waits for Resume.
   void pauseForBackground() {
-    final pending = _outcome;
-    if (pending == null || pending.isCompleted) return;
+    if (state.phase != SessionPhase.preparing && state.phase != SessionPhase.playing) return;
+    _backgrounded = true;
     unawaited(_stopPlayer());
-    pending.complete(const _Interrupted());
+    final pending = _outcome;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(_Interrupted(ref.read(sessionEnvironmentProvider).monotonicMs()));
+    }
   }
 
-  /// Plays the interrupted round again, with a fresh answer window.
+  /// Plays the paused round's clip again. The answer window carries on from
+  /// where it stopped.
   void resume() {
     final pending = _resume;
     if (pending != null && !pending.isCompleted) pending.complete();
@@ -155,6 +181,7 @@ class SessionController extends Notifier<SessionState> {
 
   void _abandon() {
     _runId++;
+    _backgrounded = false;
     _windowTimer?.cancel();
     _windowTimer = null;
     _feedbackTimer?.cancel();
@@ -322,6 +349,9 @@ class SessionController extends Notifier<SessionState> {
       if (!_alive(runId)) throw const _Cancelled();
     }
 
+    // Answer time used by earlier attempts of this round, before a pause.
+    var usedMs = 0;
+
     String labelOf(int id) => round.kind == QuestionKind.artist ? library.artistLabel(id) : library.trackLabel(id);
     final options = [for (final id in round.optionIds) AnswerOption(id: id, label: labelOf(id))];
 
@@ -339,6 +369,7 @@ class SessionController extends Notifier<SessionState> {
         kind: round.kind,
         options: options,
         windowMs: windowMs,
+        remainingMs: windowMs - usedMs,
         phase: phase,
         attempt: attempt,
         chosenId: chosenId,
@@ -357,7 +388,28 @@ class SessionController extends Notifier<SessionState> {
       _resume = resume;
       await resume.future;
       _resume = null;
+      _backgrounded = false;
       check();
+    }
+
+    Future<RoundSummary> timedOut(int attempt) async {
+      await _stopPlayer();
+      check();
+      recorder.recordRound(round, chosenId: null, responseMs: windowMs);
+      usedMs = windowMs;
+      show(view(RoundPhase.feedback, attempt, points: 0, timedOut: true));
+      await _pause(env, env.feedbackDuration);
+      check();
+      return RoundSummary(
+        number: index + 1,
+        kind: round.kind,
+        correctLabel: labelOf(round.correctId),
+        chosenLabel: null,
+        correct: false,
+        points: 0,
+        valid: true,
+        responseMs: windowMs,
+      );
     }
 
     var attempt = 0;
@@ -367,6 +419,12 @@ class SessionController extends Notifier<SessionState> {
       try {
         await player.prepare(path, limitMs);
         check();
+        if (_backgrounded) {
+          // The app left the screen between rounds or while the clip loaded.
+          // The clip stays loaded and starts when the player is back.
+          await waitForResume(attempt);
+          show(view(RoundPhase.loading, attempt));
+        }
         await player.play();
         check();
       } on ClipStoppedException {
@@ -380,13 +438,14 @@ class SessionController extends Notifier<SessionState> {
         return null;
       }
 
-      // The clock starts here: the audio is playing.
-      _roundStartedMs = env.monotonicMs();
+      // The clock starts here: the audio is playing. After a pause it carries on
+      // from the time already used.
+      _roundStartedMs = env.monotonicMs() - usedMs;
       unawaited(_preload(player, nextClip(), limitMs));
 
       final pending = Completer<_Outcome>();
       _outcome = pending;
-      _windowTimer = env.timer(Duration(milliseconds: windowMs), () {
+      _windowTimer = env.timer(Duration(milliseconds: windowMs - usedMs), () {
         if (!pending.isCompleted) pending.complete(const _TimedOut());
       });
       show(view(RoundPhase.answering, attempt));
@@ -400,7 +459,9 @@ class SessionController extends Notifier<SessionState> {
       switch (outcome) {
         case _Abandoned():
           throw const _Cancelled();
-        case _Interrupted():
+        case _Interrupted(:final atMs):
+          usedMs = atMs - _roundStartedMs;
+          if (usedMs >= windowMs) return timedOut(attempt);
           await waitForResume(attempt);
           continue;
         case _Answered(:final optionId, :final responseMs):
@@ -426,29 +487,16 @@ class SessionController extends Notifier<SessionState> {
             responseMs: responseMs,
           );
         case _TimedOut():
-          await _stopPlayer();
-          check();
-          recorder.recordRound(round, chosenId: null, responseMs: windowMs);
-          show(view(RoundPhase.feedback, attempt, points: 0, timedOut: true));
-          await _pause(env, env.feedbackDuration);
-          check();
-          return RoundSummary(
-            number: index + 1,
-            kind: round.kind,
-            correctLabel: labelOf(round.correctId),
-            chosenLabel: null,
-            correct: false,
-            points: 0,
-            valid: true,
-            responseMs: windowMs,
-          );
+          return timedOut(attempt);
       }
     }
   }
 
   void _onInterrupted() {
     final pending = _outcome;
-    if (pending != null && !pending.isCompleted) pending.complete(const _Interrupted());
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(_Interrupted(ref.read(sessionEnvironmentProvider).monotonicMs()));
+    }
   }
 
   /// Loads the next round's clip while this one plays. A failure only means the

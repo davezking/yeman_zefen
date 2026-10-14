@@ -387,17 +387,20 @@ void main() {
       expect(kit.voices.any((v) => v.playing), isFalse);
     });
 
-    test('resuming plays the round again with a fresh window and a fresh response time', () async {
+    test('resuming plays the clip again but keeps the time already used', () async {
       kit.start(short);
       await kit.untilRound(1, RoundPhase.answering);
-      kit.clockMs += 4000; // time before the call that must not count
+      kit.clockMs += 4000; // time before the call, which still counts
       kit.interruptions.add(null);
       await kit.untilRound(1, RoundPhase.interrupted);
-      kit.clockMs += 60000; // the call
+      kit.clockMs += 60000; // the call, which does not
 
       kit.controller.resume();
-      await kit.untilRound(1, RoundPhase.answering, attempt: 2);
-      expect(kit.timers.where((t) => t.isActive && t.duration == const Duration(milliseconds: 10000)), hasLength(1));
+      final resumed = await kit.untilRound(1, RoundPhase.answering, attempt: 2);
+      expect(resumed.remainingMs, 6000);
+      expect(kit.voices.any((v) => v.playing), isTrue, reason: 'the clip plays again');
+      expect(kit.timers.where((t) => t.isActive && t.duration == const Duration(milliseconds: 6000)), hasLength(1),
+          reason: 'the window only has what was left');
       kit.clockMs += 1000;
       kit.controller.answer(kit.correctOption());
       await kit.untilRound(1, RoundPhase.feedback);
@@ -406,7 +409,46 @@ void main() {
 
       final rounds = await savedRounds('session-1');
       expect(rounds, hasLength(2), reason: 'the interrupted round is recorded once');
-      expect(rounds.first['responseMs'], 1000);
+      expect(rounds.first['responseMs'], 5000, reason: '4 s before the call and 1 s after it');
+    });
+
+    test('pausing twice adds up the time from both attempts', () async {
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 3000;
+      kit.controller.pauseForBackground();
+      await kit.untilRound(1, RoundPhase.interrupted);
+      kit.controller.resume();
+      await kit.untilRound(1, RoundPhase.answering, attempt: 2);
+      kit.clockMs += 2000;
+      kit.interruptions.add(null);
+      await kit.untilRound(1, RoundPhase.interrupted, attempt: 2);
+      kit.controller.resume();
+
+      expect((await kit.untilRound(1, RoundPhase.answering, attempt: 3)).remainingMs, 5000);
+      kit.clockMs += 500;
+      kit.controller.answer(kit.correctOption());
+      await kit.untilRound(1, RoundPhase.feedback);
+      kit.endFeedback();
+      await kit.playAll(pick: kit.correctOption);
+
+      expect((await savedRounds('session-1')).first['responseMs'], 5500);
+    });
+
+    test('a pause after the window has run out times the round out', () async {
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 10000; // the window is over, but its timer has not fired yet
+      kit.interruptions.add(null);
+
+      final round = await kit.untilRound(1, RoundPhase.feedback);
+      expect(round.timedOut, isTrue);
+      kit.endFeedback();
+      await kit.playAll(pick: kit.correctOption);
+
+      final rounds = await savedRounds('session-1');
+      expect(rounds.first['chosenId'], isNull);
+      expect(rounds.first['responseMs'], 10000);
     });
 
     test('a call before the audio started pauses the round too', () async {
@@ -442,7 +484,7 @@ void main() {
       await kit.untilRound(1, RoundPhase.answering, attempt: 2);
     });
 
-    test('going to the background does nothing between rounds', () async {
+    test('going to the background between rounds holds the next round until Resume', () async {
       kit.start(short);
       await kit.untilRound(1, RoundPhase.answering);
       kit.clockMs += 2500;
@@ -450,9 +492,60 @@ void main() {
       await kit.untilRound(1, RoundPhase.feedback);
 
       kit.controller.pauseForBackground();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(kit.state.round!.phase, RoundPhase.feedback, reason: 'the answer stays on screen for its second');
+      kit.endFeedback();
 
-      expect(kit.state.round!.phase, RoundPhase.feedback);
+      await kit.untilRound(2, RoundPhase.interrupted);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(kit.state.round!.phase, RoundPhase.interrupted);
+      expect(kit.voices.any((v) => v.playing), isFalse, reason: 'no clip plays while the app is away');
+      expect(kit.timers.where((t) => t.isActive && t.duration == const Duration(milliseconds: 10000)), isEmpty);
+
+      kit.controller.resume();
+      expect((await kit.untilRound(2, RoundPhase.answering)).remainingMs, 10000);
+      expect(kit.voices.any((v) => v.playing), isTrue);
+    });
+
+    test('going to the background while a clip loads holds it until Resume', () async {
+      for (final v in kit.voices) {
+        v.startDelay = const Duration(milliseconds: 150);
+      }
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.loading);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      kit.controller.pauseForBackground();
+      await kit.untilRound(1, RoundPhase.interrupted);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(kit.state.round!.phase, RoundPhase.interrupted);
+      expect(kit.voices.any((v) => v.playing), isFalse);
+
+      kit.controller.resume();
+      await kit.untilRound(1, RoundPhase.answering);
+    });
+
+    test('going to the background before the first round holds it until Resume', () async {
+      kit.start(short);
+      expect(kit.state.phase, SessionPhase.preparing);
+      kit.controller.pauseForBackground();
+
+      await kit.untilRound(1, RoundPhase.interrupted);
+      expect(kit.voices.any((v) => v.playing), isFalse);
+      kit.controller.resume();
+      await kit.untilRound(1, RoundPhase.answering);
+    });
+
+    test('a new session does not inherit a pause from the one before', () async {
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 2500;
+      kit.controller.answer(kit.correctOption());
+      await kit.untilRound(1, RoundPhase.feedback);
+      kit.controller.pauseForBackground();
+      kit.controller.leave();
+
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
     });
 
     test('resume does nothing when the round is not interrupted', () async {

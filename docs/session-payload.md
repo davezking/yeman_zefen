@@ -67,7 +67,7 @@ A real session has 10 rounds. Two are shown.
 | `rounds[].question` | `song`: the options are track ids. `artist`: the options are artist ids. `era`: the options are era ids. |
 | `rounds[].optionIds` | Exactly 4 distinct ids, in the order shown, including the correct one. |
 | `rounds[].chosenId` | The option the player tapped. **`null` when the answer window ran out**, see below. |
-| `rounds[].responseMs` | Milliseconds from audio actually starting to the tap. For a timeout, the length of the window. |
+| `rounds[].responseMs` | Milliseconds from audio actually starting to the tap. For a timeout, the length of the window. A round paused by a call or by the app going to the background plays its clip again on resume, and the time used before the pause is included, so pausing does not reset the clock. |
 | `rounds[].hintUsed` | True when a rewarded-ad hint removed 2 options on screen. `optionIds` still lists all 4. |
 | `ads` | Counts of ads shown in the session. Both are 0 until ads are added. |
 

@@ -56,6 +56,7 @@ RoundView roundView({
   int number = 3,
   int total = 10,
   int attempt = 1,
+  int? remainingMs,
   int? chosenId,
   int? correctId,
   int? points,
@@ -73,6 +74,7 @@ RoundView roundView({
       AnswerOption(id: 14, label: 'Song Four'),
     ],
     windowMs: 10000,
+    remainingMs: remainingMs,
     phase: phase,
     attempt: attempt,
     chosenId: chosenId,
@@ -123,6 +125,7 @@ Future<Harness> pumpScreens(
   List<PackListing> packs = const [],
   Object? packsError,
   Map<String, int> installed = const {},
+  Set<int> eras = const {1, 2, 3, 4, 5},
   FakePackService? packService,
   Stream<PackInstallProgress> Function(String slug)? progress,
 }) async {
@@ -130,6 +133,7 @@ Future<Harness> pumpScreens(
   final container = ProviderContainer(
     overrides: [
       sessionControllerProvider.overrideWith(() => RecordingSessionController(state)),
+      installedErasProvider.overrideWith((ref) async => eras),
       bestScoreProvider.overrideWith((ref, key) => (bestScore ?? (_, _) async => null)(key.$1, key.$2)),
       packListingsProvider.overrideWith((ref) async {
         if (packsError != null) throw packsError;

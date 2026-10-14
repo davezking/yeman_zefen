@@ -74,7 +74,8 @@ class SessionStore {
           );
 
       final previous = await bestScore(payload.mode, payload.generationId);
-      final isNewBest = previous == null || score > previous;
+      // A first session that scored nothing is not a best worth showing.
+      final isNewBest = score > (previous ?? 0);
       if (isNewBest) {
         await db.into(db.localBests).insertOnConflictUpdate(
               LocalBestsCompanion.insert(

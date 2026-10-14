@@ -33,8 +33,10 @@ Run each on **both** devices and write down what happened.
 5. **Timeout.** Let one round run out. It should show "Time's up", and the payload should have `chosenId: null`.
 6. **Skipped clip.** (Optional.) Delete one clip file with a file browser or `adb`, then play. That round should be
    skipped, the results should say so, and "Clip errors" should go up by one.
-7. **Interruption.** Phone call or alarm during a round: the round should pause with a Resume button, and resuming
-   should play it again.
+7. **Interruption.** Phone call or alarm during a round: the round should pause with a Resume button. Resuming plays
+   the clip again, and the countdown bar carries on from where it stopped rather than starting full. Then press Home
+   during the right/wrong pause between rounds and wait a few seconds: no clip should play while the app is away, and
+   coming back should show Resume for the next round.
 8. **Best score.** Play twice in the same mode and era. The second results screen should say "New best score!" or show
    the earlier best.
 

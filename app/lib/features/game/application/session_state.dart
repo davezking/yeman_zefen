@@ -30,6 +30,7 @@ class RoundView {
     required this.kind,
     required this.options,
     required this.windowMs,
+    int? remainingMs,
     required this.phase,
     required this.attempt,
     this.chosenId,
@@ -37,7 +38,7 @@ class RoundView {
     this.points,
     this.timedOut = false,
     this.valid = true,
-  });
+  }) : remainingMs = remainingMs ?? windowMs;
 
   /// 1-based position in the session. A skipped round still uses up its number.
   final int number;
@@ -47,10 +48,14 @@ class RoundView {
 
   /// How long the player has to answer, from the moment audio starts.
   final int windowMs;
+
+  /// What is left of the window when this attempt starts. Less than [windowMs]
+  /// after a pause, because the time used before it still counts.
+  final int remainingMs;
   final RoundPhase phase;
 
   /// 1 for the first play of the round, higher after each resume. A new
-  /// attempt restarts the countdown bar.
+  /// attempt restarts the countdown bar from [remainingMs].
   final int attempt;
 
   // Filled in during feedback.

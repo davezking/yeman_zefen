@@ -23,11 +23,18 @@ class _StartScreenState extends ConsumerState<StartScreen> {
   var _difficulty = Difficulty.medium;
   var _questions = QuestionMix.mixed;
 
+  /// All eras, then the eras with installed songs, in the seed's order.
+  List<int> _eraChoices(Set<int> installed) => [0, ...eraNames.keys.where(installed.contains)];
+
+  /// The picked era, or all eras when the picked one has no songs any more.
+  int _eraIn(List<int> choices) => choices.contains(_era) ? _era : 0;
+
   void _start() {
+    final era = _eraIn(_eraChoices(ref.read(installedErasProvider).asData?.value ?? const {}));
     final config = SessionConfig(
       mode: _mode,
       difficulty: _difficulty,
-      generationId: _era,
+      generationId: era,
       questions: _questions,
     );
     // Runs until the session ends, so it is not awaited.
@@ -37,7 +44,9 @@ class _StartScreenState extends ConsumerState<StartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final best = ref.watch(bestScoreProvider((_mode, _era))).asData?.value;
+    final eras = _eraChoices(ref.watch(installedErasProvider).asData?.value ?? const {});
+    final era = _eraIn(eras);
+    final best = ref.watch(bestScoreProvider((_mode, era))).asData?.value;
 
     return Scaffold(
       appBar: AppBar(title: const Text('New game')),
@@ -56,9 +65,9 @@ class _StartScreenState extends ConsumerState<StartScreen> {
           const _Heading('Era'),
           DropdownButton<int>(
             isExpanded: true,
-            value: _era,
+            value: era,
             items: [
-              for (final id in [0, ...eraNames.keys]) DropdownMenuItem(value: id, child: Text(eraName(id))),
+              for (final id in eras) DropdownMenuItem(value: id, child: Text(eraName(id))),
             ],
             onChanged: (v) => setState(() => _era = v ?? 0),
           ),

@@ -48,6 +48,17 @@ void main() {
       expect(await store.bestScore(GameMode.intro, 0), 900);
     });
 
+    test('a first session that scored nothing is not a best', () async {
+      final result = await store.saveCompleted(payload: payloadOf(), score: 0, nowMs: 1);
+      expect(result.isNewBest, isFalse);
+      expect(result.previousBest, isNull);
+      expect(await store.bestScore(GameMode.intro, 0), isNull);
+
+      final next = await store.saveCompleted(payload: payloadOf(id: 'b'), score: 50, nowMs: 2);
+      expect(next.isNewBest, isTrue);
+      expect(await store.bestScore(GameMode.intro, 0), 50);
+    });
+
     test('a lower or equal score does not replace it', () async {
       await store.saveCompleted(payload: payloadOf(id: 'a'), score: 900, nowMs: 1);
       final lower = await store.saveCompleted(payload: payloadOf(id: 'b'), score: 800, nowMs: 2);
