@@ -18,6 +18,7 @@ describe("CORS on /admin/*", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe(ADMIN);
     expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(res.headers.get("access-control-expose-headers")?.toLowerCase()).toContain("x-request-id");
   });
 
   it("answers the preflight without an Access token", async () => {
@@ -28,6 +29,13 @@ describe("CORS on /admin/*", () => {
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe(ADMIN);
     expect(res.headers.get("access-control-allow-methods")).toContain("PATCH");
+  });
+
+  it("keeps the CORS headers on error responses, so the SPA can read the error body", async () => {
+    const res = await rawRequest("/admin/whoami", { headers: { origin: ADMIN } });
+    expect(res.status).toBe(401);
+    expect(res.headers.get("access-control-allow-origin")).toBe(ADMIN);
+    expect(res.headers.get("access-control-expose-headers")?.toLowerCase()).toContain("x-request-id");
   });
 
   it("sends no allow-origin header to any other origin", async () => {

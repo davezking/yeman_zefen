@@ -8,22 +8,46 @@ the caller against `admin_users` (`api/src/lib/accessAuth.ts`). This is defense
 in depth: a misconfigured Access rule still can't reach the catalog or royalty
 data.
 
-### Two Access applications
+### One Access application, two destinations
 
-Create both under **Zero Trust → Access → Applications**, in the same team
-(`ACCESS_TEAM_DOMAIN`, e.g. `https://yz.cloudflareaccess.com`):
+Create **one** self-hosted application under **Zero Trust → Access → Applications**, in the team
+`ACCESS_TEAM_DOMAIN` (e.g. `https://yz.cloudflareaccess.com`), with both destinations:
 
-1. **Admin SPA** — self-hosted app for `admin.<domain>`. Policy: allow the admin
-   emails (one-time PIN, or Google). This is what humans log in through.
-2. **Admin API** — self-hosted app for `api.<domain>/admin/*`. Same identity
-   policy for humans, **plus** a policy that allows the ingest **service token**
-   (below) so GitHub Actions can reach `/admin/ingest/*`.
+- `admin.<domain>` (the SPA on Pages)
+- `api.<domain>/admin/*` (the Worker's admin and ingest routes)
 
-Both applications must share one **Application Audience (AUD) tag**, or you need
-one per app and must verify against the right one. Put that tag in the
-`ACCESS_AUD` Worker var (and `[env.prod]`). The Worker checks `iss` equals the
-team domain, `aud` includes `ACCESS_AUD`, and `exp`, against the team JWKS at
-`${ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`.
+Policies:
+
+1. **Admins**: allow the admin emails (one-time PIN, or Google). Humans log in through this.
+2. **Ingest**: a Service Auth policy that allows the ingest **service token** (below), so GitHub
+   Actions can reach `/admin/ingest/*`.
+
+It has to be **one** application, for two reasons:
+
+- **The SPA calls the API cross-origin.** The browser only sends the `CF_Authorization` cookie
+  for `api.<domain>` if the user has one for that hostname. When an application has five or fewer
+  domains, Access sets the cookie on all of them during the first login. A separate API
+  application would never get a cookie from the admin login, so every SPA call would be
+  redirected to the login page and fail CORS.
+- **The Worker verifies a single audience.** Each Access application has its own **Application
+  Audience (AUD) tag**. Put this application's tag in the `ACCESS_AUD` Worker var (and in
+  `[env.prod.vars]`). The Worker checks that `iss` equals the team domain, that `aud` includes
+  `ACCESS_AUD`, and `exp`, against the team JWKS at `${ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`.
+
+The Ingest policy also lets the service token fetch the SPA's static files. That's harmless:
+the SPA holds no data, and service tokens never satisfy the human `requireAdmin` routes.
+
+### CORS preflight
+
+Every SPA request with a JSON body sends an `OPTIONS` preflight first. Browsers never attach
+cookies to preflights, so Access blocks them by default. In the application, open **Configure →
+Advanced settings → Cross-Origin Resource Sharing (CORS) settings** and turn on **Bypass OPTIONS
+requests to origin**. The Worker answers preflights itself (`api/src/lib/cors.ts`), and only for
+`ADMIN_ORIGIN`. Leave Access's own CORS header fields empty: the bypass replaces them.
+
+**When an admin's Access session expires**, the next API call is redirected to the Access login
+page. That redirect fails CORS, so the SPA can't tell it apart from a network failure. Its error
+notification therefore asks the admin to reload the page, which goes through the login again.
 
 ### Service token for ingestion
 
@@ -32,7 +56,7 @@ GitHub Actions authenticates as a machine, not a person:
 1. **Zero Trust → Access → Service Auth → Service Tokens** → create one (e.g.
    `yz-ingest`). Cloudflare gives a **Client ID** (ends in
    `.access`) and a **Client Secret** (shown once).
-2. Add a policy on the **Admin API** application that allows this service token.
+2. Add it to the **Ingest** policy on the Access application (above).
 3. Set the Worker var `INGEST_SERVICE_CLIENT_ID` to the token's **common name**
    (the Client ID value that appears as the `common_name` claim).
 4. Store the Client ID and Secret as GitHub Actions secrets; the workflow sends
@@ -223,7 +247,8 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
 ## Admin SPA on Cloudflare Pages
 
 The admin SPA (`admin/`) is a static Vite build hosted on Cloudflare Pages at `admin.<domain>`, behind the
-**Admin SPA** Access application (see above).
+Access application above. Configure the Access application (both destinations and the OPTIONS bypass) before the first
+deploy. Without it, every API call fails CORS.
 
 **Pages project settings** (Workers & Pages → Create → Pages → Connect to Git):
 
@@ -233,7 +258,10 @@ The admin SPA (`admin/`) is a static Vite build hosted on Cloudflare Pages at `a
 | Root directory | `admin` |
 | Build command | `npm ci && npm run build` |
 | Build output directory | `dist` |
-| Environment variable | `VITE_API_BASE=https://api.<domain>` |
+| Environment variable | `VITE_API_BASE=https://api.<domain>` (Production **and** Preview) |
+
+`VITE_API_BASE` is required: `npm run build` fails without it, so a misconfigured Pages project fails its deploy
+instead of shipping a site that calls `localhost`.
 
 **Worker side:** the Worker must allow the admin origin for CORS. `ADMIN_ORIGIN` in `api/wrangler.toml`
 (`[env.prod.vars]`) is set to `https://admin.<domain>`. Replace the `admin.example.com` placeholder before the
