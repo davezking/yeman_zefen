@@ -1,7 +1,7 @@
 // Catalog admin API: tracks, artists (+ aliases, merge) and clips.
 // Mounted on the human admin router, so requireAdmin() already guards every route here.
 // Editors and admins can edit; only admins can merge artists.
-import { and, count, desc, eq, inArray, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, exists, inArray, lt, notExists, or, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db, type Db } from "../../db/client";
@@ -292,6 +292,61 @@ catalog.post("/tracks/:id/reject", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
   await transition(d, id, "reject", ["ingested", "needs_review"], "rejected");
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
+});
+
+const markDuplicateSchema = z.strictObject({ canonicalTrackId: z.number().int().positive() });
+
+/**
+ * "This track is the same song as `canonicalTrackId`": reject it and link it to that track. Nothing is deleted, the
+ * clips and the track stay as they are, and its open possible_duplicate items are settled in the same batch.
+ */
+catalog.post("/tracks/:id/mark-duplicate", async (c) => {
+  const d = db(c.env);
+  const id = idParam(c);
+  const { canonicalTrackId } = parse(markDuplicateSchema, await readJson(c));
+  if (canonicalTrackId === id) throw new ApiError(400, "validation_error", "canonicalTrackId: a track cannot be a duplicate of itself");
+  const track = await requireTrack(d, id);
+  const canonical = await requireTrack(d, canonicalTrackId);
+  if (!["ingested", "needs_review"].includes(track.status)) {
+    throw new ApiError(409, "invalid_transition", `Cannot mark a track that is ${track.status} as a duplicate`);
+  }
+  // Keep the links one level deep: a duplicate points at a track that is not itself a duplicate, and a track that
+  // others point at cannot become one. Chains and cycles would make "the canonical track" ambiguous.
+  if (canonical.canonicalTrackId !== null) {
+    throw new ApiError(409, "canonical_is_duplicate", `Track ${canonicalTrackId} is itself a duplicate of track ${canonical.canonicalTrackId}; use that one`);
+  }
+  const pointedAt = await d.select({ id: tracks.id }).from(tracks).where(eq(tracks.canonicalTrackId, id)).get();
+  if (pointedAt) {
+    throw new ApiError(409, "has_duplicates", `Track ${pointedAt.id} is marked as a duplicate of this track, so this one cannot be a duplicate`);
+  }
+
+  const now = Date.now();
+  const who = c.get("admin")?.email ?? null;
+  await d.batch([
+    d
+      .update(tracks)
+      .set({ canonicalTrackId, status: "rejected", updatedAt: now })
+      .where(and(eq(tracks.id, id), inArray(tracks.status, ["ingested", "needs_review"]))),
+    // Only if the update above took effect (the track now points at the canonical one).
+    d
+      .update(reviewItems)
+      .set({ status: "resolved", resolvedBy: who, resolvedAt: now })
+      .where(
+        and(
+          eq(reviewItems.entityType, "track"),
+          eq(reviewItems.entityId, id),
+          eq(reviewItems.reason, "possible_duplicate"),
+          eq(reviewItems.status, "open"),
+          exists(d.select({ one: sql`1` }).from(tracks).where(and(eq(tracks.id, id), eq(tracks.canonicalTrackId, canonicalTrackId)))),
+        ),
+      ),
+  ]);
+  const after = await requireTrack(d, id);
+  if (after.canonicalTrackId !== canonicalTrackId) {
+    // Another admin changed the track between our check and the update.
+    throw new ApiError(409, "invalid_transition", `Cannot mark a track that is ${after.status} as a duplicate`);
+  }
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
