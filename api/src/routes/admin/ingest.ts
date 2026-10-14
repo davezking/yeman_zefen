@@ -209,7 +209,8 @@ const LINK_GENRES_SQL = `
   SELECT t.id, g.value
   FROM json_each(?1, '$.tracks') j, json_each(j.value, '$.genreIds') g
   JOIN tracks t ON t.source_url = json_extract(j.value, '$.url')
-  WHERE true`;
+  -- An admin who edited a track's genres owns them: a re-scrape must not bring back a genre they removed.
+  WHERE NOT EXISTS (SELECT 1 FROM json_each(t.admin_edited_fields) e WHERE e.value = 'genres')`;
 
 const INSERT_REVIEW_ITEMS_SQL = `
   INSERT INTO review_items (entity_type, entity_id, reason, details_json, status)

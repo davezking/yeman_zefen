@@ -11,8 +11,10 @@ import {
   CLIP_TYPES,
   clips,
   generations,
+  genres,
   reviewItems,
   TRACK_STATUSES,
+  trackGenres,
   tracks,
 } from "../../db/schema";
 import type { AppEnv } from "../../env";
@@ -20,7 +22,7 @@ import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
 import { createJob, jobOut } from "../../lib/jobs";
-import { normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
+import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
 export const PAGE_SIZE = 50;
@@ -44,9 +46,14 @@ async function requireArtist(d: Db, id: number) {
   return row;
 }
 
-async function loadTrackDetail(d: Db, id: number) {
+/** Public URL of a clip's file. Only ready clips have one: a pending clip's file no longer matches its start. */
+export function clipUrl(cdnBase: string, clip: { r2Key: string | null; status: string }): string | null {
+  return clip.r2Key && clip.status === "ready" ? `${cdnBase.replace(/\/+$/, "")}/${clip.r2Key}` : null;
+}
+
+async function loadTrackDetail(d: Db, cdnBase: string, id: number) {
   const track = await requireTrack(d, id);
-  const [artist, aliases, trackClips, openReviewItems] = await Promise.all([
+  const [artist, aliases, trackClips, openReviewItems, genreRows] = await Promise.all([
     d.select().from(artists).where(eq(artists.id, track.artistId)).get(),
     d.select().from(artistAliases).where(eq(artistAliases.artistId, track.artistId)),
     d.select().from(clips).where(eq(clips.trackId, id)).orderBy(clips.type),
@@ -54,8 +61,16 @@ async function loadTrackDetail(d: Db, id: number) {
       .select()
       .from(reviewItems)
       .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.entityId, id), eq(reviewItems.status, "open"))),
+    d.select({ genreId: trackGenres.genreId }).from(trackGenres).where(eq(trackGenres.trackId, id)).orderBy(trackGenres.genreId),
   ]);
-  return { track, artist, aliases, clips: trackClips, openReviewItems };
+  return {
+    track,
+    artist,
+    aliases,
+    clips: trackClips.map((clip) => ({ ...clip, url: clipUrl(cdnBase, clip) })),
+    openReviewItems,
+    genreIds: genreRows.map((r) => r.genreId),
+  };
 }
 
 // ----------------------------------------------------------------- tracks
@@ -64,6 +79,7 @@ const trackListQuerySchema = z.strictObject({
   status: z.enum(TRACK_STATUSES).optional(),
   generationId: z.coerce.number().int().positive().optional(),
   artistId: z.coerce.number().int().positive().optional(),
+  genreId: z.coerce.number().int().positive().optional(),
   q: z.string().trim().min(1).max(200).optional(),
   cursor: z.coerce.number().int().positive().optional(),
 });
@@ -75,6 +91,9 @@ export function trackListQuery(d: Db, f: TrackListFilters) {
   if (f.status) where.push(eq(tracks.status, f.status));
   if (f.generationId) where.push(eq(tracks.generationId, f.generationId));
   if (f.artistId) where.push(eq(tracks.artistId, f.artistId));
+  if (f.genreId) {
+    where.push(sql`EXISTS (SELECT 1 FROM track_genres tg WHERE tg.track_id = tracks.id AND tg.genre_id = ${f.genreId})`);
+  }
   if (f.q) where.push(or(containsLike(tracks.titleAm, f.q), containsLike(tracks.titleLatin, f.q)));
   if (f.cursor) where.push(lt(tracks.id, f.cursor));
   return d
@@ -91,6 +110,11 @@ export function trackListQuery(d: Db, f: TrackListFilters) {
       artistNameAm: artists.nameAm,
       artistNameLatin: artists.nameLatin,
       updatedAt: tracks.updatedAt,
+      // Correlated subqueries, so the list stays one statement however many rows it returns. A null clip
+      // status means the clip row does not exist yet. Qualified by hand (see the artists list below).
+      introStatus: sql<string | null>`(SELECT c.status FROM clips c WHERE c.track_id = tracks.id AND c.type = 'intro')`,
+      middleStatus: sql<string | null>`(SELECT c.status FROM clips c WHERE c.track_id = tracks.id AND c.type = 'middle')`,
+      openFlagCount: sql<number>`(SELECT COUNT(*) FROM review_items r WHERE r.entity_type = 'track' AND r.entity_id = tracks.id AND r.status = 'open')`,
     })
     .from(tracks)
     .innerJoin(artists, eq(artists.id, tracks.artistId))
@@ -108,7 +132,7 @@ catalog.get("/tracks", async (c) => {
 });
 
 catalog.get("/tracks/:id", async (c) => {
-  return c.json(await loadTrackDetail(db(c.env), idParam(c)));
+  return c.json(await loadTrackDetail(db(c.env), c.env.CDN_BASE_URL, idParam(c)));
 });
 
 const trackPatchSchema = z
@@ -119,6 +143,8 @@ const trackPatchSchema = z
     releaseYear: z.number().int().min(1900).max(2100).nullable(),
     generationId: z.number().int().positive().nullable(),
     artistId: z.number().int().positive(),
+    /** Replaces the track's whole genre set. */
+    genreIds: z.array(z.number().int().positive()).max(10),
   })
   .partial()
   .refine((o) => Object.keys(o).length > 0, "at least one field is required");
@@ -158,8 +184,25 @@ catalog.patch("/tracks/:id", async (c) => {
     set.generationOverridden = body.generationId !== null;
   }
 
-  await d.update(tracks).set(set).where(eq(tracks.id, id));
-  return c.json(await loadTrackDetail(d, id));
+  // One atomic batch (at most three statements, however many genres): the edit and the new genre set land together.
+  const genreIds = body.genreIds && [...new Set(body.genreIds)];
+  if (genreIds) {
+    if (genreIds.length > 0) {
+      const found = await d.select({ id: genres.id }).from(genres).where(inArray(genres.id, genreIds));
+      const missing = genreIds.filter((g) => !found.some((f) => f.id === g));
+      if (missing.length > 0) throw new ApiError(404, "not_found", `Genre ${missing[0]} not found`);
+    }
+    // Ingest re-links scraped genres on every run, unless the field is marked as hand-edited.
+    const edited = new Set<string>(JSON.parse((set.adminEditedFields ?? existing.adminEditedFields) as string) as string[]);
+    edited.add("genres");
+    set.adminEditedFields = JSON.stringify([...edited].sort());
+  }
+  await d.batch([
+    d.update(tracks).set(set).where(eq(tracks.id, id)),
+    ...(genreIds ? [d.delete(trackGenres).where(eq(trackGenres.trackId, id))] : []),
+    ...(genreIds?.length ? [d.insert(trackGenres).values(genreIds.map((genreId) => ({ trackId: id, genreId })))] : []),
+  ]);
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
 /** Status machine: ingested → needs_review → approved | rejected, approved → retired. */
@@ -200,21 +243,21 @@ catalog.post("/tracks/:id/approve", async (c) => {
   }
 
   await transition(d, id, "approve", ["ingested", "needs_review"], "approved");
-  return c.json(await loadTrackDetail(d, id));
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
 catalog.post("/tracks/:id/reject", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
   await transition(d, id, "reject", ["ingested", "needs_review"], "rejected");
-  return c.json(await loadTrackDetail(d, id));
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
 catalog.post("/tracks/:id/retire", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
   await transition(d, id, "retire", ["approved"], "retired");
-  return c.json(await loadTrackDetail(d, id));
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 
 // ---------------------------------------------------------------- artists
@@ -258,6 +301,42 @@ catalog.get("/artists/:id", async (c) => {
     d.select({ n: count() }).from(tracks).where(eq(tracks.artistId, id)),
   ]);
   return c.json({ artist, aliases, trackCount });
+});
+
+const artistCreateSchema = z.strictObject({
+  nameAm: z.string().trim().min(1).max(200),
+  nameLatin: z.string().trim().min(1).max(200).nullish(),
+});
+
+catalog.post("/artists", async (c) => {
+  const d = db(c.env);
+  const body = parse(artistCreateSchema, await readJson(c));
+  const nameAm = cleanText(body.nameAm);
+  const key = normalizeFidel(nameAm);
+  // A spelling that folds to a known artist's name or alias is that artist: point at it instead of duplicating.
+  const known = key ? await d.select().from(artistAliases).where(eq(artistAliases.aliasNorm, key)).get() : undefined;
+  if (known) {
+    const owner = await requireArtist(d, known.artistId);
+    throw new ApiError(409, "artist_exists", `That name matches the existing artist ${owner.nameAm} (id ${owner.id})`);
+  }
+  const now = Date.now();
+  try {
+    const [artist] = await d
+      .insert(artists)
+      .values({ nameAm, nameLatin: body.nameLatin ? cleanText(body.nameLatin) : null, createdAt: now, updatedAt: now })
+      .returning();
+    // As in ingest, the canonical name is also an alias: its folded key is how later spellings are matched.
+    if (key) {
+      await d
+        .insert(artistAliases)
+        .values({ artistId: artist!.id, alias: nameAm, aliasNorm: key, source: "canonical" })
+        .onConflictDoNothing({ target: artistAliases.aliasNorm });
+    }
+    return c.json({ artist }, 201);
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new ApiError(409, "name_taken", "An artist with that Amharic name already exists");
+    throw err;
+  }
 });
 
 const artistPatchSchema = z
