@@ -140,22 +140,27 @@ class ApiClient:
             params.update(missing="1", after=after)
         return self._request("GET", "/admin/ingest/clip-targets", params=params)
 
-    def post_clips(self, job_id: int, clips: list[dict], flags: list[dict] | None = None) -> dict:
-        """Register clips (and raise `missing_audio` / `short_audio` review items) in requests of at most
-        100 of each. Returns `{ "counts", "results", "flags" }` merged across requests."""
-        flags = flags or []
-        merged: dict = {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": []}
-        for start in range(0, max(len(clips), len(flags)), MAX_BATCH):
+    def post_clips(
+        self, job_id: int, clips: list[dict], flags: list[dict] | None = None, durations: list[dict] | None = None
+    ) -> dict:
+        """Register clips, raise `missing_audio` / `short_audio` review items, and record measured source
+        lengths (`{ trackId, durationMs }`), in requests of at most 100 of each. Returns
+        `{ "counts", "results", "flags", "durations" }` merged across requests."""
+        flags, durations = flags or [], durations or []
+        merged: dict = {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": [], "durations": []}
+        for start in range(0, max(len(clips), len(flags), len(durations)), MAX_BATCH):
             body = {
                 "jobId": job_id,
                 "clips": clips[start : start + MAX_BATCH],
                 "flags": flags[start : start + MAX_BATCH],
+                "durations": durations[start : start + MAX_BATCH],
             }
             data = self._request("POST", "/admin/ingest/clips", body)
             for key in merged["counts"]:
                 merged["counts"][key] += data.get("counts", {}).get(key, 0)
             merged["results"].extend(data.get("results", []))
             merged["flags"].extend(data.get("flags", []))
+            merged["durations"].extend(data.get("durations", []))
         return merged
 
     def create_job(self, kind: str, params: dict | None = None) -> int:

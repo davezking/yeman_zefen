@@ -191,3 +191,13 @@ def test_post_clips_with_only_flags_is_one_request():
     s = FakeSession(FakeResponse(200, {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": [{"result": "created"}]}))
     out = client(s).post_clips(7, [], [{"trackId": 1, "reason": "missing_audio", "details": {"cause": "x"}}])
     assert len(s.calls) == 1 and s.calls[0]["json"]["clips"] == [] and out["flags"] == [{"result": "created"}]
+
+
+def test_post_clips_sends_durations_and_batches_them():
+    reply = FakeResponse(200, {"counts": {"created": 0, "updated": 0, "skipped": 0}, "results": [], "flags": [], "durations": [{"r": 1}]})
+    s = FakeSession(reply, reply)
+    durations = [{"trackId": i, "durationMs": 200_000} for i in range(1, 151)]
+    out = client(s).post_clips(7, [], [], durations)
+    assert [len(c["json"]["durations"]) for c in s.calls] == [100, 50]
+    assert all(c["json"]["clips"] == [] and c["json"]["flags"] == [] for c in s.calls)
+    assert out["durations"] == [{"r": 1}, {"r": 1}]

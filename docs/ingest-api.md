@@ -57,8 +57,9 @@ For a run that started without a job: the weekly scrape, or one started by hand 
 
 ## `POST /admin/ingest/clips`
 
-Up to 100 clips and up to 100 flags, either or both:
-`{ jobId, clips: [{ trackId, type, startMs, lengthMs, r2Key, sha256, bytes }], flags: [{ trackId, reason, details? }] }`
+Up to 100 each of clips, flags and durations, in any combination:
+`{ jobId, clips: [{ trackId, type, startMs, lengthMs, r2Key, sha256, bytes }], flags: [{ trackId, reason, details? }],
+durations: [{ trackId, durationMs }] }`
 (`type` is `intro` or `middle`, `sha256` is 64 lowercase hex). Upserts on `(track, type)`,
 sets `status = ready`, and bumps `version` only when something changed (the clip was not `ready`, or its
 start, length, key, checksum or size differ). An unknown `trackId`, in a clip or a flag, rejects the whole
@@ -74,8 +75,15 @@ objects in `yz-clips` are never rewritten and can be cached for a year (`immutab
 no separate endpoint). `reason` is `missing_audio` or `short_audio` only; `details` is free-form. Each flag
 becomes an open `review_items` row for the track, and an `ingested` track moves to `needs_review` (an
 `approved` one is left alone). An identical open item (same reason and details, whatever the key order) is
-not duplicated, so re-running a job is safe. The response lists each flag as `created` or `skipped`:
-`{ jobId, counts, results, flags: [{ trackId, reason, result }] }`.
+not duplicated, so re-running a job is safe.
+
+**Durations.** `durations` records the length of a track's source audio, which the cutter measures and the scraper
+cannot know. It sets `tracks.duration_ms`, which the clip editor (`PATCH /admin/clips/:id`) needs to check a new start
+time and duplicate detection uses to compare lengths. A track is only written when its length changes, and never
+when an admin has edited `durationMs` (`tracks.admin_edited_fields`). One track per request at most once.
+
+The response lists each flag as `created` or `skipped` and each duration as `updated` or `skipped`:
+`{ jobId, counts, results, flags: [{ trackId, reason, result }], durations: [{ trackId, result }] }`.
 
 ## `GET /admin/ingest/clip-targets`
 
@@ -116,6 +124,8 @@ it with `json_each()` in set-based `INSERT ... SELECT` / `UPDATE ... FROM` state
 | `POST /clips`, any number of clips up to 100 | 6 |
 | `POST /clips`, 3 or 100 flags and no clips | 6 |
 | `POST /clips`, 100 clips and 100 flags | 8 |
+| `POST /clips`, 3 or 100 durations, none changed / some changed | 4 / 5 |
+| `POST /clips`, 100 each of clips, flags and durations | 9 |
 | `GET /clip-targets`, any number of tracks | 2 |
 
 `test/queryBudget.test.ts` counts the statements that reach D1 and fails if a request goes over

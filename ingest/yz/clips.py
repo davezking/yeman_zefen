@@ -195,6 +195,7 @@ class CutStats:
     updated: int = 0  # clips cut again with a new version
     unchanged: int = 0  # clips that came out identical to what is registered
     flagged: int = 0
+    durations: int = 0  # source lengths recorded on tracks (new or changed)
     errors: int = 0
     error_samples: list[str] = field(default_factory=list)
 
@@ -207,13 +208,14 @@ class CutStats:
     def summary(self) -> dict:
         return {
             "tracks": self.tracks, "created": self.created, "updated": self.updated, "unchanged": self.unchanged,
-            "flagged": self.flagged, "errors": self.errors, "error_samples": self.error_samples,
+            "flagged": self.flagged, "durations": self.durations, "errors": self.errors,
+            "error_samples": self.error_samples,
         }
 
 
 # ------------------------------------------------------------------ cutter
 
-REGISTER_AT = 90  # send to the API once this many clips or flags are waiting (its limit is 100 of each)
+REGISTER_AT = 90  # send to the API once this many clips, flags or durations wait (its limit is 100 of each)
 
 
 class Cutter:
@@ -227,6 +229,7 @@ class Cutter:
         self.stats = CutStats()
         self._clips: list[dict] = []
         self._flags: list[dict] = []
+        self._durations: list[dict] = []
 
     # -------------------------------------------------------------- run
 
@@ -237,7 +240,7 @@ class Cutter:
             with tempfile.TemporaryDirectory(prefix="yz-cut-") as workdir:
                 for target in targets:
                     self._cut_track(target, request, Path(workdir))
-                    if len(self._clips) >= REGISTER_AT or len(self._flags) >= REGISTER_AT:
+                    if max(len(self._clips), len(self._flags), len(self._durations)) >= REGISTER_AT:
                         self._register()
             self._register()
         except Exception as exc:
@@ -287,6 +290,11 @@ class Cutter:
             return
         try:
             duration_ms = self.tools.probe_duration_ms(src)
+            # The scraper cannot know a song's length; the cutter measures it, so it records it. The clip
+            # editor needs it to check a new start time, and duplicate detection to compare lengths.
+            if duration_ms != target.duration_ms:
+                self._durations.append({"trackId": target.id, "durationMs": duration_ms})
+                self.stats.durations += 1
             if duration_ms < SHORT_AUDIO_MS:
                 self._flag(target.id, "short_audio", durationMs=duration_ms)
             if duration_ms < CLIP_MS:
@@ -363,9 +371,9 @@ class Cutter:
     # ------------------------------------------------------------ register
 
     def _register(self) -> None:
-        if not self._clips and not self._flags:
+        if not self._clips and not self._flags and not self._durations:
             return
-        response = self.api.post_clips(self.job_id, self._clips, self._flags)
+        response = self.api.post_clips(self.job_id, self._clips, self._flags, self._durations)
         assigned = {(r["trackId"], r["type"]): r for r in response["results"]}
         for clip in self._clips:
             got = assigned.get((clip["trackId"], clip["type"]))
@@ -375,5 +383,8 @@ class Cutter:
                     f"track {clip['trackId']} {clip['type']}: registered as version "
                     f"{got['version'] if got else '?'} but uploaded as {clip['r2Key']}"
                 )
-        log.info("registered %d clips, %d flags: %s", len(self._clips), len(self._flags), response["counts"])
-        self._clips, self._flags = [], []
+        log.info(
+            "registered %d clips, %d flags, %d durations: %s",
+            len(self._clips), len(self._flags), len(self._durations), response["counts"],
+        )
+        self._clips, self._flags, self._durations = [], [], []

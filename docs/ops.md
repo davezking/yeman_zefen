@@ -164,8 +164,12 @@ the R2 token must be able to read `yz-source` and write `yz-clips`.
   uploaded. MP3 is framed in 26.1 ms frames, so ffprobe reports whole frames: encoding exactly 10.000 s gives
   384 frames = 10.031 s, just outside the tolerance, so the cutter encodes 9.975 s (383 frames = 10.005 s by
   ffprobe, 9.975 s decoded). The registered `lengthMs` stays the nominal 10000.
+- **Song length**: the cutter measures every source it downloads and records the length on the track (in the same
+  call that registers the clips), when it is new or has changed. The scraper cannot know it, and moving a clip's
+  start time needs it, so until a track has been through a cut its clips cannot be moved (`409 duration_unknown`).
+  A source too short to cut still has its length recorded.
 - **Job status** works as for the scraper, with a summary of `tracks`, `created`, `updated`, `unchanged`,
-  `flagged` and `errors`. A track that cannot be cut counts as an error and the run carries on; a storage or
+  `flagged`, `durations` and `errors`. A track that cannot be cut counts as an error and the run carries on; a storage or
   API failure fails the job.
 
 ## Running the scraper (`ingest/`)

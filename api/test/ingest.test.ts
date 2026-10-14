@@ -714,3 +714,92 @@ describe("POST /admin/ingest/clips: source-audio flags", () => {
     expect(await count("review_items")).toBe(0);
   });
 });
+
+describe("POST /admin/ingest/clips: measured durations", () => {
+  const durationOf = async (id: number) => (await db(env).select().from(tracks).where(eq(tracks.id, id)))[0]!.durationMs;
+
+  it("stores each track's measured length and is idempotent", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const a = await makeTrack(artist.id);
+    const b = await makeTrack(artist.id, { durationMs: 180_000 });
+    const job = await makeJob("cut");
+    const body = { jobId: job.id, durations: [{ trackId: a.id, durationMs: 214_532 }, { trackId: b.id, durationMs: 180_000 }] };
+
+    const first = await json(await svc("/admin/ingest/clips", { body }));
+    expect(first.durations).toEqual([{ trackId: a.id, result: "updated" }, { trackId: b.id, result: "skipped" }]);
+    expect(await durationOf(a.id)).toBe(214_532);
+    expect(await durationOf(b.id)).toBe(180_000);
+
+    const again = await json(await svc("/admin/ingest/clips", { body }));
+    expect(again.durations.map((d: any) => d.result)).toEqual(["skipped", "skipped"]);
+  });
+
+  it("replaces a stale length when the source changed", async () => {
+    const t = await makeTrack((await makeArtist("አርቲስት")).id, { durationMs: 100_000 });
+    const job = await makeJob("cut");
+    const res = await json(await svc("/admin/ingest/clips", { body: { jobId: job.id, durations: [{ trackId: t.id, durationMs: 101_000 }] } }));
+    expect(res.durations[0].result).toBe("updated");
+    expect(await durationOf(t.id)).toBe(101_000);
+  });
+
+  it("never overwrites a length an admin edited", async () => {
+    const t = await makeTrack((await makeArtist("አርቲስት")).id, { durationMs: 90_000, adminEditedFields: JSON.stringify(["durationMs"]) });
+    const job = await makeJob("cut");
+    const res = await json(await svc("/admin/ingest/clips", { body: { jobId: job.id, durations: [{ trackId: t.id, durationMs: 95_000 }] } }));
+    expect(res.durations[0].result).toBe("skipped");
+    expect(await durationOf(t.id)).toBe(90_000);
+  });
+
+  it("goes in the same request as clips and flags", async () => {
+    const t = await makeTrack((await makeArtist("አርቲስት")).id, { status: "ingested" });
+    const job = await makeJob("cut");
+    const res = await json(
+      await svc("/admin/ingest/clips", {
+        body: {
+          jobId: job.id,
+          clips: [{ trackId: t.id, type: "intro", startMs: 0, lengthMs: 10_000, r2Key: `clips/${t.id}/intro-v1.mp3`, sha256: "a".repeat(64), bytes: 160_000 }],
+          flags: [{ trackId: t.id, reason: "short_audio", details: { durationMs: 18_000 } }],
+          durations: [{ trackId: t.id, durationMs: 18_000 }],
+        },
+      }),
+    );
+    expect(res.counts.created).toBe(1);
+    expect(res.flags[0].result).toBe("created");
+    expect(res.durations).toEqual([{ trackId: t.id, result: "updated" }]);
+    expect(await durationOf(t.id)).toBe(18_000);
+  });
+
+  it("rejects an unknown track before writing anything", async () => {
+    const t = await makeTrack((await makeArtist("አርቲስት")).id);
+    const job = await makeJob("cut");
+    const res = await svc("/admin/ingest/clips", { body: { jobId: job.id, durations: [{ trackId: t.id, durationMs: 1_000 }, { trackId: 424242, durationMs: 1_000 }] } });
+    expect(res.status).toBe(404);
+    expect(await durationOf(t.id)).toBeNull();
+  });
+
+  it.each([
+    ["the same track twice", [{ trackId: 1, durationMs: 1_000 }, { trackId: 1, durationMs: 2_000 }]],
+    ["a zero length", [{ trackId: 1, durationMs: 0 }]],
+    ["a fractional length", [{ trackId: 1, durationMs: 1.5 }]],
+    ["more than a day", [{ trackId: 1, durationMs: 86_400_001 }]],
+    ["an unknown field", [{ trackId: 1, durationMs: 1_000, extra: true }]],
+  ])("rejects %s", async (_name, durations) => {
+    expect((await svc("/admin/ingest/clips", { body: { jobId: 1, durations } })).status).toBe(400);
+  });
+
+  it("a recorded length lets an admin move the clip's start (the reason this exists)", async () => {
+    const t = await makeTrack((await makeArtist("አርቲስት")).id); // scraped: no duration yet
+    const clip = await makeClip(t.id, "middle");
+    const blocked = await api(`/admin/clips/${clip.id}`, { method: "PATCH", body: { start_ms: 42_000 } });
+    expect(blocked.status).toBe(409);
+    expect((await json(blocked)).error.code).toBe("duration_unknown");
+
+    const job = await makeJob("cut");
+    await svc("/admin/ingest/clips", { body: { jobId: job.id, durations: [{ trackId: t.id, durationMs: 200_000 }] } });
+
+    const moved = await api(`/admin/clips/${clip.id}`, { method: "PATCH", body: { start_ms: 42_000 } });
+    expect(moved.status).toBe(200);
+    expect((await json(moved)).clip).toMatchObject({ startMs: 42_000, status: "pending" });
+    expect((await api(`/admin/clips/${clip.id}`, { method: "PATCH", body: { start_ms: 195_000 } })).status).toBe(400); // and the bound is enforced
+  });
+});

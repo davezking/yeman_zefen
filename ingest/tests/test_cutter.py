@@ -195,7 +195,8 @@ def test_a_chosen_start_is_never_moved(world):
     api, _src, clip_s3, cutter = world
     stats = cutter().run(Selection(track_ids=(1,)), CutRequest(types=("intro",), start_ms=55_000))  # only 5 s left
     assert stats.errors == 1 and "55000" in stats.error_samples[0]
-    assert not clip_s3.put_calls and not api.registrations
+    assert not clip_s3.put_calls and api.registrations == [([], [])]  # no clip registered...
+    assert api.duration_posts == [[{"trackId": 1, "durationMs": 60_000}]]  # ...but the source's length is recorded
     assert [s for s, _ in api.statuses] == ["running", "succeeded"]  # one bad request is not a failed job
 
 
@@ -264,15 +265,15 @@ def test_a_clip_of_the_wrong_length_is_never_uploaded_or_registered(world):
     api, _src, clip_s3, cutter = world
     stats = cutter(FakeTools(clip_ms=10_500)).run(Selection(track_ids=(1,)))
     assert stats.errors == 2 and "10500" in stats.error_samples[0]
-    assert not clip_s3.put_calls and not api.registrations
+    assert not clip_s3.put_calls and api.registrations == [([], [])]  # only the duration was sent
 
 
 def test_a_version_mismatch_from_the_api_is_reported(world):
     api, _src, _clips, cutter = world
     original = api.post_clips
 
-    def drifted(job_id, clips, flags=None):
-        out = original(job_id, clips, flags)
+    def drifted(job_id, clips, flags=None, durations=None):
+        out = original(job_id, clips, flags, durations)
         for r in out["results"]:
             r["version"] += 1  # the API says it assigned a different version than the key promised
         return out
@@ -407,3 +408,55 @@ def test_real_audio_a_corrupt_source_is_an_error_not_a_crash(tmp_path):
     src_s3.objects["source/bad.mp3"] = b"definitely not audio" * 100
     stats = Cutter(api, SourceStore(src_s3), ClipStore(clip_s3), 9, tools=FfmpegTools()).run(Selection(track_ids=(1,)))
     assert stats.errors == 1 and not clip_s3.put_calls and api.statuses[-1][0] == "succeeded"
+
+
+# ------------------------------------------------------------- durations
+
+
+def test_the_measured_source_length_is_recorded_on_the_track(world):
+    api, _src, _clips, cutter = world
+    stats = cutter().run(Selection(track_ids=(1,)))
+    assert api.duration_posts[0] == [{"trackId": 1, "durationMs": 60_000}]
+    assert api.tracks[1]["durationMs"] == 60_000
+    assert stats.durations == 1 and api.statuses[-1][1]["durations"] == 1
+    assert len(api.registrations) == 1  # sent with the clips, not in a call of its own
+
+
+def test_a_length_that_is_already_stored_is_not_sent_again(world):
+    api, _src, _clips, cutter = world
+    cutter().run(Selection(track_ids=(1,)))
+    again = cutter().run(Selection(track_ids=(1,)))  # clips unchanged, length unchanged
+    assert again.durations == 0 and len(api.registrations) == 1  # nothing to send at all
+
+
+def test_a_changed_source_length_is_sent_again(world):
+    api, src_s3, _clips, cutter = world
+    cutter().run(Selection(track_ids=(1,)))
+    src_s3.objects["source/1.mp3"] = source(61_500, silence_ms=2_000)
+    stats = cutter().run(Selection(track_ids=(1,)))
+    assert stats.durations == 1 and api.tracks[1]["durationMs"] == 61_500
+
+
+def test_a_short_source_still_gets_its_length_recorded(world):
+    api, src_s3, _clips, cutter = world
+    api.add_track(2, "source/2.mp3")
+    src_s3.objects["source/2.mp3"] = source(8_000)  # too short to cut
+    cutter().run(Selection(track_ids=(2,)))
+    assert api.duration_posts[0] == [{"trackId": 2, "durationMs": 8_000}]
+
+
+def test_missing_audio_records_no_length(world):
+    api, _src, _clips, cutter = world
+    api.add_track(2, "source/gone.mp3")
+    cutter().run(Selection(track_ids=(2,)))
+    assert api.duration_posts == [[]]
+
+
+def test_durations_alone_trigger_a_flush_under_the_api_limit(world):
+    api, src_s3, _clips, cutter = world
+    for i in range(2, 121):  # 120 tracks whose clips are already registered, only the lengths are new
+        api.add_track(i, f"source/{i}.mp3")
+        src_s3.objects[f"source/{i}.mp3"] = source(60_000)
+    cutter().run(Selection(track_ids=tuple(range(1, 121))), CutRequest(types=()))  # cut nothing, just measure
+    sizes = [len(d) for d in api.duration_posts]
+    assert sum(sizes) == 120 and max(sizes) <= 100 and len(sizes) >= 2
