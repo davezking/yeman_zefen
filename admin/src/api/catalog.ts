@@ -195,7 +195,7 @@ export type TrackAction = "approve" | "reject";
  * Approve or reject one track. Rejections of the API (409: clips not ready, wrong status) are shown by the caller,
  * next to the button or in the bulk result, so the global notification is switched off for these.
  */
-export function useTrackAction() {
+export function useTrackAction({ invalidateList = true }: { invalidateList?: boolean } = {}) {
   const qc = useQueryClient();
   return useMutation({
     meta: { silent: true },
@@ -204,7 +204,10 @@ export function useTrackAction() {
     onSuccess: (detail, { id }) => {
       qc.setQueryData(keys.track(id), detail);
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["tracks"] }),
+    // A bulk run turns this off and refreshes the list once at the end, not once per row.
+    onSettled: () => {
+      if (invalidateList) void qc.invalidateQueries({ queryKey: ["tracks"] });
+    },
   });
 }
 

@@ -14,7 +14,8 @@ import {
   Title,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   TRACK_STATUSES,
@@ -41,14 +42,26 @@ export function TracksPage() {
   const generations = useGenerations();
   const genres = useGenres();
   const list = useTrackList(filters);
-  const action = useTrackAction();
+  const qc = useQueryClient();
+  const action = useTrackAction({ invalidateList: false });
 
+  // The search box writes `q` to the URL after a pause. `written` is the last value it wrote, so a `q` that
+  // changes any other way (back/forward, a link) is copied back into the box instead of being fought over.
   const [search, setSearch] = useState(filters.q ?? "");
   const [debounced] = useDebouncedValue(search, 300);
+  const written = useRef(filters.q);
   useEffect(() => {
-    if ((debounced.trim() || undefined) !== filters.q) setSp(paramsFromFilters({ ...filters, q: debounced.trim() || undefined }), { replace: true });
+    const q = debounced.trim() || undefined;
+    if (q === filters.q) return;
+    written.current = q;
+    setSp(paramsFromFilters({ ...filters, q }), { replace: true });
     // Only the debounced text should trigger this, not the filters it reads.
   }, [debounced]);
+  useEffect(() => {
+    if (filters.q === written.current) return;
+    written.current = filters.q;
+    setSearch(filters.q ?? "");
+  }, [filters.q]);
 
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -78,6 +91,7 @@ export function TracksPage() {
     const targets = rows.filter((r) => selected.has(r.id));
     setRunning(kind);
     const results = await runBulk(targets, (t) => action.mutateAsync({ id: t.id, action: kind }), describe);
+    void qc.invalidateQueries({ queryKey: ["tracks"] });
     setRunning(null);
     setBulkResults({ action: kind, results });
     // Rows that went through are done; failed ones stay selected so they can be looked at.

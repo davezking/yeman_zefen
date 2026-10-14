@@ -16,7 +16,8 @@ devCdn.get("/*", async (c) => {
   if (c.env.ENV !== "dev") throw notFound();
   let raw: string;
   try {
-    raw = decodeURIComponent(c.req.path.replace(/^\/cdn\//, ""));
+    // c.req.path is already decoded; decode the raw pathname exactly once instead.
+    raw = decodeURIComponent(new URL(c.req.url).pathname.replace(/^\/cdn\//, ""));
   } catch {
     throw notFound(); // a malformed %-escape is just a key that does not exist
   }
@@ -59,7 +60,8 @@ export function parseRange(header: string | undefined, size: number): { offset: 
     return { offset: size - length, length };
   }
   const offset = Number(m[1]);
+  if (m[2] !== "" && Number(m[2]) < offset) return undefined; // last < first is invalid: ignore it (RFC 9110 14.1.1)
+  if (offset >= size) return "unsatisfiable";
   const end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
-  if (offset >= size || end < offset) return "unsatisfiable";
   return { offset, length: end - offset + 1 };
 }

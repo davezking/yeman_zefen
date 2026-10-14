@@ -1,7 +1,7 @@
 // Catalog admin API: tracks, artists (+ aliases, merge) and clips.
 // Mounted on the human admin router, so requireAdmin() already guards every route here.
 // Editors and admins can edit; only admins can merge artists.
-import { and, count, desc, eq, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, notExists, or, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db, type Db } from "../../db/client";
@@ -208,12 +208,27 @@ catalog.patch("/tracks/:id", async (c) => {
     const who = c.get("admin")?.email ?? null;
     eraStatements.push(d.update(reviewItems).set({ status: "resolved", resolvedBy: who, resolvedAt: Date.now() }).where(openEraItem));
   } else if (eraTouched && !pinned) {
-    const hasOpen = await d.select({ id: reviewItems.id }).from(reviewItems).where(openEraItem).get();
-    if (!hasOpen) {
-      eraStatements.push(d.insert(reviewItems).values({ entityType: "track", entityId: id, reason: "era_unknown", status: "open" }));
-      // As in ingest: a clean track that just got flagged needs a human look.
-      if (existing.status === "ingested") set.status = "needs_review";
-    }
+    // The duplicate check runs inside the batch, so two quick saves cannot each open an item.
+    eraStatements.push(
+      d.insert(reviewItems).select(
+        d
+          // Drizzle's insert-from-select wants every column, in table order.
+          .select({
+            id: sql<number>`NULL`.as("id"),
+            entityType: sql<string>`'track'`.as("entity_type"),
+            entityId: tracks.id,
+            reason: sql<"era_unknown">`'era_unknown'`.as("reason"),
+            detailsJson: sql<string | null>`NULL`.as("details_json"),
+            status: sql<"open">`'open'`.as("status"),
+            resolvedBy: sql<string | null>`NULL`.as("resolved_by"),
+            resolvedAt: sql<number | null>`NULL`.as("resolved_at"),
+          })
+          .from(tracks)
+          .where(and(eq(tracks.id, id), notExists(d.select({ one: sql`1` }).from(reviewItems).where(openEraItem)))),
+      ),
+      // As in ingest: a clean track that is flagged needs a human look.
+      d.update(tracks).set({ status: "needs_review" }).where(and(eq(tracks.id, id), eq(tracks.status, "ingested"))),
+    );
   }
 
   const genreIds = body.genreIds && [...new Set(body.genreIds)];

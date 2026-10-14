@@ -190,6 +190,17 @@ describe("era follows the release year unless pinned", () => {
     expect(await openEraItems(t.id)).toHaveLength(1); // not duplicated
   });
 
+  it("two saves at the same moment still open only one era_unknown item", async () => {
+    const artist = await makeArtist("አርቲስት");
+    const t = await makeTrack(artist.id, { releaseYear: 1985, generationId: 2, status: "ingested" });
+    const both = await Promise.all([
+      api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { releaseYear: null } }),
+      api(`/admin/tracks/${t.id}`, { method: "PATCH", body: { releaseYear: null } }),
+    ]);
+    expect(both.map((r) => r.status)).toEqual([200, 200]);
+    expect(await openEraItems(t.id)).toHaveLength(1);
+  });
+
   it("an edit that makes the era known resolves the open era_unknown item", async () => {
     const artist = await makeArtist("አርቲስት");
     const byYear = await makeTrack(artist.id, { status: "needs_review" });
@@ -335,6 +346,11 @@ describe("dev CDN stand-in", () => {
 
     const tail = await rawRequest(`/cdn/${key}`, { headers: { range: "bytes=-3" } });
     expect(tail.headers.get("content-range")).toBe("bytes 7-9/10");
+
+    // A range whose end is before its start is invalid, so it is ignored and the whole file is served.
+    const backwards = await rawRequest(`/cdn/${key}`, { headers: { range: "bytes=8-2" } });
+    expect(backwards.status).toBe(200);
+    expect(new Uint8Array(await backwards.arrayBuffer())).toHaveLength(10);
   });
 
   it("416s a range past the end of the file", async () => {
@@ -347,6 +363,9 @@ describe("dev CDN stand-in", () => {
     expect((await rawRequest("/cdn/source/secret.mp3")).status).toBe(404);
     expect((await rawRequest("/cdn/clips/%E0.mp3")).status).toBe(404); // malformed escape: not a 500
     expect((await rawRequest("/cdn/clips/%2E%2E/source/x.mp3")).status).toBe(404);
+    // Decoded once: %252E is a literal "%2E" in the key, not a dot, so this is not the clip.
+    expect((await rawRequest("/cdn/clips/7/intro-v1%252Emp3")).status).toBe(404);
+    expect((await rawRequest("/cdn/clips/7/intro-v1%2Emp3")).status).toBe(200);
     expect((await rawRequest("/cdn/clips/404/none.mp3")).status).toBe(404);
     const { default: app } = await import("../src/index");
     const prod = await app.fetch(new Request(`https://api.test/cdn/${key}`), { ...env, ENV: "prod" });

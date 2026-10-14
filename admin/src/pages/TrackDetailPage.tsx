@@ -105,9 +105,24 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
   const filters = filtersFromParams(sp);
   const list = useTrackList(filters);
 
+  // `base` is the version of the track the form was filled from. The patch is worked out against it, not against
+  // the latest fetch, so a change made elsewhere (another admin, a re-scrape) never shows up as the admin's own edit
+  // and is never written back over. With no edits in progress, the form simply follows the latest version.
+  const [base, setBase] = useState<TrackDetail>(detail);
   const [values, setValues] = useState<FormValues>(() => toForm(detail));
-  const patch = buildPatch(values, detail);
+  const patch = buildPatch(values, base);
   const dirty = Object.keys(patch).length > 0;
+  const changedElsewhere = detail !== base;
+  useEffect(() => {
+    if (detail === base || dirty) return;
+    setBase(detail);
+    setValues(toForm(detail));
+    // Runs when a new version arrives; `dirty` is read at that moment on purpose.
+  }, [detail]);
+  const reset = (d: TrackDetail) => {
+    setBase(d);
+    setValues(toForm(d));
+  };
   const set = <K extends keyof FormValues>(k: K, v: FormValues[K]) => setValues((prev) => ({ ...prev, [k]: v }));
   const titleRef = useRef<HTMLInputElement>(null);
   const [actionError, setActionError] = useState<{ action: TrackAction; message: string } | null>(null);
@@ -172,7 +187,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
     if (!dirty || patchTrack.isPending) return;
     const saved = await patchTrack.mutateAsync(patch).catch(() => null);
     if (saved) {
-      setValues(toForm(saved));
+      reset(saved);
       notifications.show({ color: "green", message: "Saved" });
     }
   }
@@ -283,7 +298,10 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
               label: `${g.nameEn}${g.yearFrom || g.yearTo ? ` (${g.yearFrom ?? "…"}–${g.yearTo ?? "…"})` : ""}`,
             }))}
             value={values.generationId}
-            onChange={(v) => set("generationId", v)}
+            // Clicking the chosen era again must pin it, not clear it: clearing is the × button's job.
+            allowDeselect={false}
+            onOptionSubmit={(v) => setValues((prev) => ({ ...prev, generationId: v, eraPicked: true }))}
+            onChange={(v) => setValues((prev) => ({ ...prev, generationId: v, eraPicked: v !== null && prev.eraPicked }))}
           />
           {era === undefined && values.generationId !== null && <Text size="xs" c="dimmed">Loading eras…</Text>}
           <MultiSelect
@@ -297,13 +315,19 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
             <Button loading={patchTrack.isPending} disabled={!dirty} onClick={() => void save()}>
               Save
             </Button>
-            <Button variant="default" disabled={!dirty} onClick={() => setValues(toForm(detail))}>
+            <Button variant="default" disabled={!dirty} onClick={() => reset(detail)}>
               Discard
             </Button>
             <Text size="xs" c="dimmed">
               Ctrl+Enter saves
             </Text>
           </Group>
+          {dirty && changedElsewhere && (
+            <Text size="xs" c="orange">
+              This track was changed elsewhere since you opened it. Saving sends only the fields you edited; Discard
+              shows the latest version.
+            </Text>
+          )}
           {detail.track.sourceUrl && (
             <Text size="sm">
               Source:{" "}

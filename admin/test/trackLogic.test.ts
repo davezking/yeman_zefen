@@ -57,6 +57,15 @@ describe("buildPatch", () => {
     });
   });
 
+  it("picking the auto-assigned era pins it; picking it again on a pinned track sends nothing", () => {
+    const auto = detail({ generationId: 2, generationOverridden: false });
+    expect(buildPatch({ ...toForm(auto), eraPicked: true }, auto)).toEqual({ generationId: 2 });
+    const pinned = detail({ generationId: 2, generationOverridden: true });
+    expect(buildPatch({ ...toForm(pinned), eraPicked: true }, pinned)).toEqual({});
+    // Clearing is never a pin, whatever the flag says.
+    expect(buildPatch({ ...toForm(auto), generationId: null, eraPicked: false }, auto)).toEqual({ generationId: null });
+  });
+
   it("compares genres as a set, ignoring order", () => {
     const d = detail({}, [1, 2]);
     expect(buildPatch({ ...toForm(d), genreIds: ["2", "1"] }, d)).toEqual({});
@@ -79,6 +88,13 @@ describe("track list filters in the URL", () => {
   it("drops values it does not understand", () => {
     const sp = new URLSearchParams("status=bogus&era=abc&genre=1.5&q=%20%20");
     expect(filtersFromParams(sp)).toEqual({ status: undefined, generationId: undefined, genreId: undefined, q: undefined });
+  });
+
+  it("accepts only positive ids, as the API does", () => {
+    for (const bad of ["0", "-1", "0x10", "1e3", "01", " 2", "99999999999"]) {
+      expect(filtersFromParams(new URLSearchParams({ era: bad })).generationId, bad).toBeUndefined();
+    }
+    expect(filtersFromParams(new URLSearchParams({ era: "3", genre: "12" }))).toMatchObject({ generationId: 3, genreId: 12 });
   });
 
   it("writes only the filters that are set", () => {

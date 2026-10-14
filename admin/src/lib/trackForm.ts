@@ -7,6 +7,8 @@ export interface FormValues {
   album: string;
   releaseYear: number | "";
   generationId: string | null;
+  /** The admin picked the era in this form, so it is pinned even if it is the era already assigned. */
+  eraPicked: boolean;
   genreIds: string[];
   artist: Artist;
 }
@@ -17,6 +19,7 @@ export const toForm = (d: TrackDetail): FormValues => ({
   album: d.track.album ?? "",
   releaseYear: d.track.releaseYear ?? "",
   generationId: d.track.generationId === null ? null : String(d.track.generationId),
+  eraPicked: false,
   genreIds: d.genreIds.map(String),
   // A track always has an artist; the detail response types it as nullable only because of the join.
   artist: d.artist ?? { id: d.track.artistId, nameAm: `Artist ${d.track.artistId}`, nameLatin: null },
@@ -37,7 +40,10 @@ export function buildPatch(v: FormValues, d: TrackDetail): TrackPatch {
   const year = v.releaseYear === "" ? null : v.releaseYear;
   if (year !== d.track.releaseYear) patch.releaseYear = year;
   const era = v.generationId === null ? null : Number(v.generationId);
-  if (era !== d.track.generationId) patch.generationId = era;
+  // Picking the era that was auto-assigned still pins it, so a later year edit or re-scrape cannot move it.
+  if (era !== d.track.generationId || (v.eraPicked && era !== null && !d.track.generationOverridden)) {
+    patch.generationId = era;
+  }
   if (v.artist.id !== d.track.artistId) patch.artistId = v.artist.id;
   const genreIds = v.genreIds.map(Number);
   if (!sameSet(genreIds, d.genreIds)) patch.genreIds = genreIds;
