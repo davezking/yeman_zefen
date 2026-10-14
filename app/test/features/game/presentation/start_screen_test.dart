@@ -28,7 +28,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byType(DropdownButton<int>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('1990s').last);
+    await tester.tap(find.text("The '90s").last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Start'));
@@ -51,7 +51,7 @@ void main() {
 
     await tester.tap(find.byType(DropdownButton<int>));
     await tester.pumpAndSettle();
-    for (final era in ['All eras', 'Golden Age', '1980s', '1990s', '2000s', 'Modern']) {
+    for (final era in ['All eras', 'Golden Age', "The '80s", "The '90s", 'The 2000s', 'Modern']) {
       expect(find.text(era), findsWidgets, reason: era);
     }
   });
@@ -62,10 +62,10 @@ void main() {
 
     await tester.tap(find.byType(DropdownButton<int>));
     await tester.pumpAndSettle();
-    for (final era in ['All eras', '1980s', 'Modern']) {
+    for (final era in ['All eras', "The '80s", 'Modern']) {
       expect(find.text(era), findsWidgets, reason: era);
     }
-    for (final era in ['Golden Age', '1990s', '2000s']) {
+    for (final era in ['Golden Age', "The '90s", 'The 2000s']) {
       expect(find.text(era), findsNothing, reason: era);
     }
   });

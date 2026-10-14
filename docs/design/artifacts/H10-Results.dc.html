@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: results</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.5}
+.sun{background:radial-gradient(70% 55% at 50% 50%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.pill{font-size:12px;font-weight:800;padding:4px 12px;border-radius:10px;background:#2B2118;color:#FFC93C}
+.nudge{border:0;border-radius:18px;background:linear-gradient(180deg,#2E3D39 0%,#2B2118 100%);color:#FFF3D1;display:flex;align-items:center;gap:10px;padding:10px 14px;font:inherit;font-size:13px;font-weight:600;text-align:left;box-shadow:0 5px 0 #120D09;min-height:52px;width:100%}
+.rw{display:flex;align-items:center;gap:10px;min-height:42px;padding:0 12px;border-radius:14px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 3px 0 #EDE3D2;font-size:13px}
+.btnY{min-height:56px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:17px;font-weight:800;box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.4),inset 0 2px 0 rgba(255,255,255,.6);width:100%}
+.btnW{min-height:48px;border:0;border-radius:16px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);color:#2B2118;font:inherit;font-size:13px;font-weight:700;box-shadow:0 4px 0 #EDE3D2,0 8px 16px rgba(43,33,24,.08);padding:4px 8px}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="flex: none; border-radius: 0 0 44px 44px; box-shadow: 0 14px 30px rgba(255,176,46,.35); position: relative; z-index: 1; padding: 34px 20px 24px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+<div style="font-size: 14px; font-weight: 700; color: #4A3B2E">{{L.title}}</div>
+<div style="font-family: 'Poppins', sans-serif; font-size: 52px; font-weight: 800; line-height: 1.05">1,240</div>
+<div style="font-size: 15px; font-weight: 700">{{L.correct}}</div>
+<span class="pill">★ {{L.best}}</span>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 24px 16px 16px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px)">
+<button class="nudge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFC93C" stroke-width="2" aria-hidden="true" style="flex: none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3"></path></svg><span style="flex: 1">{{L.guest}}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+<div style="font-size: 14px; font-weight: 800; margin-top: 2px">{{L.rounds}}</div>
+<sc-for list="{{L.rows}}" as="r" hint-placeholder-count="5">
+<div class="rw"><span style="font-family: 'Poppins', sans-serif; font-weight: 700; width: 14px">{{r.n}}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{r.color}}" stroke-width="3" aria-hidden="true"><path d="{{r.icon}}"></path></svg><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600">{{r.text}}</span><span style="font-family: 'Poppins', sans-serif; font-weight: 700">{{r.pts}}</span></div>
+</sc-for>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px">
+<button class="btnY">{{L.again}}</button>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px"><button class="btnW">{{L.change}}</button><button class="btnW">{{L.home}}</button></div>
+</div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const OK = 'M5 12.5l4.5 4.5L19 7', NO = 'M6 6l12 12M18 6L6 18';
+const rows = (first, ph) => [
+{ n: 1, icon: OK, color: '#1D6658', text: first, pts: '+143' }, { n: 2, icon: OK, color: '#1D6658', text: ph, pts: '+138' }, { n: 3, icon: NO, color: '#B8321B', text: ph, pts: '0' }, { n: 4, icon: OK, color: '#1D6658', text: ph, pts: '+129' }, { n: 5, icon: OK, color: '#1D6658', text: ph, pts: '+141' }
+];
+return { langs: [
+{ code: 'en', cap: 'English · guest · new best · sample rows', title: 'Game complete', correct: '8 of 10 right', best: 'New personal best', guest: 'Sign in to put this score on the leaderboard', rounds: 'Your rounds', rows: rows('Ere Mela Mela · Mahmoud Ahmed', '[Song] · [Artist]'), again: 'Play again', change: 'Change era or mode', home: 'Home' },
+{ code: 'am', cap: 'Amharic · guest · new best · sample rows', title: 'ጨዋታው ተጠናቋል', correct: 'ከ10 8 ትክክል', best: 'አዲስ የግል ምርጥ ውጤት', guest: 'ይህ ውጤት በደረጃ ሰንጠረዡ ላይ እንዲሰፍር ይግቡ', rounds: 'የእርስዎ ዙሮች', rows: rows('እረ መላ መላ · ማሕሙድ አሕመድ', '[ዘፈን] · [ዘፋኝ]'), again: 'እንደገና ይጫወቱ', change: 'ዘመን ወይም ጨዋታ ይቀይሩ', home: 'መነሻ' }
+] };
+}
+}
+</script>
+</body>
+</html>

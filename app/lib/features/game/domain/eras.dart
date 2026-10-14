@@ -2,9 +2,9 @@
 /// `api/migrations/0001_seed.sql`. Admin-editable names are not fetched yet.
 const eraNames = <int, String>{
   1: 'Golden Age',
-  2: '1980s',
-  3: '1990s',
-  4: '2000s',
+  2: "The '80s",
+  3: "The '90s",
+  4: 'The 2000s',
   5: 'Modern',
 };
 

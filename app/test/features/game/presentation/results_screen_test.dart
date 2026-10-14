@@ -52,7 +52,7 @@ void main() {
     );
 
     expect(find.text('412'), findsOneWidget);
-    expect(find.text('Middle · 1990s · hard'), findsOneWidget);
+    expect(find.text("Middle · The '90s · hard"), findsOneWidget);
   });
 
   testWidgets('lists each round with its points', (tester) async {

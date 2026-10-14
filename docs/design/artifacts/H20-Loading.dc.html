@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: loading</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+@keyframes yzshim{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4;background:radial-gradient(80% 35% at 50% 25%,rgba(255,255,255,.4) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 45%,#FFA94D 100%)}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.5}
+.sq{width:48px;height:48px;border-radius:16px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 4px 0 rgba(0,0,0,.1);flex:none}
+.sk{background:linear-gradient(90deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,.75) 50%,rgba(255,255,255,.35) 100%);background-size:400px 100%;animation:yzshim 1.4s linear infinite}
+.rw{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;border-radius:16px;background:rgba(255,255,255,.4)}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px 8px">
+<button class="sq" aria-label="{{L.back}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
+<h1 style="margin: 0; font-size: 20px; font-weight: 800">{{L.title}}</h1>
+</div>
+<div role="status" aria-busy="true" style="padding: 8px 18px 14px; font-size: 13px; font-weight: 700">{{L.loading}}</div>
+<div aria-hidden="true" style="display: flex; justify-content: center; align-items: flex-end; gap: 16px; padding: 4px 16px 18px">
+<span class="sk" style="width: 52px; height: 52px; border-radius: 18px"></span><span class="sk" style="width: 68px; height: 68px; border-radius: 22px"></span><span class="sk" style="width: 52px; height: 52px; border-radius: 18px"></span>
+</div>
+<div aria-hidden="true" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 16px">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<div class="rw"><span class="sk" style="width: 16px; height: 12px; border-radius: 6px"></span><span class="sk" style="width: 30px; height: 30px; border-radius: 10px"></span><span class="sk" style="flex: 1; max-width: 140px; height: 12px; border-radius: 6px"></span><span style="flex: 1"></span><span class="sk" style="width: 44px; height: 12px; border-radius: 6px"></span></div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { rows: [1, 2, 3, 4, 5, 6, 7], langs: [
+{ code: 'en', cap: 'English · loading > 300 ms', back: 'Back', title: 'Leaderboard', loading: 'Loading the leaderboard…' },
+{ code: 'am', cap: 'Amharic · loading > 300 ms', back: 'ይመለሱ', title: 'የደረጃ ሰንጠረዥ', loading: 'የደረጃ ሰንጠረዡን በመጫን ላይ…' }
+] };
+}
+}
+</script>
+</body>
+</html>

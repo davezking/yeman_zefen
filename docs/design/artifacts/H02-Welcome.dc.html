@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: welcome</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.55}
+.sun{background:radial-gradient(70% 55% at 50% 50%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.ans{min-height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;text-align:center;color:#2B2118;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 5px 0 #EDE3D2,0 10px 20px rgba(43,33,24,.10)}
+.btnY{min-height:58px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:17px;font-weight:800;box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.4),inset 0 2px 0 rgba(255,255,255,.6);width:100%}
+.dots{display:flex;gap:8px;justify-content:center}
+.dots span{width:8px;height:8px;border-radius:4px;background:#E3C9A0}
+.dots span.on{width:24px;background:#2B2118}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="height: 400px; flex: none; border-radius: 0 0 44px 44px; box-shadow: 0 14px 30px rgba(255,176,46,.35); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; box-sizing: border-box; position: relative; z-index: 1" aria-hidden="true">
+<div style="width: 190px; height: 120px; border-radius: 18px; background: linear-gradient(180deg, #4A3B2E 0%, #2B2118 100%); padding: 9px 9px 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 7px; box-shadow: 0 8px 0 rgba(0,0,0,.15), 0 0 0 8px rgba(255,255,255,.3), 0 0 46px rgba(240,86,58,.45)">
+<div style="flex: 1; border-radius: 10px; background: linear-gradient(180deg, #FF8A5C 0%, #E0452A 100%); display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 5px 9px"><div style="height: 5px; border-radius: 3px; background: linear-gradient(90deg, #FFC93C, #FFE07A)"></div><div style="height: 38px; border-radius: 19px; background: #2B2118; display: flex; align-items: center; justify-content: space-between; padding: 0 6px"><span style="width: 28px; height: 28px; border-radius: 14px; background: radial-gradient(circle, #FFC93C 0 4px, #FFF3D1 5px 100%)"></span><span style="width: 28px; height: 28px; border-radius: 14px; background: radial-gradient(circle, #FFC93C 0 4px, #FFF3D1 5px 100%)"></span></div></div>
+<div style="height: 14px; margin: 0 30px; border-radius: 8px 8px 0 0; background: #3B2F25"></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%">
+<div class="ans">{{L.a1}}</div><div class="ans">{{L.a2}}</div>
+</div>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 30px 24px 24px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px)">
+<h1 style="margin: 0; font-size: 26px; font-weight: 800; line-height: 1.35">{{L.title}}</h1>
+<p style="margin: 0; font-size: 16px; color: #4A3B2E">{{L.body}}</p>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 18px">
+<div class="dots" aria-hidden="true"><span></span><span class="on"></span></div>
+<button class="btnY">{{L.start}}</button>
+</div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { langs: [
+{ code: 'en', cap: 'English · goes straight to round 1', a1: 'Mahmoud Ahmed', a2: 'Aster Aweke', title: 'Name the song from its first notes.', body: 'Hear a short clip, then pick the song or the singer. No sign-up needed.', start: 'Start playing' },
+{ code: 'am', cap: 'Amharic · goes straight to round 1', a1: 'ማሕሙድ አሕመድ', a2: 'አስቴር አወቀ', title: 'ዘፈኑን ከመጀመሪያዎቹ ድምፆች ይለዩ።', body: 'አጭር ቅንጭብ ያዳምጡ፣ ከዚያ ዘፈኑን ወይም ዘፋኙን ይምረጡ። መመዝገብ አያስፈልግም።', start: 'መጫወት ይጀምሩ' }
+] };
+}
+}
+</script>
+</body>
+</html>

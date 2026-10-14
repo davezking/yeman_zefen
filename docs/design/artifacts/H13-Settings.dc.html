@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.5}
+.sun{background:radial-gradient(70% 55% at 50% 62%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;background:rgba(255,255,255,.45);border-radius:16px;padding:5px}
+.seg button{min-height:46px;border:0;border-radius:12px;background:transparent;font-size:15px;font-weight:700;color:#4A3B2E}
+.seg button.on{background:#2B2118;color:#FFC93C;box-shadow:0 3px 0 #120D09}
+.grp{border-radius:20px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 5px 0 #EDE3D2,0 10px 22px rgba(43,33,24,.08);overflow:hidden}
+.rw{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;border-top:1px solid #F1E8DA;font-size:14px;font-weight:600;color:#2B2118;text-decoration:none}
+.rw:first-child{border-top:0}
+.tg{width:46px;height:28px;border-radius:14px;background:linear-gradient(180deg,#2A8A77,#1D6658);position:relative;flex:none;border:0;padding:0}
+.tg span{position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:11px;background:#FFFFFF}
+.sm{min-height:36px;border:0;border-radius:12px;background:linear-gradient(180deg,#FFE07A,#FFB02E);font:inherit;font-size:13px;font-weight:800;padding:0 14px;color:#2B2118;box-shadow:0 3px 0 #D99418;flex:none}
+.sq{width:52px;height:52px;border-radius:18px;border:0;background:#FFFFFF;display:flex;align-items:center;justify-content:center;color:#2B2118;padding:0;box-shadow:0 5px 0 #EDE3D2,0 8px 20px rgba(43,33,24,.08);flex:none}
+.sq.on{background:#2B2118;color:#FFC93C;box-shadow:0 5px 0 #120D09}
+.bar{background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,#FFFFFF 45%);border-radius:36px 36px 0 0;box-shadow:0 -10px 26px rgba(255,169,77,.28);padding:14px 26px 20px;display:flex;align-items:center;justify-content:space-between;flex:none}
+.play{min-width:140px;height:62px;border-radius:22px;border:0;font:inherit;font-size:18px;font-weight:800;color:#2B2118;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.45),inset 0 2px 0 rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;gap:8px}
+.chev{margin-left:auto;flex:none}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="flex: none; border-radius: 0 0 40px 40px; box-shadow: 0 14px 30px rgba(255,176,46,.35); position: relative; z-index: 1; padding: 26px 18px 22px; display: flex; flex-direction: column; gap: 12px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 800">{{L.title}}</h1>
+<div style="font-size: 13px; font-weight: 700">{{L.language}}</div>
+<div class="seg" role="group"><button class="{{L.amOn}}" lang="am" style="font-family: 'Noto Sans Ethiopic', sans-serif">አማርኛ</button><button class="{{L.enOn}}" lang="en" style="font-family: 'Poppins', sans-serif">English</button></div>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 24px 16px 12px; margin-top: -12px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 140px); overflow: hidden">
+<div class="grp">
+<div class="rw"><span style="flex: 1">{{L.sound}}</span><button class="tg" role="switch" aria-checked="true" aria-label="{{L.sound}}"><span></span></button></div>
+<div class="rw"><span style="flex: 1">{{L.haptics}}</span><button class="tg" role="switch" aria-checked="true" aria-label="{{L.haptics}}"><span></span></button></div>
+</div>
+<div class="grp">
+<div class="rw"><span style="flex: 1; color: #4A3B2E">{{L.guest}}</span><button class="sm">{{L.signIn}}</button></div>
+<a class="rw" href="#"><span>{{L.offline}}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+<a class="rw" href="#"><span>{{L.adPrivacy}}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+</div>
+<div class="grp">
+<a class="rw" href="#"><span>{{L.privacy}}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+<a class="rw" href="#"><span>{{L.about}}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+</div>
+<div style="font-size: 12px; color: #4A3B2E; text-align: center">{{L.version}}</div>
+</div>
+<nav class="bar">
+<button class="sq" aria-label="{{L.navHome}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg></button>
+<button class="play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>{{L.play}}</button>
+<button class="sq on" aria-label="{{L.navSettings}}" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></button>
+</nav>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { langs: [
+{ code: 'en', cap: 'English · guest', title: 'Settings', language: 'Language', amOn: '', enOn: 'on', sound: 'Sound effects', haptics: 'Vibration', guest: 'Playing as a guest', signIn: 'Sign in', offline: 'Offline play · 1 pack · 12 MB', adPrivacy: 'Ad privacy choices', privacy: 'Privacy policy', about: 'About and licenses', version: 'Version 1.0.0', navHome: 'Home', navSettings: 'Settings', play: 'Play' },
+{ code: 'am', cap: 'Amharic · guest', title: 'ቅንብሮች', language: 'ቋንቋ', amOn: 'on', enOn: '', sound: 'የድምፅ ውጤቶች', haptics: 'ንዝረት', guest: 'በእንግድነት እየተጫወቱ ነው', signIn: 'ይግቡ', offline: 'ያለ ኢንተርኔት መጫወት · 1 ጥቅል · 12 ሜባ', adPrivacy: 'የማስታወቂያ ግላዊነት ምርጫዎች', privacy: 'የግላዊነት ፖሊሲ', about: 'ስለ መተግበሪያው እና ፈቃዶች', version: 'ስሪት 1.0.0', navHome: 'መነሻ', navSettings: 'ቅንብሮች', play: 'ይጫወቱ' }
+] };
+}
+}
+</script>
+</body>
+</html>

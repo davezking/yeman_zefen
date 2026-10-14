@@ -172,7 +172,7 @@ All JSON. Errors use the shape `{ error: { code, message } }`. Versioned under `
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/config` | Tunables: interstitial frequency (4), register-prompt threshold (5 sessions), min app version |
+| `GET /v1/config` | Tunables: interstitial frequency (3), register-prompt threshold (5 sessions), min app version |
 | `GET /v1/packs` | Published packs with current version, size, track count, manifest URL |
 | `PUT /v1/me` | Upsert user (display name, country from `cf.country`), updates last_seen |
 | `DELETE /v1/me` | Account deletion (required by both stores); anonymizes sessions, removes leaderboard rows |

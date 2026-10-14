@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hi-fi: language</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;family=Noto+Sans+Ethiopic:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cap{font:600 12px/20px 'Poppins',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#33433F}
+.ph{position:relative;width:360px;height:780px;border-radius:40px;overflow:hidden;background:#FFFFFF;display:flex;flex-direction:column;box-shadow:0 24px 50px rgba(43,33,24,.16);font-family:'Poppins','Noto Sans Ethiopic',sans-serif;color:#2B2118;font-size:15px;line-height:1.4}
+.ph.am{font-family:'Noto Sans Ethiopic','Poppins',sans-serif;line-height:1.55}
+.sun{background:radial-gradient(70% 55% at 50% 40%,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 70%),linear-gradient(180deg,#FFDF6E 0%,#FFC93C 55%,#FFB02E 100%)}
+.tile{width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-family:'Noto Sans Ethiopic',sans-serif;font-size:20px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.12),inset 0 10px 12px rgba(255,255,255,.38)}
+.opt{min-height:64px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFFFFF 0%,#FBF4E8 100%);box-shadow:0 6px 0 #EDE3D2,0 12px 26px rgba(43,33,24,.10);font-size:19px;font-weight:700;display:flex;align-items:center;justify-content:space-between;padding:8px 20px;width:100%;color:#2B2118}
+.opt.on{background:linear-gradient(180deg,#2A3A36 0%,#2B2118 100%);color:#FFF3D1;box-shadow:0 6px 0 #120D09,0 12px 26px rgba(43,33,24,.25)}
+.btnY{min-height:58px;border:0;border-radius:20px;background:linear-gradient(180deg,#FFE07A 0%,#FFC93C 50%,#FFAE2E 100%);color:#2B2118;font:inherit;font-size:17px;font-weight:800;box-shadow:0 6px 0 #D99418,0 12px 26px rgba(255,170,46,.4),inset 0 2px 0 rgba(255,255,255,.6);width:100%}
+</style>
+</helmet>
+<div style="width: 840px; height: 900px; box-sizing: border-box; padding: 32px 40px 40px; display: flex; gap: 40px; background: radial-gradient(50% 40% at 90% 5%, rgba(255,217,94,.45) 0%, rgba(255,217,94,0) 70%), linear-gradient(160deg, #E2F3EF 0%, #BFE0D9 100%)">
+<sc-for list="{{langs}}" as="L" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="cap">{{L.cap}}</div>
+<div class="ph {{L.code}}" lang="{{L.code}}">
+<div class="sun" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; border-radius: 0 0 44px 44px; box-shadow: 0 14px 30px rgba(255,176,46,.35)">
+<div style="display: flex; gap: 5px"><span class="tile" style="background: #FFFFFF">የ</span><span class="tile" style="background: #7FB5A8">ማ</span><span class="tile" style="background: #FFFFFF">ን</span><span style="width: 8px"></span><span class="tile" style="background: #F0563A">ዘ</span><span class="tile" style="background: #FFFFFF">ፈ</span><span class="tile" style="background: #E3C9A0">ን</span></div>
+<div style="font-size: 26px; font-weight: 800; margin-top: 8px">{{L.appName}}</div>
+<div style="font-size: 16px; font-weight: 600; color: #4A3B2E">{{L.tagline}}</div>
+</div>
+<div style="padding: 26px 20px 28px; display: flex; flex-direction: column; gap: 14px; background: linear-gradient(180deg, #FFF3D1 0%, #FFFFFF 120px)">
+<div style="font-size: 16px; font-weight: 700; text-align: center">ቋንቋ ይምረጡ · Choose your language</div>
+<button class="opt {{L.amOn}}" lang="am" style="font-family: 'Noto Sans Ethiopic', sans-serif">አማርኛ<span style="width: 26px; height: 26px; border-radius: 13px; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #FFC93C; opacity: {{L.amDot}}"></span></span></button>
+<button class="opt {{L.enOn}}" lang="en" style="font-family: 'Poppins', sans-serif">English<span style="width: 26px; height: 26px; border-radius: 13px; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #FFC93C; opacity: {{L.enDot}}"></span></span></button>
+<div style="font-size: 13px; color: #4A3B2E; text-align: center">{{L.later}}</div>
+<button class="btnY">{{L.next}}</button>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":840,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { langs: [
+{ code: 'en', cap: 'English · phone locale en', appName: 'Yeman Zefen', tagline: 'Whose song is it?', later: 'You can change this anytime in Settings.', next: 'Next', amOn: '', enOn: 'on', amDot: 0, enDot: 1 },
+{ code: 'am', cap: 'Amharic · phone locale am', appName: 'የማን ዘፈን', tagline: 'የማን ዘፈን ነው?', later: 'ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።', next: 'ቀጣይ', amOn: 'on', enOn: '', amDot: 1, enDot: 0 }
+] };
+}
+}
+</script>
+</body>
+</html>
