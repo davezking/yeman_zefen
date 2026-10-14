@@ -20,6 +20,7 @@ import { artistAliases, artists, CLIP_TYPES, INGEST_KINDS, INGEST_STATUSES, inge
 import type { AppEnv, Bindings } from "../../env";
 import { assignGeneration } from "../../lib/era";
 import { ApiError } from "../../lib/errors";
+import { insertJob, jobRequest } from "../../lib/jobs";
 import { cleanText, normalizeAlias, normalizeFidel } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
@@ -673,6 +674,16 @@ ingestRoutes.get("/clip-targets", async (c) => {
   c.header("Cache-Control", "no-store");
   // `next` is the cursor for the following page of a missing=1 listing; null once the last page is out.
   return c.json({ tracks: tracksOut, next: q.missing && tracksOut.length === q.limit ? tracksOut[tracksOut.length - 1]!.id : null });
+});
+
+// ---------------------------------------------------------------- jobs
+
+// A workflow that starts on a schedule has no job yet, so it asks for one. Nothing is dispatched: the run
+// that asks is the run. (Admins use POST /admin/jobs, which dispatches.)
+ingestRoutes.post("/jobs", async (c) => {
+  const req = parse(jobRequest, await readJson(c));
+  const job = await insertJob(c.env, req);
+  return c.json({ jobId: job.id }, 201);
 });
 
 // ------------------------------------------------------------- job status

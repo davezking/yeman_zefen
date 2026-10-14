@@ -53,6 +53,7 @@ describe("auth", () => {
     ["POST", "/admin/ingest/jobs/1/status"],
     ["GET", "/admin/ingest/catalog-snapshot"],
     ["GET", "/admin/ingest/clip-targets?missing=1"],
+    ["POST", "/admin/ingest/jobs"],
   ] as const;
 
   it("401 without a token, 403 for a human admin token", async () => {

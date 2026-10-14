@@ -61,6 +61,75 @@ added with `add-admin.ts`. When `ENV=dev`, a request with no Access header is
 then treated as that admin. With `DEV_ADMIN_EMAIL` unset, `/admin/*` returns 401
 even in dev. This bypass never applies when `ENV=prod`.
 
+## Ingest jobs and workflows
+
+Scraping and cutting run as GitHub Actions workflows, started from the Worker and tracked in `ingest_jobs`.
+
+```
+admin  --POST /admin/jobs-->  Worker: insert job (queued) --dispatch--> GitHub: ingest-scrape.yml | ingest-cut.yml
+                                                                          |
+        job: queued -> running -> succeeded | failed  <--status calls--  the run (yz.scrape / yz.cut)
+```
+
+- **Start a job**: `POST /admin/jobs { kind, params }` (any signed-in admin or editor), `GET /admin/jobs` for the last
+  50, newest first. `kind` and `params` (anything else is a 400):
+
+  | kind | params | workflow and arguments |
+  |---|---|---|
+  | `scrape` | `{ limit?, since? }` (`since` is `YYYY-MM-DD`) | `ingest-scrape.yml` with inputs `limit`, `since` |
+  | `cut` | `{ trackIds: [..] }` or `{ allMissing: true, limit? }`, plus optional `type` | `ingest-cut.yml`, `--track-ids 1,2` or `--all-missing [--limit N]`, `--type T` |
+  | `recut` | `{ trackId, type, startMs }` | `ingest-cut.yml`, `--track-id N --type T --start-ms M` |
+
+  The arguments are built by the Worker from these validated values, never copied from the request.
+  The answer is 201 with the job. If GitHub will not start the workflow, the job is kept as `failed` with
+  GitHub's reason in its summary and the request is a 502 `dispatch_failed` that names the job.
+- **A clip's start time** (`PATCH /admin/clips/:id`) saves the start, sets the clip `pending`, and starts a `recut`
+  job for it. The response carries the job. If the job cannot be started the edit is still saved (the job is
+  recorded as `failed`) and the clip stays `pending`, so the next `cut` with `allMissing` picks it up.
+- **Scheduled scrape**: Mondays 03:17 UTC, looking back 30 days. A run with no job (the schedule, or started by
+  hand) creates its own with `POST /admin/ingest/jobs`. Start one by hand from the Actions tab with empty inputs
+  to try the pipeline.
+- **Reporting**: each run posts `running` with a link to the Actions run, then `succeeded` or `failed` with a
+  summary (the scraper's and cutter's counts). A step that runs on failure or cancellation marks the job `failed`
+  if the run died before the scraper or cutter could say so (a bad argument, `pip` failing, a cancel). It never
+  overrides a result the job already has.
+- **Runs that cannot report for themselves**: scrape and cut share the concurrency group `ingest`, so one runs at
+  a time. GitHub keeps only the **newest** waiting run and cancels older waiting ones before any step executes,
+  so a job started while two others are ahead of it would stay `queued` for good. `ingest-watch.yml` catches
+  this (and a run killed by a timeout or that never started): whenever an ingest run ends unsuccessfully it marks
+  the job named in the run's title failed. A job whose run was cancelled this way is not retried; start it again,
+  or start a `cut` job with `allMissing` to catch up on every pending clip.
+
+### Setup
+
+Repository secrets (GitHub: Settings > Secrets and variables > Actions) used by the three workflows:
+
+| Secret | Value |
+|---|---|
+| `API_BASE` | the Worker's URL, e.g. `https://api.example.com` |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above) |
+| `R2_ENDPOINT` | `https://<account>.r2.cloudflarestorage.com` |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | an R2 API token that can read `yz-source` and write `yz-clips` |
+
+Worker configuration:
+
+| Name | Kind | Value |
+|---|---|---|
+| `GH_DISPATCH_TOKEN` | secret: `npx wrangler secret put GH_DISPATCH_TOKEN` (add `--env prod` for production) | the token below |
+| `GH_REPO` | var in `wrangler.toml` | `owner/name` of this repository |
+| `GH_REF` | var in `wrangler.toml` | the branch the workflows run from, `main` |
+
+The Worker needs a token that can start workflows, and nothing more. Create a **fine-grained personal access
+token** (GitHub: Settings > Developer settings > Personal access tokens > Fine-grained tokens):
+resource owner = the account or org that owns the repository; **Repository access = Only select repositories**,
+this repository alone; **Repository permissions = Actions: Read and write** and nothing else (GitHub adds
+read-only Metadata itself); no account permissions; an expiry (set a reminder to rotate it). Tokens like this
+cannot be broader than what you tick, and you can check it: with the token, `GET /repos/{owner}/{repo}/contents`
+and any other repository both fail (403/404), while the workflow dispatch succeeds.
+
+The workflows only exist for the dispatch API once they are on the branch named by `GH_REF`, so none of this
+works until they are merged to `main`.
+
 ## Cutting clips (`ingest/`)
 
 `python -m yz.cut` (run from `ingest/`, needs ffmpeg and the same environment variables as the scraper, with

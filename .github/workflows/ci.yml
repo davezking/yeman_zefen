@@ -44,5 +44,18 @@ jobs:
           cache: pip
           cache-dependency-path: ingest/requirements.txt
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
-      - run: pip install -r requirements.txt pytest
+      - run: pip install -r requirements.txt pytest pyyaml
       - run: pytest
+
+  # The ingest workflows run unattended and only on main, so a mistake in one would surface late. actionlint
+  # checks the expressions and (with the shellcheck that the runner image has) the shell inside `run:`.
+  workflows:
+    name: workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install actionlint-py==1.7.12.25
+      - run: actionlint

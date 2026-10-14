@@ -1,0 +1,65 @@
+name: ingest-cut
+
+# Cuts the intro and middle clips (python -m yz.cut). Started by the Worker (POST /admin/jobs, and when an
+# admin changes a clip's start time), which passes the job it just created and the arguments for the cutter.
+# The cutter reports running/succeeded/failed itself; the last step covers a run that dies before it can.
+run-name: Cut job ${{ inputs.job_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: The ingest_jobs row to report to
+        required: true
+      args:
+        description: "Arguments for yz.cut, e.g. --all-missing or --track-id 7 --type intro --start-ms 41200"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: ingest
+    env:
+      JOB_ID: ${{ inputs.job_id }}
+      API_BASE: ${{ secrets.API_BASE }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ingest/requirements.txt
+
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - run: pip install -r requirements.txt
+
+      - name: Cut
+        env:
+          CUT_ARGS: ${{ inputs.args }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          # Split on whitespace only: no globbing, no shell evaluation of what the arguments contain.
+          read -r -a args <<< "$CUT_ARGS"
+          python -m yz.cut "${args[@]}"
+
+      - name: Mark the job failed if the run did not report
+        if: ${{ failure() || cancelled() }}
+        env:
+          RUN_STATUS: ${{ job.status }}
+        run: python -m yz.jobs fail --message "the cut run ended as $RUN_STATUS before the job reported a result"

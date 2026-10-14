@@ -1,0 +1,90 @@
+name: ingest-scrape
+
+# Scrapes ethiozeima.com into the catalog. Started by the Worker (POST /admin/jobs, which passes the job it
+# just created), by hand from the Actions tab, or weekly on a schedule. The latter two have no job yet, so
+# this run creates one. The scraper reports running/succeeded/failed itself; the last step covers a run that
+# dies before it can. Secrets and the job lifecycle are described in docs/ops.md.
+run-name: ${{ inputs.job_id && format('Scrape job {0}', inputs.job_id) || 'Scrape (no job yet)' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: The ingest_jobs row to report to (leave empty to create one)
+        required: false
+        default: ""
+      limit:
+        description: Process at most this many posts
+        required: false
+        default: ""
+      since:
+        description: Only posts published on or after this date (YYYY-MM-DD)
+        required: false
+        default: ""
+  schedule:
+    - cron: "17 3 * * 1" # Mondays, 03:17 UTC
+
+permissions:
+  contents: read
+
+# One ingest run at a time, scrape and cut alike. Runs wait their turn rather than cancelling the one in
+# progress. (GitHub keeps only the newest waiting run; ingest-watch.yml marks the others' jobs failed.)
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: ingest
+    env:
+      API_BASE: ${{ secrets.API_BASE }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ingest/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # Scheduled and hand-started runs have no job. They look back 30 days unless told otherwise.
+      - name: Create the job
+        id: job
+        if: ${{ !inputs.job_id }}
+        env:
+          SINCE_INPUT: ${{ inputs.since }}
+        run: |
+          since="${SINCE_INPUT:-$(date -u -d '30 days ago' +%F)}"
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+          python -m yz.jobs create --kind scrape --since "$since"
+
+      - name: Scrape
+        env:
+          JOB_ID: ${{ inputs.job_id || steps.job.outputs.job_id }}
+          LIMIT: ${{ inputs.limit }}
+          SINCE: ${{ inputs.job_id && inputs.since || steps.job.outputs.since }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          args=()
+          if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          if [ -n "$SINCE" ]; then args+=(--since "$SINCE"); fi
+          python -m yz.scrape "${args[@]}"
+
+      # A run that fails, or is cancelled, before the scraper reported leaves its job queued or running for
+      # good. This marks it failed. It does nothing to a job that already finished.
+      - name: Mark the job failed if the run did not report
+        if: ${{ failure() || cancelled() }}
+        env:
+          JOB_ID: ${{ inputs.job_id || steps.job.outputs.job_id }}
+          RUN_STATUS: ${{ job.status }}
+        run: python -m yz.jobs fail --message "the scrape run ended as $RUN_STATUS before the job reported a result"

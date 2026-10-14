@@ -21,6 +21,21 @@ class ConfigError(Exception):
     """A required setting is missing or malformed."""
 
 
+def github_run_url(env: Mapping[str, str]) -> str | None:
+    """The URL of the Actions run we are in (GitHub sets these variables), so a job row can link to it."""
+    if all(env.get(k) for k in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")):
+        return f"{env['GITHUB_SERVER_URL']}/{env['GITHUB_REPOSITORY']}/actions/runs/{env['GITHUB_RUN_ID']}"
+    return None
+
+
+def require(env: Mapping[str, str], *names: str) -> dict[str, str]:
+    """The named variables, trimmed, or a ConfigError naming every one that is missing."""
+    missing = [n for n in names if not env.get(n, "").strip()]
+    if missing:
+        raise ConfigError("missing environment variables: " + ", ".join(missing))
+    return {n: env[n].strip() for n in names}
+
+
 @dataclass(frozen=True)
 class Config:
     api_base: str
@@ -47,11 +62,6 @@ class Config:
         if job_id <= 0:
             raise ConfigError(f"JOB_ID must be a positive integer, got {env['JOB_ID']!r}")
 
-        # Set by GitHub Actions; lets the job row link back to the run.
-        run_url = None
-        if all(env.get(k) for k in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")):
-            run_url = f"{env['GITHUB_SERVER_URL']}/{env['GITHUB_REPOSITORY']}/actions/runs/{env['GITHUB_RUN_ID']}"
-
         return cls(
             api_base=env["API_BASE"].strip().rstrip("/"),
             cf_access_client_id=env["CF_ACCESS_CLIENT_ID"].strip(),
@@ -62,5 +72,5 @@ class Config:
             job_id=job_id,
             r2_bucket=env.get("R2_BUCKET", "").strip() or "yz-source",
             r2_clips_bucket=env.get("R2_CLIPS_BUCKET", "").strip() or "yz-clips",
-            gh_run_url=run_url,
+            gh_run_url=github_run_url(env),
         )

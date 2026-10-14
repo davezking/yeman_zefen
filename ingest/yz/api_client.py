@@ -158,6 +158,13 @@ class ApiClient:
             merged["flags"].extend(data.get("flags", []))
         return merged
 
+    def create_job(self, kind: str, params: dict | None = None) -> int:
+        """Ask for a job row for a run that is already under way (the scheduled scrape). Returns its id."""
+        body: dict = {"kind": kind}
+        if params:
+            body["params"] = params
+        return int(self._request("POST", "/admin/ingest/jobs", body)["jobId"])
+
     def get_catalog_snapshot(self) -> dict:
         """The catalog as `GET /admin/ingest/catalog-snapshot` returns it (for client-side dedupe)."""
         return self._request("GET", "/admin/ingest/catalog-snapshot")

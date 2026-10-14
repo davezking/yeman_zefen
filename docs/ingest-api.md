@@ -48,6 +48,13 @@ Rules:
 - **Genres** are slugs from the `genres` table; unknown slugs are ignored and echoed back as `unknownGenres`.
 - Sending the same batch again returns `skipped` for every record and changes nothing.
 
+## `POST /admin/ingest/jobs`
+
+For a run that started without a job: the weekly scrape, or one started by hand from the Actions tab.
+`{ kind, params? }` (the same body as `POST /admin/jobs`, see `docs/ops.md`) creates a `queued` job and returns
+`{ jobId }` (201). Nothing is dispatched: the run that asks is the run. The workflow then reports through
+`POST /admin/ingest/jobs/:id/status`.
+
 ## `POST /admin/ingest/clips`
 
 Up to 100 clips and up to 100 flags, either or both:

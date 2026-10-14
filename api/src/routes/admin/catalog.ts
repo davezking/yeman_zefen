@@ -19,6 +19,7 @@ import type { AppEnv } from "../../env";
 import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
+import { createJob, jobOut } from "../../lib/jobs";
 import { normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
@@ -388,7 +389,16 @@ catalog.patch("/clips/:id", async (c) => {
     throw new ApiError(400, "validation_error", `start_ms: must be between 0 and ${maxStart} for this track`);
   }
 
-  // The existing file no longer matches; Sprint 2's job trigger will recut it.
+  // The existing file no longer matches the start, so the clip is pending until it is recut.
   const [updated] = await d.update(clips).set({ startMs, status: "pending" }).where(eq(clips.id, id)).returning();
-  return c.json({ needsRecut: true, clip: updated });
+
+  // Ask for that recut now. The edit is already saved, so a job that cannot be started (GitHub down, no
+  // token) must not fail the request: it is recorded as failed, and the clip stays pending for the next cut.
+  let job: ReturnType<typeof jobOut> | null = null;
+  try {
+    job = jobOut((await createJob(c.env, { kind: "recut", params: { trackId: clip.trackId, type: clip.type, startMs } })).job);
+  } catch (err) {
+    console.error("could not create the recut job", err instanceof Error ? err.message : String(err));
+  }
+  return c.json({ needsRecut: true, clip: updated, job });
 });
