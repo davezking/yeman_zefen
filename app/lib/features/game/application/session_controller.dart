@@ -120,6 +120,15 @@ class SessionController extends Notifier<SessionState> {
     pending.complete(_Answered(optionId, responseMs));
   }
 
+  /// The app went to the background. The round pauses as it does after a call,
+  /// so a clip does not keep playing, and the window does not run out, unseen.
+  void pauseForBackground() {
+    final pending = _outcome;
+    if (pending == null || pending.isCompleted) return;
+    unawaited(_stopPlayer());
+    pending.complete(const _Interrupted());
+  }
+
   /// Plays the interrupted round again, with a fresh answer window.
   void resume() {
     final pending = _resume;

@@ -428,6 +428,33 @@ void main() {
       await kit.untilRound(1, RoundPhase.answering, attempt: 2);
     });
 
+    test('going to the background pauses the round like a call', () async {
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+
+      kit.controller.pauseForBackground();
+      await kit.untilRound(1, RoundPhase.interrupted);
+
+      expect(kit.voices.any((v) => v.playing), isFalse, reason: 'the clip does not keep playing in the background');
+      expect(kit.timers.where((t) => t.duration == const Duration(milliseconds: 10000)).every((t) => !t.isActive), isTrue);
+
+      kit.controller.resume();
+      await kit.untilRound(1, RoundPhase.answering, attempt: 2);
+    });
+
+    test('going to the background does nothing between rounds', () async {
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 2500;
+      kit.controller.answer(kit.correctOption());
+      await kit.untilRound(1, RoundPhase.feedback);
+
+      kit.controller.pauseForBackground();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(kit.state.round!.phase, RoundPhase.feedback);
+    });
+
     test('resume does nothing when the round is not interrupted', () async {
       kit.start(short);
       await kit.untilRound(1, RoundPhase.answering);
