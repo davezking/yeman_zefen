@@ -16,14 +16,26 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown, label = "bo
 
 /** Read a JSON body; malformed JSON is a 400, not a 500. */
 export async function readJson(c: Context): Promise<unknown> {
+  return parseJsonText(await c.req.text());
+}
+
+/** Like readJson, but an empty body reads as `{}` (for endpoints whose every field is optional). */
+export async function readOptionalJson(c: Context): Promise<unknown> {
+  const text = await c.req.text();
+  return text.trim() === "" ? {} : parseJsonText(text);
+}
+
+function parseJsonText(text: string): unknown {
   try {
-    return await c.req.json();
+    return JSON.parse(text);
   } catch {
     throw new ApiError(400, "invalid_json", "Request body must be valid JSON");
   }
 }
 
-const id = z.coerce.number().int().positive();
+/** A positive integer id, from a path or query string. */
+export const idSchema = z.coerce.number().int().positive();
+const id = idSchema;
 
 /** A positive integer path parameter. */
 export function idParam(c: Context, name = "id"): number {

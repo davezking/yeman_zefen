@@ -21,10 +21,12 @@ import {
 import type { AppEnv } from "../../env";
 import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
+import { cdnUrl } from "../../lib/cdn";
 import { ApiError } from "../../lib/errors";
 import { assignGeneration } from "../../lib/era";
 import { isOutOfCatalog } from "../../lib/trackStatus";
 import { createJob, jobOut } from "../../lib/jobs";
+import { presignSourceUrl } from "../../lib/sourceUrl";
 import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
 
@@ -51,7 +53,7 @@ async function requireArtist(d: Db, id: number) {
 
 /** Public URL of a clip's file. Only ready clips have one: a pending clip's file no longer matches its start. */
 export function clipUrl(cdnBase: string, clip: { r2Key: string | null; status: string }): string | null {
-  return clip.r2Key && clip.status === "ready" ? `${cdnBase.replace(/\/+$/, "")}/${clip.r2Key}` : null;
+  return clip.r2Key && clip.status === "ready" ? cdnUrl(cdnBase, clip.r2Key) : null;
 }
 
 async function loadTrackDetail(d: Db, cdnBase: string, id: number) {
@@ -151,6 +153,13 @@ const trackPatchSchema = z
   })
   .partial()
   .refine((o) => Object.keys(o).length > 0, "at least one field is required");
+
+// A short-lived signed URL for the track's private source audio, so the clip editor can draw its waveform.
+catalog.get("/tracks/:id/source-url", async (c) => {
+  const track = await requireTrack(db(c.env), idParam(c));
+  if (!track.sourceAudioKey) throw new ApiError(404, "no_source_audio", `Track ${track.id} has no source audio`);
+  return c.json(await presignSourceUrl(c.env, track.sourceAudioKey));
+});
 
 catalog.patch("/tracks/:id", async (c) => {
   const d = db(c.env);

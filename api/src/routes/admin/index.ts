@@ -4,6 +4,7 @@ import { requireAdmin, requireService } from "../../lib/accessAuth";
 import { catalog } from "./catalog";
 import { ingestRoutes } from "./ingest";
 import { jobRoutes } from "./jobs";
+import { packRoutes } from "./packs";
 import { reviewRoutes } from "./reviewItems";
 import { taxonomy } from "./taxonomy";
 
@@ -16,6 +17,7 @@ human.use("*", requireAdmin());
 human.get("/whoami", (c) => c.json({ admin: c.get("admin") }));
 human.route("/", catalog);
 human.route("/", jobRoutes);
+human.route("/", packRoutes);
 human.route("/", taxonomy);
 human.route("/", reviewRoutes);
 

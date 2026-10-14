@@ -186,3 +186,22 @@ export async function svcWithQueryCount(
   );
   return { response, queries: counter.queries };
 }
+
+/** Call the app directly with a counting DB as a signed-in admin, and report how many D1 queries it used. */
+export async function adminWithQueryCount(
+  path: string,
+  opts: { method?: string; body?: unknown } = {},
+): Promise<{ response: Response; queries: number }> {
+  const { default: app } = await import("../src/index");
+  const { db, counter } = countingDb(env.DB);
+  const jwt = await signAccessJwt({ email: "admin@yz.test" });
+  const response = await app.fetch(
+    new Request(`https://api.test${path}`, {
+      method: opts.method ?? (opts.body === undefined ? "GET" : "POST"),
+      headers: opts.body === undefined ? { [ACCESS_HEADER]: jwt } : { "content-type": "application/json", [ACCESS_HEADER]: jwt },
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    }),
+    { ...env, DB: db },
+  );
+  return { response, queries: counter.queries };
+}

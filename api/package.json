@@ -12,6 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply yz-db --local"
   },
   "dependencies": {
+    "aws4fetch": "^1.0.20",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
     "jose": "^6.2.12",

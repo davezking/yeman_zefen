@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./layout/AppShell";
+import { JobsPage } from "./pages/JobsPage";
+import { PacksPage } from "./pages/PacksPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { TrackDetailPage } from "./pages/TrackDetailPage";
@@ -14,8 +16,10 @@ export function App() {
         <Route path="tracks" element={<TracksPage />} />
         <Route path="tracks/:id" element={<TrackDetailPage />} />
         <Route path="review" element={<ReviewPage />} />
+        <Route path="packs" element={<PacksPage />} />
+        <Route path="jobs" element={<JobsPage />} />
         {navItems
-          .filter((item) => item.path !== "/tracks" && item.path !== "/review")
+          .filter((item) => item.path !== "/tracks" && item.path !== "/review" && item.path !== "/packs" && item.path !== "/jobs")
           .map((item) => (
             <Route key={item.path} path={item.path.slice(1)} element={<PlaceholderPage title={item.label} />} />
           ))}

@@ -23,7 +23,8 @@ function notifyError(error: Error) {
 
 // A mutation with `meta: { silent: true }` reports its own errors, in place, next to what the admin was doing.
 export const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError: notifyError }),
+  // A query with `meta: { silent: true }` shows its own error too.
+  queryCache: new QueryCache({ onError: (error, query) => { if (!query.meta?.silent) notifyError(error); } }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _onMutateResult, mutation) => {
       if (!mutation.meta?.silent) notifyError(error);

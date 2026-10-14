@@ -3,7 +3,7 @@
 // the number of records in the request.
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { makeArtist, makeJob, makeTrack, installTestJwks, removeTestJwks, resetCatalog, seedAdmins, svcWithQueryCount } from "./helpers";
+import { adminWithQueryCount, makeArtist, makeJob, makeTrack, installTestJwks, removeTestJwks, resetCatalog, seedAdmins, svcWithQueryCount } from "./helpers";
 
 beforeAll(async () => {
   await installTestJwks();
@@ -185,5 +185,46 @@ describe("review item lookups use the entity index", () => {
     expect(dedupe).toMatch(/review_items_entity_idx/);
     const forTrack = await plan(`SELECT * FROM review_items WHERE entity_type = 'track' AND entity_id = 5 AND status = 'open'`);
     expect(forTrack).toMatch(/review_items_entity_idx/);
+  });
+});
+
+describe("pack routes stay within the Free plan's query cap", () => {
+  /** n approved tracks with both clips ready, in one statement per table. */
+  async function eligibleTracks(count: number, start: number) {
+    const artist = await makeArtist(`አርቲስት ${start}`);
+    for (let i = 0; i < count; i++) {
+      const t = await makeTrack(artist.id, { titleAm: `ዘፈን ${start + i}`, status: "approved" });
+      await env.DB.batch(
+        (["intro", "middle"] as const).map((type) =>
+          env.DB.prepare("INSERT INTO clips (track_id, type, start_ms, status, r2_key, sha256, bytes) VALUES (?1, ?2, 0, 'ready', ?3, ?4, 1000)")
+            .bind(t.id, type, `clips/${t.id}/${type}-v1.mp3`, "a".repeat(64)),
+        ),
+      );
+    }
+  }
+
+  it("publishes 5 or 60 tracks with the same number of queries", async () => {
+    const pack = (await env.DB.prepare("INSERT INTO packs (slug, name_am, name_en) VALUES ('p', 'ፓ', 'P') RETURNING id").first<{ id: number }>())!;
+    await eligibleTracks(5, 0);
+    const small = await adminWithQueryCount(`/admin/packs/${pack.id}/versions`, { method: "POST" });
+    expect(small.response.status).toBe(201);
+    await eligibleTracks(55, 100);
+    const large = await adminWithQueryCount(`/admin/packs/${pack.id}/versions`, { method: "POST" });
+    expect(large.response.status).toBe(201);
+    expect(large.queries).toBe(small.queries);
+    expect(large.queries).toBeLessThanOrEqual(BUDGET);
+  });
+
+  it("lists 2 or 30 packs with the same number of queries", async () => {
+    await eligibleTracks(3, 0);
+    const add = (from: number, to: number) =>
+      env.DB.batch(Array.from({ length: to - from }, (_, i) => env.DB.prepare("INSERT INTO packs (slug, name_am, name_en) VALUES (?1, 'ፓ', 'P')").bind(`p-${from + i}`)));
+    await add(0, 2);
+    const small = await adminWithQueryCount("/admin/packs");
+    await add(2, 30);
+    const large = await adminWithQueryCount("/admin/packs");
+    expect(large.response.status).toBe(200);
+    expect(large.queries).toBe(small.queries);
+    expect(large.queries).toBeLessThanOrEqual(BUDGET);
   });
 });

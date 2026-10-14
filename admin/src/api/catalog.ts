@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { z } from "zod";
 import { REASONS } from "../lib/review";
 import { apiFetch } from "./client";
+import { jobSchema } from "./jobs";
 
 export const TRACK_STATUSES = ["ingested", "needs_review", "approved", "rejected", "retired"] as const;
 export type TrackStatus = (typeof TRACK_STATUSES)[number];
@@ -235,6 +236,43 @@ export function useCloseReviewItem(trackId: number) {
       apiFetch(`/admin/review-items/${id}/${action}`, z.object({ item: reviewItemSchema }), { method: "POST" }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.track(trackId) });
+      void qc.invalidateQueries({ queryKey: ["tracks"] });
+    },
+  });
+}
+
+// ----------------------------------------------------------------- clip editor
+
+/** A signed URL for the track's private source audio. Short-lived: ask again for each editing session. */
+// Fetched once per editor: the waveform is decoded from it straight away, so a refetch (which would rebuild the
+// waveform under the admin's edits) buys nothing. Dropped as soon as the editor unmounts, so it is never reused
+// after it expires. Errors are shown in the editor, not as a notification.
+export function useSourceUrl(trackId: number, { enabled }: { enabled: boolean }) {
+  return useQuery({
+    queryKey: ["source-url", trackId],
+    enabled,
+    queryFn: () => apiFetch(`/admin/tracks/${trackId}/source-url`, z.object({ url: z.string(), expiresAt: z.number() })),
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+    meta: { silent: true },
+  });
+}
+
+/** Move a clip's start. The clip becomes pending and `job` is its recut (null when the job could not be started). */
+export function usePatchClip() {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({ clipId, startMs }: { clipId: number; startMs: number }) =>
+      apiFetch(
+        `/admin/clips/${clipId}`,
+        z.object({ job: jobSchema.nullable(), clip: z.object({ id: z.number(), trackId: z.number() }) }),
+        { method: "PATCH", json: { start_ms: startMs } },
+      ),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tracks"] });
     },
   });
