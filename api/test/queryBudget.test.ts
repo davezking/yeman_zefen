@@ -131,6 +131,34 @@ describe("clip flags and GET /admin/ingest/clip-targets stay within the cap", ()
     expect(res.queries).toBe(8);
   });
 
+  it("adding 100 durations costs one more statement, however many there are", async () => {
+    const ids = await seedTracks(100);
+    const job = await makeJob("cut");
+    const durations = (n: number, base: number) => ids.slice(0, n).map((trackId, i) => ({ trackId, durationMs: base + i }));
+    const few = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, durations: durations(3, 100_000) });
+    const many = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, durations: durations(100, 200_000) });
+    expect(few.response.status).toBe(200);
+    expect(many.response.status).toBe(200);
+    expect(many.queries).toBe(few.queries);
+    expect(many.queries).toBe(5);
+    const unchanged = await svcWithQueryCount("/admin/ingest/clips", { jobId: job.id, durations: durations(100, 200_000) });
+    expect(unchanged.queries).toBe(4); // nothing changed: no write at all
+  });
+
+  it("100 clips, 100 flags and 100 durations together stay constant", async () => {
+    const ids = await seedTracks(100);
+    const job = await makeJob("cut");
+    const body = {
+      jobId: job.id,
+      clips: ids.map((trackId) => ({ trackId, type: "intro", startMs: 0, lengthMs: 10_000, r2Key: `clips/${trackId}/intro-v1.mp3`, sha256: "a".repeat(64), bytes: 160_000 })),
+      flags: ids.map((trackId) => ({ trackId, reason: "short_audio", details: { trackId } })),
+      durations: ids.map((trackId) => ({ trackId, durationMs: 200_000 })),
+    };
+    const res = await svcWithQueryCount("/admin/ingest/clips", body);
+    expect(res.response.status).toBe(200);
+    expect(res.queries).toBe(9);
+  });
+
   it("listing 10 or 100 tracks (with clips) takes the same two queries", async () => {
     const ids = await seedTracks(100);
     const small = await svcWithQueryCount(`/admin/ingest/clip-targets?trackIds=${ids.slice(0, 10).join(",")}`);

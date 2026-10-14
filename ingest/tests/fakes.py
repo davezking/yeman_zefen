@@ -138,6 +138,7 @@ class FakeClipApi(FakeApi):
         # id -> {"status", "sourceAudioKey", "durationMs", "clips": {type: {startMs, lengthMs, r2Key, sha256, bytes, version, status}}}
         self.tracks = tracks if tracks is not None else {}
         self.registrations = []  # every post_clips call: (clips, flags)
+        self.duration_posts = []  # the durations sent with each post_clips call
         self.open_flags = set()
 
     def add_track(self, track_id, source_key="source/x.mp3", status="needs_review", clips=None):
@@ -160,8 +161,15 @@ class FakeClipApi(FakeApi):
         ][:limit]
         return {"tracks": [self._target(i) for i in ids], "next": ids[-1] if len(ids) == limit else None}
 
-    def post_clips(self, job_id, clips, flags=None):
+    def post_clips(self, job_id, clips, flags=None, durations=None):
         self.registrations.append((list(clips), list(flags or [])))
+        self.duration_posts.append(list(durations or []))
+        duration_results = []
+        for d in durations or []:
+            t = self.tracks[d["trackId"]]
+            changed = t["durationMs"] != d["durationMs"]
+            t["durationMs"] = d["durationMs"]
+            duration_results.append({"trackId": d["trackId"], "result": "updated" if changed else "skipped"})
         counts, results, flag_results = {"created": 0, "updated": 0, "skipped": 0}, [], []
         for c in clips:
             clip_map = self.tracks[c["trackId"]]["clips"]
@@ -181,4 +189,4 @@ class FakeClipApi(FakeApi):
             key = (f["trackId"], f["reason"], repr(sorted((f.get("details") or {}).items())))
             flag_results.append({"trackId": f["trackId"], "reason": f["reason"], "result": "skipped" if key in self.open_flags else "created"})
             self.open_flags.add(key)
-        return {"counts": counts, "results": results, "flags": flag_results}
+        return {"counts": counts, "results": results, "flags": flag_results, "durations": duration_results}

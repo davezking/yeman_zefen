@@ -454,16 +454,28 @@ const clipFlagInput = z.strictObject({
   details: z.record(z.string(), z.unknown()).nullish(),
 });
 
+/** A source's measured length. The cutter probes every source it downloads, which the scraper cannot. */
+const durationInput = z.strictObject({
+  trackId: z.number().int().positive(),
+  durationMs: z.number().int().min(1).max(86_400_000),
+});
+
 const clipsBody = z
   .strictObject({
     jobId: z.number().int().positive(),
     clips: z.array(clipInput).max(MAX_BATCH).default([]),
     flags: z.array(clipFlagInput).max(MAX_BATCH).default([]),
+    durations: z.array(durationInput).max(MAX_BATCH).default([]),
   })
   .superRefine((b, ctx) => {
-    if (b.clips.length === 0 && b.flags.length === 0) {
-      ctx.addIssue({ code: "custom", path: ["clips"], message: "send at least one clip or flag" });
+    if (b.clips.length === 0 && b.flags.length === 0 && b.durations.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["clips"], message: "send at least one clip, flag or duration" });
     }
+    const seenTracks = new Set<number>();
+    b.durations.forEach((d, i) => {
+      if (seenTracks.has(d.trackId)) ctx.addIssue({ code: "custom", path: ["durations", i], message: `duplicate duration for track ${d.trackId}` });
+      seenTracks.add(d.trackId);
+    });
     const seen = new Set<string>();
     b.clips.forEach((cl, i) => {
       const key = `${cl.trackId}:${cl.type}`;
@@ -506,6 +518,15 @@ const BUMP_FLAGGED_TRACKS_SQL = `
   UPDATE tracks SET status = 'needs_review', updated_at = ?2
   WHERE status = 'ingested' AND id IN (SELECT json_extract(value, '$.trackId') FROM json_each(?1))`;
 
+// The measured length of a track's source audio. Like a scraped field, it never overwrites a value an
+// admin edited, and a row is only touched when the length actually changes.
+const SET_DURATIONS_SQL = `
+  UPDATE tracks SET duration_ms = n.duration_ms, updated_at = ?2
+  FROM (SELECT json_extract(d.value, '$.trackId') AS id, json_extract(d.value, '$.durationMs') AS duration_ms
+        FROM json_each(?1) d) n
+  WHERE tracks.id = n.id AND tracks.duration_ms IS NOT n.duration_ms
+    AND NOT EXISTS (SELECT 1 FROM json_each(tracks.admin_edited_fields) e WHERE e.value = 'durationMs')`;
+
 type ClipRow = {
   id: number; track_id: number; type: string; start_ms: number; length_ms: number;
   r2_key: string | null; sha256: string | null; bytes: number | null; version: number; status: string;
@@ -523,14 +544,16 @@ ingestRoutes.post("/clips", async (c) => {
     flagItems.set(`${f.trackId}|${f.reason}|${details ?? ""}`, { trackId: f.trackId, reason: f.reason, details });
   }
 
-  const allTrackIds = [...new Set([...body.clips.map((cl) => cl.trackId), ...body.flags.map((f) => f.trackId)])];
+  const allTrackIds = [
+    ...new Set([...body.clips.map((cl) => cl.trackId), ...body.flags.map((f) => f.trackId), ...body.durations.map((d) => d.trackId)]),
+  ];
   const trackIdsJson = JSON.stringify(allTrackIds);
   const inTrackIds = "IN (SELECT value FROM json_each(?1))";
 
   // ---- Batch 1: reads (4 queries).
   const [jobRes, trackRes, clipRes, openRes] = await runBatch(env, [
     env.DB.prepare(JOB_SQL).bind(body.jobId),
-    env.DB.prepare(`SELECT id FROM tracks WHERE id ${inTrackIds}`).bind(trackIdsJson),
+    env.DB.prepare(`SELECT id, duration_ms, admin_edited_fields FROM tracks WHERE id ${inTrackIds}`).bind(trackIdsJson),
     env.DB.prepare(
       `SELECT id, track_id, type, start_ms, length_ms, r2_key, sha256, bytes, version, status FROM clips WHERE track_id ${inTrackIds}`,
     ).bind(trackIdsJson),
@@ -541,7 +564,8 @@ ingestRoutes.post("/clips", async (c) => {
   ]);
   assertJobOpen((jobRes!.results as unknown as JobRow[])[0], body.jobId, ["cut", "recut"]);
 
-  const found = new Set((trackRes!.results as { id: number }[]).map((t) => t.id));
+  const trackRows = trackRes!.results as { id: number; duration_ms: number | null; admin_edited_fields: string }[];
+  const found = new Set(trackRows.map((t) => t.id));
   const missing = allTrackIds.filter((id) => !found.has(id));
   if (missing.length > 0) {
     // Nothing has been written yet, so the whole request is rejected cleanly.
@@ -575,8 +599,18 @@ ingestRoutes.post("/clips", async (c) => {
   }));
   const newFlags = [...flagItems.entries()].filter(([key]) => !openItems.has(key)).map(([, f]) => f);
 
-  // ---- Batch 2: set-based writes, then read back ids and versions (at most 4 queries).
+  // Mirrors SET_DURATIONS_SQL: changed, and not edited by an admin.
+  const trackById = new Map(trackRows.map((t) => [t.id, t]));
+  const durationResults = body.durations.map((d) => {
+    const t = trackById.get(d.trackId)!;
+    const adminEdited = (JSON.parse(t.admin_edited_fields) as string[]).includes("durationMs");
+    return { trackId: d.trackId, durationMs: d.durationMs, result: !adminEdited && t.duration_ms !== d.durationMs ? ("updated" as const) : ("skipped" as const) };
+  });
+  const changedDurations = durationResults.filter((d) => d.result === "updated").map(({ trackId, durationMs }) => ({ trackId, durationMs }));
+
+  // ---- Batch 2: set-based writes, then read back ids and versions (at most 5 queries).
   const writes: Prepared[] = [];
+  if (changedDurations.length > 0) writes.push(env.DB.prepare(SET_DURATIONS_SQL).bind(payloadOrThrow(changedDurations), Date.now()));
   if (body.clips.length > 0) writes.push(env.DB.prepare(UPSERT_CLIPS_SQL).bind(payload));
   if (newFlags.length > 0) {
     const flagsPayload = payloadOrThrow(newFlags);
@@ -600,7 +634,7 @@ ingestRoutes.post("/clips", async (c) => {
   });
   const counts = { created: 0, updated: 0, skipped: 0 };
   for (const r of results) counts[r.result]++;
-  return c.json({ jobId: body.jobId, counts, results, flags: flagResults });
+  return c.json({ jobId: body.jobId, counts, results, flags: flagResults, durations: durationResults.map(({ trackId, result }) => ({ trackId, result })) });
 });
 
 // ------------------------------------------------------------ clip targets
