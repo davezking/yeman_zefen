@@ -1,0 +1,88 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/features/packs/data/pack_manifest.dart';
+
+import 'pack_fixtures.dart';
+
+void main() {
+  test('parses a valid manifest', () {
+    final m = PackManifest.parse(manifestJson(tracks: 2));
+    expect(m.slug, 'golden-era');
+    expect(m.version, 1);
+    expect(m.nameEn, 'Golden era');
+    expect(m.tracks, hasLength(2));
+    expect(m.tracks.first.titleAm, 'ዘፈን 1');
+    expect(m.tracks.first.intro.sha256, hasLength(64));
+    expect(m.totalBytes, greaterThan(0));
+  });
+
+  test('accepts null titles and year', () {
+    final map = manifestMap(tracks: 1);
+    final track = (map['tracks'] as List).first as Map<String, dynamic>;
+    track['titleAm'] = null;
+    track['titleLatin'] = null;
+    track['releaseYear'] = null;
+    final m = PackManifest.parse(jsonEncode(map));
+    expect(m.tracks.single.titleAm, isNull);
+    expect(m.tracks.single.releaseYear, isNull);
+  });
+
+  test('ignores unknown fields', () {
+    final map = manifestMap(tracks: 1)..['somethingNew'] = true;
+    expect(() => PackManifest.parse(jsonEncode(map)), returnsNormally);
+  });
+
+  test('rejects a clip with no checksum', () {
+    final map = manifestMap(tracks: 1);
+    final clips = ((map['tracks'] as List).first as Map)['clips'] as Map<String, dynamic>;
+    (clips['intro'] as Map<String, dynamic>).remove('sha256');
+    expect(
+      () => PackManifest.parse(jsonEncode(map)),
+      throwsA(isA<PackManifestException>().having((e) => e.message, 'message', contains('sha256'))),
+    );
+  });
+
+  test('rejects a malformed checksum', () {
+    final map = manifestMap(tracks: 1);
+    final clips = ((map['tracks'] as List).first as Map)['clips'] as Map<String, dynamic>;
+    (clips['middle'] as Map<String, dynamic>)['sha256'] = 'ABC';
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
+  });
+
+  test('rejects an unknown schema', () {
+    final map = manifestMap()..['schema'] = 2;
+    expect(
+      () => PackManifest.parse(jsonEncode(map)),
+      throwsA(isA<PackManifestException>().having((e) => e.message, 'message', contains('schema'))),
+    );
+  });
+
+  test('rejects a missing schema', () {
+    final map = manifestMap()..remove('schema');
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
+  });
+
+  test('rejects totalBytes that do not match the clips', () {
+    final map = manifestMap()..['totalBytes'] = 1;
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
+  });
+
+  test('rejects a track listed twice', () {
+    final map = manifestMap(tracks: 2);
+    final tracks = map['tracks'] as List;
+    (tracks[1] as Map<String, dynamic>)['id'] = 1;
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
+  });
+
+  test('rejects an empty track list', () {
+    final map = manifestMap()
+      ..['tracks'] = <Object>[]
+      ..['totalBytes'] = 0;
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
+  });
+
+  test('rejects text that is not JSON', () {
+    expect(() => PackManifest.parse('<html>'), throwsA(isA<PackManifestException>()));
+  });
+}
