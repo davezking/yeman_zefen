@@ -32,26 +32,19 @@ import {
   useTrack,
   useTrackAction,
   useTrackList,
-  type Clip,
   type TrackAction,
   type TrackDetail,
 } from "../api/catalog";
 import { ApiError } from "../api/client";
 import { ArtistPicker } from "../components/ArtistPicker";
+import { ClipPlayers } from "../components/ClipPlayers";
 import { StatusBadge, statusLabel, trackName } from "../components/TrackBits";
+import { isHttpUrl } from "../lib/format";
+import { REASON_LABEL } from "../lib/review";
 import { filtersFromParams } from "../lib/trackFilters";
-import { mmss } from "../lib/format";
 import { buildPatch, toForm, type FormValues } from "../lib/trackForm";
 
-const REASON_LABEL: Record<string, string> = {
-  translit_uncertain: "Transliteration uncertain",
-  possible_duplicate: "Possible duplicate",
-  missing_audio: "Missing audio",
-  short_audio: "Short audio",
-  era_unknown: "Era unknown",
-};
 
-const isHttp = (u: string) => /^https?:\/\//i.test(u);
 
 /**
  * Where the page is heading, shared by every track's editor. A key pressed after we start moving but before the
@@ -331,7 +324,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           {detail.track.sourceUrl && (
             <Text size="sm">
               Source:{" "}
-              {isHttp(detail.track.sourceUrl) ? (
+              {isHttpUrl(detail.track.sourceUrl) ? (
                 <Anchor href={detail.track.sourceUrl} target="_blank" rel="noreferrer noopener">
                   {detail.track.sourceUrl}
                 </Anchor>
@@ -346,9 +339,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           <Card withBorder>
             <Stack gap="sm">
               <Title order={4}>Clips</Title>
-              {(["intro", "middle"] as const).map((type) => (
-                <ClipRow key={type} type={type} clip={detail.clips.find((c) => c.type === type)} />
-              ))}
+              <ClipPlayers clips={detail.clips} />
             </Stack>
           </Card>
 
@@ -360,7 +351,7 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
                 <Stack key={item.id} gap={4}>
                   <Group justify="space-between">
                     <Badge color="orange" variant="light">
-                      {REASON_LABEL[item.reason] ?? item.reason}
+                      {REASON_LABEL[item.reason]}
                     </Badge>
                     <Group gap="xs">
                       <Button
@@ -429,33 +420,6 @@ function TrackEditor({ id, detail, nav }: { id: number; detail: TrackDetail; nav
           </Group>
         </Stack>
       </Modal>
-    </Stack>
-  );
-}
-
-function ClipRow({ type, clip }: { type: "intro" | "middle"; clip: Clip | undefined }) {
-  const name = type === "intro" ? "Intro" : "Middle";
-  if (!clip) {
-    return (
-      <Group>
-        <Text fw={500} w={60}>{name}</Text>
-        <Badge color="gray" variant="light">not cut yet</Badge>
-      </Group>
-    );
-  }
-  const color = clip.status === "ready" ? "green" : clip.status === "failed" ? "red" : "yellow";
-  return (
-    <Stack gap={4}>
-      <Group>
-        <Text fw={500} w={60}>{name}</Text>
-        <Badge color={color} variant="light">{clip.status === "pending" ? "pending: cut job" : clip.status}</Badge>
-        <Text size="xs" c="dimmed">starts at {mmss(clip.startMs)}, {(clip.lengthMs / 1000).toFixed(0)} s</Text>
-      </Group>
-      {clip.url ? (
-        <audio controls preload="none" src={clip.url} style={{ width: "100%" }} />
-      ) : (
-        <Text size="sm" c="dimmed">No file to play until the clip is ready.</Text>
-      )}
     </Stack>
   );
 }

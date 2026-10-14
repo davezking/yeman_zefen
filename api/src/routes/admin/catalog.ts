@@ -1,7 +1,8 @@
 // Catalog admin API: tracks, artists (+ aliases, merge) and clips.
 // Mounted on the human admin router, so requireAdmin() already guards every route here.
 // Editors and admins can edit; only admins can merge artists.
-import { and, count, desc, eq, inArray, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, exists, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db, type Db } from "../../db/client";
@@ -22,6 +23,7 @@ import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
 import { assignGeneration } from "../../lib/era";
+import { isOutOfCatalog } from "../../lib/trackStatus";
 import { createJob, jobOut } from "../../lib/jobs";
 import { cleanText, normalizeAlias, normalizeFidel, normalizeLatin } from "../../lib/normalize";
 import { idParam, parse, readJson } from "../../lib/validate";
@@ -207,7 +209,7 @@ catalog.patch("/tracks/:id", async (c) => {
     // The era is known now, so an open "era unknown" item is settled by this edit.
     const who = c.get("admin")?.email ?? null;
     eraStatements.push(d.update(reviewItems).set({ status: "resolved", resolvedBy: who, resolvedAt: Date.now() }).where(openEraItem));
-  } else if (eraTouched && !pinned) {
+  } else if (eraTouched && !pinned && !isOutOfCatalog(existing.status)) {
     // The duplicate check runs inside the batch, so two quick saves cannot each open an item.
     eraStatements.push(
       d.insert(reviewItems).select(
@@ -266,6 +268,51 @@ async function transition(
   }
 }
 
+/**
+ * Take a track out of the catalog (reject or retire). In one batch with the status change, its open review items are
+ * dismissed: nothing about it is left to review. A track that others are marked as duplicates of cannot be rejected,
+ * or every copy of the song would be out; retiring an approved one is allowed, since that takes the song out on purpose.
+ */
+async function takeOut(d: Db, id: number, to: "rejected" | "retired", who: string | null) {
+  const action = to === "rejected" ? "reject" : "retire";
+  const from: (typeof TRACK_STATUSES)[number][] = to === "rejected" ? ["ingested", "needs_review"] : ["approved"];
+  const other = alias(tracks, "other");
+  const noDuplicates = notExists(d.select({ one: sql`1` }).from(other).where(eq(other.canonicalTrackId, id)));
+  const now = Date.now();
+  const [updated] = await d.batch([
+    d
+      .update(tracks)
+      .set({ status: to, updatedAt: now })
+      .where(and(eq(tracks.id, id), inArray(tracks.status, from), to === "rejected" ? noDuplicates : undefined))
+      .returning({ id: tracks.id }),
+    // Only if the update above took effect: the track now has the new status, stamped by this request.
+    d
+      .update(reviewItems)
+      .set({ status: "dismissed", resolvedBy: who, resolvedAt: now })
+      .where(
+        and(
+          openItemsOf(id),
+          exists(d.select({ one: sql`1` }).from(tracks).where(and(eq(tracks.id, id), eq(tracks.status, to), eq(tracks.updatedAt, now)))),
+        ),
+      ),
+  ]);
+  if (updated.length === 0) {
+    const current = await requireTrack(d, id);
+    if (to === "rejected" && from.includes(current.status)) {
+      const dup = await d.select({ id: tracks.id }).from(tracks).where(eq(tracks.canonicalTrackId, id)).get();
+      if (dup) {
+        throw new ApiError(409, "has_duplicates", `Track ${dup.id} is marked as a duplicate of this track; rejecting this one would leave no copy of the song`);
+      }
+    }
+    throw new ApiError(409, "invalid_transition", `Cannot ${action} a track that is ${current.status}`);
+  }
+}
+
+/** Every open review item of a track. */
+function openItemsOf(trackId: number): SQL {
+  return and(eq(reviewItems.entityType, "track"), eq(reviewItems.entityId, trackId), eq(reviewItems.status, "open")) as SQL;
+}
+
 catalog.post("/tracks/:id/approve", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
@@ -291,14 +338,111 @@ catalog.post("/tracks/:id/approve", async (c) => {
 catalog.post("/tracks/:id/reject", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
-  await transition(d, id, "reject", ["ingested", "needs_review"], "rejected");
+  await takeOut(d, id, "rejected", c.get("admin")?.email ?? null);
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
+
+const markDuplicateSchema = z.strictObject({ canonicalTrackId: z.number().int().positive() });
+
+/**
+ * "This track is the same song as `canonicalTrackId`": reject it and link it to that track. Nothing is deleted, the
+ * clips and the track stay as they are, and its open possible_duplicate items are settled in the same batch.
+ */
+catalog.post("/tracks/:id/mark-duplicate", async (c) => {
+  const d = db(c.env);
+  const id = idParam(c);
+  const { canonicalTrackId } = parse(markDuplicateSchema, await readJson(c));
+  if (canonicalTrackId === id) throw new ApiError(400, "validation_error", "canonicalTrackId: a track cannot be a duplicate of itself");
+  const track = await requireTrack(d, id);
+  const canonical = await requireTrack(d, canonicalTrackId);
+  // These checks give the precise reason. The same rules are repeated as guards in the update below, so two
+  // admins acting at once cannot get past them between the check and the write.
+  const blocker = await duplicateBlocker(d, track, canonical);
+  if (blocker) throw blocker;
+
+  const now = Date.now();
+  const who = c.get("admin")?.email ?? null;
+  const other = alias(tracks, "other");
+  const linked = and(eq(tracks.id, id), eq(tracks.canonicalTrackId, canonicalTrackId)) as SQL;
+  const nowLinked = exists(d.select({ one: sql`1` }).from(tracks).where(linked));
+  await d.batch([
+    d
+      .update(tracks)
+      .set({ canonicalTrackId, status: "rejected", updatedAt: now })
+      .where(
+        and(
+          eq(tracks.id, id),
+          inArray(tracks.status, ["ingested", "needs_review"]),
+          // Nothing is a duplicate of this track...
+          notExists(d.select({ one: sql`1` }).from(other).where(eq(other.canonicalTrackId, id))),
+          // ...and the canonical track is a usable track that is not itself a duplicate.
+          exists(
+            d
+              .select({ one: sql`1` })
+              .from(other)
+              .where(and(eq(other.id, canonicalTrackId), isNull(other.canonicalTrackId), inArray(other.status, CANONICAL_STATUSES))),
+          ),
+        ),
+      ),
+    // Only if the update above took effect: the duplicate flags are settled by this decision, and the track's other
+    // open items no longer matter (it is out of the catalog).
+    d
+      .update(reviewItems)
+      .set({ status: "resolved", resolvedBy: who, resolvedAt: now })
+      .where(
+        and(
+          openItemsOf(id),
+          eq(reviewItems.reason, "possible_duplicate"),
+          // The song-duplicate flag is what this decides. An artist-duplicate flag was not looked at, so it is
+          // dismissed with the rest below rather than recorded as resolved.
+          sql`json_extract(${reviewItems.detailsJson}, '$.field') = 'track'`,
+          nowLinked,
+        ),
+      ),
+    d
+      .update(reviewItems)
+      .set({ status: "dismissed", resolvedBy: who, resolvedAt: now })
+      .where(and(openItemsOf(id), nowLinked)),
+  ]);
+  const after = await requireTrack(d, id);
+  if (after.canonicalTrackId !== canonicalTrackId) {
+    // Something changed between the checks and the update (another admin). Report what is in the way now.
+    const err = await duplicateBlocker(d, after, await requireTrack(d, canonicalTrackId));
+    throw err ?? new ApiError(409, "conflict", "The tracks changed while this was being saved; try again");
+  }
+  return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
+});
+
+/** Statuses a canonical track may have: one that is (or may become) part of the catalog. */
+const CANONICAL_STATUSES: (typeof TRACK_STATUSES)[number][] = ["ingested", "needs_review", "approved"];
+
+/**
+ * Why `track` cannot be marked as a duplicate of `canonical`, or null if it can. Links stay one level deep: a
+ * duplicate points at a track that is not itself a duplicate, and a track that others point at cannot become one.
+ * Chains and cycles would make "the canonical track" ambiguous.
+ */
+async function duplicateBlocker(d: Db, track: typeof tracks.$inferSelect, canonical: typeof tracks.$inferSelect) {
+  if (!["ingested", "needs_review"].includes(track.status)) {
+    return new ApiError(409, "invalid_transition", `Cannot mark a track that is ${track.status} as a duplicate`);
+  }
+  // Checked first: a duplicate is always rejected too, and "use that one" is the more useful answer.
+  if (canonical.canonicalTrackId !== null) {
+    return new ApiError(409, "canonical_is_duplicate", `Track ${canonical.id} is itself a duplicate of track ${canonical.canonicalTrackId}; use that one`);
+  }
+  if (!CANONICAL_STATUSES.includes(canonical.status)) {
+    return new ApiError(409, "canonical_not_usable", `Track ${canonical.id} is ${canonical.status}, so it cannot be the original; pick a track that is in the catalog`);
+  }
+  const pointedAt = await d.select({ id: tracks.id }).from(tracks).where(eq(tracks.canonicalTrackId, track.id)).get();
+  if (pointedAt) {
+    return new ApiError(409, "has_duplicates", `Track ${pointedAt.id} is marked as a duplicate of this track, so this one cannot be a duplicate`);
+  }
+  return null;
+}
 
 catalog.post("/tracks/:id/retire", async (c) => {
   const d = db(c.env);
   const id = idParam(c);
-  await transition(d, id, "retire", ["approved"], "retired");
+  await takeOut(d, id, "retired", c.get("admin")?.email ?? null);
   return c.json(await loadTrackDetail(d, c.env.CDN_BASE_URL, id));
 });
 

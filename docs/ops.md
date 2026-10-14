@@ -289,3 +289,38 @@ and admins alike):
 Worker serves `GET /cdn/clips/*` from the local `yz-clips` bucket (with byte ranges, so the player can seek). The
 route answers 404 unless `ENV=dev`: in prod the CDN domain serves the bucket directly. To try the editor with audio,
 put a file at a clip's key: `npx wrangler r2 object put yz-clips/clips/1/intro-v1.mp3 --file clip.mp3 --local`.
+
+### Review queue API
+
+The review queue (`/review`) works through the open `review_items` that ingest and the cutter raise, one reason per tab.
+Only items about tracks are listed: that is all the pipeline raises.
+
+| Route | Purpose |
+|---|---|
+| `GET /admin/review-items` | Oldest first (by id), 50 per page (`cursor`). Filters: `reason`, `status` (`open` by default). Each item has its `track` (titles, artist names, year, era, status, length, source) and its `details` parsed from JSON (`null` if it is not JSON). |
+| `GET /admin/review-items/counts` | Open items per reason, `0` for reasons with none. |
+| `POST /admin/review-items/:id/resolve`, `/dismiss` | Close an open item. *Resolve* means the problem was dealt with; *dismiss* means it was not a problem. |
+| `POST /admin/tracks/:id/mark-duplicate` `{ canonicalTrackId }` | Reject the track and link it to the canonical one (`tracks.canonical_track_id`). Nothing is deleted. In the same step its open `possible_duplicate` items are resolved and its other open items dismissed. Only `ingested` or `needs_review` tracks, and the canonical track must be `ingested`, `needs_review` or `approved` (`409 canonical_not_usable`). Links stay one level deep: `409 canonical_is_duplicate` if the target is itself a duplicate, `409 has_duplicates` if other tracks point at this one. These rules are also guards in the update itself, so two admins at once cannot make a chain or a cycle. |
+
+What each tab shows, from the flag's `details` (written by `ingest/yz/`):
+
+| Reason | `details` | Panel |
+|---|---|---|
+| `translit_uncertain` | `{ field: "artist" \| "title", source, generated, confidence? \| distance? }`. With `confidence`, `generated` is Fidel made from the source Latin; with `distance`, it is Latin made from the source Fidel. | The stored Fidel and Latin are editable, beside the source and generated text. Accepting saves what changed (the track's title, or the artist's name everywhere) and resolves the item. |
+| `possible_duplicate`, `field: "track"` | `{ field, candidates: [{ id \| sourceUrl, score, durationDiff? }], variant_of? }` | The incoming track beside each candidate, with players. *Same song* marks it as a duplicate (above); *different* dismisses. |
+| `possible_duplicate`, `field: "artist"` | same, with artist candidates | *Same artist* merges the track's artist into the candidate (`POST /admin/artists/:id/merge`, **admins only**), then resolves. *Different* dismisses. |
+| `era_unknown` | none | A year and/or an era. Saving settles the item through `PATCH /admin/tracks/:id`. |
+| `missing_audio`, `short_audio` | free-form (`cause`, `key`, `durationMs`) | *Re-run cut* starts a `cut` job for the track and resolves the item (a cut that still fails raises a new one). Retire (approved track) or reject (any other: the status machine has no retire for them) takes the track out, which closes its items. *Dismiss* when the audio is fine. |
+
+A candidate that was scraped in the same batch has only a `sourceUrl` until it is ingested, so it cannot be merged or
+linked to: the panel says so. Closing the last open item of a track offers to approve it.
+
+**Taking a track out closes its items.** Rejecting or retiring a track (`/reject`, `/retire`, and mark-duplicate)
+dismisses all of its open review items in the same batch, recording who did it: a track out of the catalog has nothing
+left to review. It also stays closed: ingest and the cutter open no new items about a rejected or retired track (a
+re-scrape reports it `skipped`), an era edit on one opens no `era_unknown` item, and the queue and its counts leave such
+tracks out. Mark-duplicate records only the song-duplicate flag (`field: "track"`) as resolved; an artist-duplicate
+flag on the same track is dismissed, since nobody looked at the artists.
+
+**A track others are duplicates of cannot be rejected** (`409 has_duplicates`): that would leave no copy of the song.
+Retiring an approved one is allowed, since that takes the song out on purpose.

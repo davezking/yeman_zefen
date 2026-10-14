@@ -149,3 +149,14 @@ describe("mmss", () => {
     expect(mmss(605_049)).toBe("10:05.0");
   });
 });
+
+describe("isHttpUrl", () => {
+  it("accepts only http and https links", async () => {
+    const { isHttpUrl } = await import("../src/lib/format");
+    expect(isHttpUrl("https://ethiozeima.com/x/")).toBe(true);
+    expect(isHttpUrl("HTTP://example.com")).toBe(true);
+    for (const bad of ["javascript:alert(1)", "data:text/html,x", "ftp://x", "//example.com", " https://x", ""]) {
+      expect(isHttpUrl(bad), bad).toBe(false);
+    }
+  });
+});

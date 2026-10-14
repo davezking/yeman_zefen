@@ -1,6 +1,7 @@
 // Schemas and hooks for the catalog admin API (tracks, artists, eras, genres, review items).
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { REASONS } from "../lib/review";
 import { apiFetch } from "./client";
 
 export const TRACK_STATUSES = ["ingested", "needs_review", "approved", "rejected", "retired"] as const;
@@ -29,13 +30,13 @@ export type TrackRow = z.infer<typeof trackRowSchema>;
 
 const trackListSchema = z.object({ items: z.array(trackRowSchema), nextCursor: z.string().nullable() });
 
-export const REVIEW_REASONS = ["translit_uncertain", "possible_duplicate", "missing_audio", "short_audio", "era_unknown"] as const;
+export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 
 const reviewItemSchema = z.object({
   id: z.number(),
-  reason: z.enum(REVIEW_REASONS),
+  reason: z.enum(REASONS),
   detailsJson: z.string().nullable(),
-  status: z.enum(["open", "resolved", "dismissed"]),
+  status: z.enum(REVIEW_STATUSES),
 });
 export type ReviewItem = z.infer<typeof reviewItemSchema>;
 
@@ -49,10 +50,10 @@ const clipSchema = z.object({
 });
 export type Clip = z.infer<typeof clipSchema>;
 
-const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
+export const artistSchema = z.object({ id: z.number(), nameAm: z.string(), nameLatin: z.string().nullable() });
 export type Artist = z.infer<typeof artistSchema>;
 
-const trackDetailSchema = z.object({
+export const trackDetailSchema = z.object({
   track: z.object({
     id: z.number(),
     artistId: z.number(),
@@ -134,6 +135,12 @@ export function useEnsureTrack() {
   return (id: number) => qc.ensureQueryData({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id) });
 }
 
+/** The track's detail as the server has it now, not as cached: for deciding what to offer after an edit. */
+export function useFreshTrack() {
+  const qc = useQueryClient();
+  return (id: number) => qc.fetchQuery({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id), staleTime: 0 });
+}
+
 export function usePrefetchTrack() {
   const qc = useQueryClient();
   return (id: number) => void qc.prefetchQuery({ queryKey: keys.track(id), queryFn: trackDetailFetcher(id) });
@@ -177,9 +184,11 @@ export interface TrackPatch {
   genreIds?: number[];
 }
 
-export function usePatchTrack(id: number) {
+/** `silent`: the caller shows errors itself, so the global notification is switched off. */
+export function usePatchTrack(id: number, { silent = false }: { silent?: boolean } = {}) {
   const qc = useQueryClient();
   return useMutation({
+    meta: { silent },
     mutationFn: (patch: TrackPatch) =>
       apiFetch(`/admin/tracks/${id}`, trackDetailSchema, { method: "PATCH", json: patch }),
     onSuccess: (detail) => {

@@ -3,3 +3,6 @@ export const mmss = (ms: number) => {
   const tenths = Math.round(ms / 100);
   return `${Math.floor(tenths / 600)}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
 };
+
+/** Only http(s) links are rendered as links: a scraped URL could be `javascript:` or anything else. */
+export const isHttpUrl = (u: string) => /^https?:\/\//i.test(u);
