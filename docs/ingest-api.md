@@ -41,6 +41,9 @@ Rules:
 - **Re-scrapes** fill and refresh scraped fields but never null a value out and never touch a
   field an admin edited (`tracks.admin_edited_fields`, recorded by `PATCH /admin/tracks/:id`).
   Status is left alone, except `ingested` becomes `needs_review` when a new flag arrives.
+  A track's **genres** count as one such field (`genres` in `admin_edited_fields`): once an admin
+  has set them with `PATCH /admin/tracks/:id { genreIds }`, a re-scrape no longer links genres to
+  it, so a genre the admin removed does not come back.
 - **Era** is derived from the release year (`api/src/lib/era.ts`), using the stored year when the
   scrape has none. Tracks with `generation_overridden = 1` are never reassigned. A missing year or
   one that matches no generation leaves the era null and adds an `era_unknown` review item.

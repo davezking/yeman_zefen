@@ -28,5 +28,29 @@ Worker's `/admin/*` routes with the Cloudflare Access cookie. Hosted on Cloudfla
   as FormData, as `body`. Use the `noContent` schema for 204 responses.
 - `src/queryClient.ts`: shows every failed query or mutation as a Mantine notification, with the Worker's request id
   when there is one.
+- `src/api/catalog.ts`: schemas and TanStack Query hooks for tracks, artists, eras, genres and review items.
 - `src/layout/`: the app shell and sidebar. `nav.ts` is the list of routes.
-- `src/pages/`: placeholder pages. Later sprints replace them.
+- `src/pages/`: `TracksPage` (table, filters, bulk actions) and `TrackDetailPage` (editor). The other routes are
+  placeholders that later sprints replace.
+- `src/lib/`: logic with tests: the form-to-patch diff (`trackForm.ts`), the filters kept in the URL
+  (`trackFilters.ts`) and the bulk runner (`bulk.ts`).
+
+## Tracks
+
+`/tracks` lists tracks with filters (status, era, genre, search). They live in the URL, so the editor can walk the
+same filtered list. Select rows to approve or reject in bulk; each row's result is listed, and failed rows stay selected.
+
+`/tracks/:id` edits a track. Only the fields you changed are sent, because the API pins every field it receives
+against re-scrapes. Keyboard shortcuts (they do not fire while you type in a field):
+
+| Key | Does |
+|---|---|
+| `j` / `k` | Next / previous track in the current filter |
+| `a` | Approve, then move to the next track |
+| `e` | Focus the Fidel title |
+| `Ctrl/⌘ + Enter` | Save |
+
+`j`, `k` and `a` refuse to act while the form has unsaved changes. If a track can't be approved (a clip missing or
+not ready), the reason shows next to the buttons and you stay on the track.
+
+To try it with data and audio locally, see "Track editor API" in `docs/ops.md`.
