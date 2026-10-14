@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/home_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -17,6 +18,10 @@ ThemeData buildAppTheme() {
 final _router = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    GoRoute(
+      path: '/debug/clip-playback',
+      builder: (context, state) => const ClipPlaybackDebugScreen(),
+    ),
   ],
 );
 

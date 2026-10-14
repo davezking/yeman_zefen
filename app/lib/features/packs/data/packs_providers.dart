@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -15,6 +17,9 @@ final packsApiProvider = Provider<PacksApi>((ref) {
 });
 
 final clipDownloaderProvider = Provider<ClipDownloader>((ref) => BackgroundClipDownloader());
+
+/// Where pack files live. Paths in `local_tracks` are relative to this directory.
+final supportDirectoryProvider = FutureProvider<Directory>((ref) => getApplicationSupportDirectory());
 
 final packInstallerProvider = Provider<PackInstaller>((ref) {
   final installer = PackInstaller(
