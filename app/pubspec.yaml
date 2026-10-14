@@ -1,0 +1,41 @@
+name: yeman_zefen
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  audio_session: ^0.2.4
+  background_downloader: ^9.6.4
+  crypto: ^3.0.7
+  drift: ^2.35.2
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.0.2
+  http: ^1.6.0
+  intl: ^0.20.3
+  just_audio: ^0.10.6
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  sqlite3_flutter_libs: ^0.6.0+eol
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.35.1
+  build_runner: ^2.16.2
+flutter:
+  generate: true
+  uses-material-design: true
+  fonts:
+    - family: NotoSansEthiopic
+      fonts:
+        - asset: assets/fonts/NotoSansEthiopic.ttf
+

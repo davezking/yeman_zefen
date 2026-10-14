@@ -1,0 +1,160 @@
+import 'dart:math';
+
+import 'game_track.dart';
+import 'generated_session.dart';
+import 'session_config.dart';
+
+/// The installed packs cannot make the session that was asked for.
+class RoundGenerationException implements Exception {
+  const RoundGenerationException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'RoundGenerationException: $message';
+}
+
+/// Builds the rounds of a session from the installed tracks. Pure Dart: the
+/// only source of randomness is [rng], so a seeded one gives the same session.
+class RoundGenerator {
+  /// A track in more than one pack is the same track, so it is kept once.
+  RoundGenerator(Iterable<GameTrack> tracks, {Random? rng})
+      : _tracks = List.unmodifiable({for (final t in tracks) t.id: t}.values),
+        _rng = rng ?? Random();
+
+  final List<GameTrack> _tracks;
+  final Random _rng;
+
+  /// Options per question (FR-8).
+  static const optionCount = 4;
+
+  /// How many past sessions' tracks are avoided when choosing new ones.
+  static const historySessions = 3;
+
+  /// Makes a session.
+  ///
+  /// [recentSessions] holds the track ids played in earlier sessions, newest
+  /// first. Only the first [historySessions] count. Tracks outside them come
+  /// first, but older ones are used when there are not enough.
+  GeneratedSession generate(
+    SessionConfig config, {
+    List<Iterable<int>> recentSessions = const [],
+  }) {
+    if (config.mode == GameMode.generation) {
+      throw ArgumentError.value(config.mode, 'config.mode', 'generation mode has no round generator yet');
+    }
+    if (_tracks.length < optionCount) {
+      throw RoundGenerationException(
+        'need at least $optionCount tracks for 4 options, have ${_tracks.length}',
+      );
+    }
+
+    final pool = [
+      for (final t in _tracks)
+        if (config.generationId == 0 || t.generationId == config.generationId) t,
+    ];
+    if (pool.isEmpty) {
+      throw RoundGenerationException('no installed tracks in era ${config.generationId}');
+    }
+
+    final artistCount = _tracks.map((t) => t.artistId).toSet().length;
+    final canAskArtist = artistCount >= optionCount;
+    if (config.questions == QuestionMix.artist && !canAskArtist) {
+      throw RoundGenerationException(
+        'need at least $optionCount artists for artist questions, have $artistCount',
+      );
+    }
+
+    final chosen = _chooseTracks(pool, config.rounds, recentSessions);
+    return GeneratedSession(
+      config: config,
+      rounds: [
+        for (final track in chosen)
+          _buildRound(track, _kindFor(config.questions, canAskArtist)),
+      ],
+    );
+  }
+
+  /// Tracks not seen recently first, then the rest, each in random order.
+  /// A track appears at most once.
+  List<GameTrack> _chooseTracks(
+    List<GameTrack> pool,
+    int count,
+    List<Iterable<int>> recentSessions,
+  ) {
+    final recent = {for (final s in recentSessions.take(historySessions)) ...s};
+    final unseen = [for (final t in pool) if (!recent.contains(t.id)) t]..shuffle(_rng);
+    final seen = [for (final t in pool) if (recent.contains(t.id)) t]..shuffle(_rng);
+    final chosen = [...unseen, ...seen].take(count).toList()..shuffle(_rng);
+    return chosen;
+  }
+
+  QuestionKind _kindFor(QuestionMix mix, bool canAskArtist) => switch (mix) {
+        QuestionMix.song => QuestionKind.song,
+        QuestionMix.artist => QuestionKind.artist,
+        QuestionMix.mixed => canAskArtist && _rng.nextBool() ? QuestionKind.artist : QuestionKind.song,
+      };
+
+  GeneratedRound _buildRound(GameTrack track, QuestionKind kind) {
+    final picked = kind == QuestionKind.artist ? _artistDistractors(track) : _songDistractors(track);
+    final correctId = kind == QuestionKind.artist ? track.artistId : track.id;
+    final options = [correctId, ...picked.ids]..shuffle(_rng);
+    return GeneratedRound(
+      trackId: track.id,
+      kind: kind,
+      correctId: correctId,
+      optionIds: options,
+      distractorFallback: picked.fallback,
+    );
+  }
+
+  /// 0 for the track's own era, 1 for an adjacent era, 2 for any other.
+  /// A track with no era counts only as "any" to a track that has one.
+  static int _tier(int? correctEra, int? candidateEra) {
+    if (correctEra == null && candidateEra == null) return 0;
+    if (correctEra == null || candidateEra == null) return 2;
+    final distance = (correctEra - candidateEra).abs();
+    return distance == 0 ? 0 : (distance == 1 ? 1 : 2);
+  }
+
+  ({List<int> ids, int fallback}) _songDistractors(GameTrack correct) {
+    final tiers = List.generate(3, (_) => <int>[]);
+    for (final t in _tracks) {
+      if (t.id == correct.id) continue;
+      tiers[_tier(correct.generationId, t.generationId)].add(t.id);
+    }
+    return _fill(tiers);
+  }
+
+  ({List<int> ids, int fallback}) _artistDistractors(GameTrack correct) {
+    // An artist takes the closest tier any of their tracks reaches.
+    final bestTier = <int, int>{};
+    for (final t in _tracks) {
+      if (t.artistId == correct.artistId) continue;
+      final tier = _tier(correct.generationId, t.generationId);
+      final known = bestTier[t.artistId];
+      if (known == null || tier < known) bestTier[t.artistId] = tier;
+    }
+    final tiers = List.generate(3, (_) => <int>[]);
+    bestTier.forEach((artistId, tier) => tiers[tier].add(artistId));
+    return _fill(tiers);
+  }
+
+  /// Takes distractors from the closest tier first, in random order within a
+  /// tier. Everything outside tier 0 counts as a fallback.
+  ({List<int> ids, int fallback}) _fill(List<List<int>> tiers) {
+    const needed = optionCount - 1;
+    final ids = <int>[];
+    var fallback = 0;
+    for (var tier = 0; tier < tiers.length && ids.length < needed; tier++) {
+      final candidates = tiers[tier]..shuffle(_rng);
+      for (final id in candidates) {
+        if (ids.length == needed) break;
+        ids.add(id);
+        if (tier > 0) fallback++;
+      }
+    }
+    // generate() checks there are enough tracks and artists in total.
+    assert(ids.length == needed);
+    return (ids: ids, fallback: fallback);
+  }
+}
