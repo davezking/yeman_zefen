@@ -3,6 +3,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../env";
+import { cdnUrl } from "../../lib/cdn";
 import { isUniqueViolation } from "../../lib/dbErrors";
 import { ApiError } from "../../lib/errors";
 import { diffAgainstCurrent, ELIGIBLE_JOINS, eligibleWhere, publishVersion, requirePack } from "../../lib/packs";
@@ -54,7 +55,6 @@ async function listPacks(env: AppEnv["Bindings"], onlyId?: number) {
     env.DB.prepare(`${PACKS_SQL} WHERE (?1 IS NULL OR p.id = ?1) ORDER BY p.id DESC`).bind(onlyId ?? null).all<PackRowWithCount>(),
     env.DB.prepare("SELECT * FROM pack_versions WHERE (?1 IS NULL OR pack_id = ?1) ORDER BY pack_id, version DESC").bind(onlyId ?? null).all<VersionRow>(),
   ]);
-  const cdn = env.CDN_BASE_URL.replace(/\/+$/, "");
   return packs.results.map((p) => ({
     id: p.id,
     slug: p.slug,
@@ -68,7 +68,7 @@ async function listPacks(env: AppEnv["Bindings"], onlyId?: number) {
       .filter((v) => v.pack_id === p.id)
       .map((v) => ({
         version: v.version,
-        manifestUrl: `${cdn}/${v.manifest_key}`,
+        manifestUrl: cdnUrl(env.CDN_BASE_URL, v.manifest_key),
         trackCount: v.track_count,
         totalBytes: v.total_bytes,
         publishedAt: v.published_at,
@@ -87,12 +87,16 @@ packRoutes.get("/packs", async (c) => c.json({ items: await listPacks(c.env) }))
 // What publishing now would change against the current version: the confirm step shows this.
 packRoutes.get("/packs/:id/diff", async (c) => c.json(await diffAgainstCurrent(c.env, await requirePack(c.env, idParam(c)))));
 
-const publishSchema = z.strictObject({ trackIds: z.array(z.number().int().positive()).min(1).max(2000).optional() });
+const publishSchema = z.strictObject({
+  trackIds: z.array(z.number().int().positive()).min(1).max(10_000).optional(),
+  /** The version the confirm step showed (`nextVersion` from the diff). If another publish took it, 409. */
+  expectedVersion: z.number().int().positive().optional(),
+});
 
 packRoutes.post("/packs/:id/versions", async (c) => {
   const pack = await requirePack(c.env, idParam(c));
   // No body means "all eligible tracks".
   const body = parse(publishSchema, await readOptionalJson(c));
-  const published = await publishVersion(c.env, pack, body.trackIds, c.get("admin")?.email ?? null);
+  const published = await publishVersion(c.env, pack, body.trackIds, c.get("admin")?.email ?? null, body.expectedVersion);
   return c.json({ published }, 201);
 });

@@ -3,7 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.esm.js";
-import { keys, useJobPoll, usePatchClip, useSourceUrl, type Clip } from "../api/catalog";
+import { keys, usePatchClip, useSourceUrl, type Clip } from "../api/catalog";
+import { useJobPoll } from "../api/jobs";
 import { changedStarts, clampStart, nudgeStart, PREVIEW_SECONDS } from "../lib/clipEdit";
 import { mmss } from "../lib/format";
 
@@ -15,7 +16,8 @@ const COLORS: Record<ClipType, string> = { intro: "rgba(34,139,230,0.3)", middle
  * recuts the clips; the job is followed here until it is done, then the clip players get their new files.
  */
 export function ClipEditor({ trackId, durationMs, clips }: { trackId: number; durationMs: number | null; clips: Clip[] }) {
-  const source = useSourceUrl(trackId);
+  // Only sign a URL when there is something to edit.
+  const source = useSourceUrl(trackId, { enabled: durationMs != null && clips.length > 0 });
   if (durationMs == null) return <Text size="sm" c="dimmed">The track's length is unknown, so clip starts cannot be edited.</Text>;
   if (clips.length === 0) return <Text size="sm" c="dimmed">Cut the clips first; then their starts can be edited here.</Text>;
   if (source.isPending) return <Loader size="sm" />;
@@ -35,8 +37,11 @@ function Editor({ trackId, durationMs, clips, url }: { trackId: number; duration
   const [jobs, setJobs] = useState<Partial<Record<ClipType, number | null>>>({});
   const patch = usePatchClip();
 
+  // The waveform's handlers live as long as the waveform, so they read the clips through a ref, never a stale copy.
+  const clipsRef = useRef(clips);
+  clipsRef.current = clips;
   const startOf = useCallback((type: ClipType) => edited[type] ?? clips.find((c) => c.type === type)?.startMs ?? 0, [edited, clips]);
-  const lengthOf = (type: ClipType) => clips.find((c) => c.type === type)?.lengthMs ?? 10_000;
+  const lengthOf = (type: ClipType) => clipsRef.current.find((c) => c.type === type)?.lengthMs ?? 10_000;
 
   useEffect(() => {
     if (!container.current) return;
@@ -45,7 +50,7 @@ function Editor({ trackId, durationMs, clips, url }: { trackId: number; duration
     ws.current = surfer;
     surfer.on("error", (e) => setError(e.message));
     surfer.on("decode", () => {
-      for (const clip of clips) {
+      for (const clip of clipsRef.current) {
         const start = clip.startMs / 1000;
         regions.current[clip.type] = plugin.addRegion({ id: clip.type, start, end: start + clip.lengthMs / 1000, color: COLORS[clip.type], drag: true, resize: false, content: clip.type });
       }
@@ -65,8 +70,13 @@ function Editor({ trackId, durationMs, clips, url }: { trackId: number; duration
         surfer.pause();
       }
     });
-    return () => surfer.destroy();
-    // The waveform is built once per signed url; clip rows only change after a save, which keeps the windows.
+    return () => {
+      setReady(false);
+      regions.current = {};
+      ws.current = null;
+      surfer.destroy();
+    };
+    // Built once per signed url (fetched once per editor). Clips and lengths are read through clipsRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 

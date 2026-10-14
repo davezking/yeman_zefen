@@ -1,5 +1,5 @@
 import { Alert, Badge, Button, Card, Code, Group, Loader, Modal, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGenerations, useGenres } from "../api/catalog";
 import { useCreatePack, usePackDiff, usePacks, usePublishPack, type Pack, type PackDiff } from "../api/packs";
 import { megabytes, SLUG_RE } from "../lib/packs";
@@ -98,15 +98,20 @@ function PackCard({ pack }: { pack: Pack }) {
           </Table>
         )}
       </Stack>
-      {confirming && <PublishConfirm pack={pack} publishing={publish.isPending} error={publish.isError ? publish.error.message : null} onClose={() => setConfirming(false)} onConfirm={() => publish.mutate(pack.id, { onSuccess: () => setConfirming(false) })} />}
+      {confirming && <PublishConfirm pack={pack} publishing={publish.isPending} error={publish.isError ? publish.error.message : null} onClose={() => setConfirming(false)} onConfirm={(diff) => publish.mutate({ id: pack.id, diff }, { onSuccess: () => setConfirming(false) })} />}
     </Card>
   );
 }
 
 const trackLabel = (t: { id: number; titleAm: string | null; titleLatin: string | null }) => t.titleLatin || t.titleAm || `Track ${t.id}`;
 
-function PublishConfirm({ pack, publishing, error, onClose, onConfirm }: { pack: Pack; publishing: boolean; error: string | null; onClose: () => void; onConfirm: () => void }) {
+function PublishConfirm({ pack, publishing, error, onClose, onConfirm }: { pack: Pack; publishing: boolean; error: string | null; onClose: () => void; onConfirm: (diff: PackDiff) => void }) {
   const diff = usePackDiff(pack.id);
+  // A refused publish (someone published first, or a track changed) shows the up-to-date changes to confirm instead.
+  const refetchDiff = diff.refetch;
+  useEffect(() => {
+    if (error) void refetchDiff();
+  }, [error, refetchDiff]);
   return (
     <Modal opened onClose={onClose} title={`Publish ${pack.nameEn}`} size="lg">
       <Stack>
@@ -117,7 +122,7 @@ function PublishConfirm({ pack, publishing, error, onClose, onConfirm }: { pack:
         <Text size="xs" c="dimmed">A published version is never changed. Players get this one the next time they refresh their packs.</Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>Cancel</Button>
-          <Button color="green" loading={publishing} disabled={!diff.data || diff.data.eligibleCount === 0} onClick={onConfirm}>
+          <Button color="green" loading={publishing} disabled={!diff.data || diff.data.eligibleCount === 0} onClick={() => diff.data && onConfirm(diff.data)}>
             {diff.data ? `Publish v${diff.data.nextVersion}` : "Publish"}
           </Button>
         </Group>

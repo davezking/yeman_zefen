@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { z } from "zod";
 import { REASONS } from "../lib/review";
 import { apiFetch } from "./client";
+import { jobSchema } from "./jobs";
 
 export const TRACK_STATUSES = ["ingested", "needs_review", "approved", "rejected", "retired"] as const;
 export type TrackStatus = (typeof TRACK_STATUSES)[number];
@@ -242,23 +243,21 @@ export function useCloseReviewItem(trackId: number) {
 
 // ----------------------------------------------------------------- clip editor
 
-const jobSchema = z.object({
-  id: z.number(),
-  kind: z.string(),
-  status: z.enum(["queued", "running", "succeeded", "failed"]),
-  ghRunUrl: z.string().nullable(),
-  summary: z.unknown(),
-});
-export type Job = z.infer<typeof jobSchema>;
-
 /** A signed URL for the track's private source audio. Short-lived: ask again for each editing session. */
-export function useSourceUrl(trackId: number) {
+// Fetched once per editor: the waveform is decoded from it straight away, so a refetch (which would rebuild the
+// waveform under the admin's edits) buys nothing. Dropped as soon as the editor unmounts, so it is never reused
+// after it expires. Errors are shown in the editor, not as a notification.
+export function useSourceUrl(trackId: number, { enabled }: { enabled: boolean }) {
   return useQuery({
     queryKey: ["source-url", trackId],
+    enabled,
     queryFn: () => apiFetch(`/admin/tracks/${trackId}/source-url`, z.object({ url: z.string(), expiresAt: z.number() })),
-    staleTime: 5 * 60_000,
-    gcTime: 5 * 60_000,
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
+    meta: { silent: true },
   });
 }
 
@@ -276,17 +275,5 @@ export function usePatchClip() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tracks"] });
     },
-  });
-}
-
-const POLL_MS = 5_000;
-
-/** A job, refreshed every 5 s until it has succeeded or failed. */
-export function useJobPoll(jobId: number | null) {
-  return useQuery({
-    queryKey: ["job", jobId],
-    enabled: jobId !== null,
-    queryFn: async () => (await apiFetch(`/admin/jobs?id=${jobId}`, z.object({ jobs: z.array(jobSchema) }))).jobs[0]!,
-    refetchInterval: (q) => (q.state.data && (q.state.data.status === "succeeded" || q.state.data.status === "failed") ? false : POLL_MS),
   });
 }

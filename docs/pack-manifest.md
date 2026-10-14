@@ -74,8 +74,10 @@ Public, cached for 5 minutes. Only packs with a published version:
 - `POST /admin/packs { slug, nameAm, nameEn, generationId?, genreId? }`
 - `GET /admin/packs`: packs with `eligibleCount` and version history.
 - `GET /admin/packs/:id/diff`: tracks a new version would add and remove against the current one, and
-  `nextVersion`, the number it would take.
-- `POST /admin/packs/:id/versions { trackIds? }` (empty body: all eligible tracks): publish.
+  `nextVersion`, the number it would take, and `trackIds`, the exact list it describes.
+- `POST /admin/packs/:id/versions { trackIds?, expectedVersion? }` (empty body: all eligible tracks): publish.
+  The admin UI sends the diff's `trackIds` and `nextVersion`, so what ships is exactly what was confirmed.
+  - 409 `version_conflict`: `expectedVersion` was given and another publish took it.
   - 409 `tracks_not_eligible` / `no_eligible_tracks`.
   - 409 `catalog_changed`: a track was rejected or a clip recut while publishing. Nothing is recorded and the
     manifest is removed again; review the diff and publish again.

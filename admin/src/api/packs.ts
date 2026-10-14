@@ -12,7 +12,7 @@ const versionSchema = z.object({
   publishedBy: z.string().nullable(),
 });
 
-const packSchema = z.object({
+export const packSchema = z.object({
   id: z.number(),
   slug: z.string(),
   nameAm: z.string(),
@@ -20,19 +20,19 @@ const packSchema = z.object({
   generationId: z.number().nullable(),
   genreId: z.number().nullable(),
   currentVersion: z.number().nullable(),
-  /** The number a publish now would take (the server skips numbers whose manifest already exists). */
-  nextVersion: z.number(),
   eligibleCount: z.number(),
   versions: z.array(versionSchema),
 });
 export type Pack = z.infer<typeof packSchema>;
 
 const briefTrack = z.object({ id: z.number(), titleAm: z.string().nullable(), titleLatin: z.string().nullable() });
-const diffSchema = z.object({
+export const diffSchema = z.object({
   currentVersion: z.number().nullable(),
   /** The number a publish now would take (the server skips numbers whose manifest already exists). */
   nextVersion: z.number(),
   eligibleCount: z.number(),
+  /** Exactly the tracks this diff describes. Publishing sends these, so later approvals stay out. */
+  trackIds: z.array(z.number()),
   added: z.array(briefTrack),
   removed: z.array(briefTrack),
 });
@@ -72,7 +72,12 @@ export function usePublishPack() {
   const qc = useQueryClient();
   return useMutation({
     meta: { silent: true },
-    mutationFn: (id: number) => apiFetch(`/admin/packs/${id}/versions`, z.object({ published: z.object({ version: z.number() }) }), { method: "POST" }),
+    // Publish exactly what the confirm step showed: its tracks, at its version number (409 if someone published first).
+    mutationFn: ({ id, diff }: { id: number; diff: Pick<PackDiff, "trackIds" | "nextVersion"> }) =>
+      apiFetch(`/admin/packs/${id}/versions`, z.object({ published: z.object({ version: z.number() }) }), {
+        method: "POST",
+        json: { trackIds: diff.trackIds, expectedVersion: diff.nextVersion },
+      }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["packs"] }),
   });
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isActive } from "../lib/jobs";
 import { apiFetch } from "./client";
 
-const jobSchema = z.object({
+export const jobSchema = z.object({
   id: z.number(),
   kind: z.enum(["scrape", "cut", "recut"]),
   status: z.enum(["queued", "running", "succeeded", "failed"]),
@@ -32,5 +32,15 @@ export function useStartJob() {
     mutationFn: (req: JobStart) => apiFetch("/admin/jobs", z.object({ job: jobSchema }), { method: "POST", json: req }),
     // A refused dispatch (502) still leaves a failed job row: show it.
     onSettled: () => void qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
+/** One job, refreshed every 5 s until it has succeeded or failed (the clip editor follows its recut with this). */
+export function useJobPoll(jobId: number | null) {
+  return useQuery({
+    queryKey: ["job", jobId],
+    enabled: jobId !== null,
+    queryFn: async () => (await apiFetch(`/admin/jobs?id=${jobId}`, z.object({ jobs: z.array(jobSchema) }))).jobs[0]!,
+    refetchInterval: (q) => (q.state.data && !isActive(q.state.data.status) ? false : 5_000),
   });
 }

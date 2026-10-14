@@ -2,13 +2,12 @@
 // Spec: docs/architecture.md §5 "Jobs".
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { z } from "zod";
 import { db } from "../../db/client";
 import { ingestJobs } from "../../db/schema";
 import type { AppEnv } from "../../env";
 import { ApiError } from "../../lib/errors";
 import { createJob, jobOut, jobRequest } from "../../lib/jobs";
-import { parse, readJson } from "../../lib/validate";
+import { idSchema, parse, readJson } from "../../lib/validate";
 
 export const jobRoutes = new Hono<AppEnv>();
 
@@ -29,7 +28,7 @@ jobRoutes.post("/jobs", async (c) => {
 jobRoutes.get("/jobs", async (c) => {
   const idQuery = c.req.query("id");
   if (idQuery !== undefined) {
-    const id = parse(z.coerce.number().int().positive(), idQuery, "id");
+    const id = parse(idSchema, idQuery, "id");
     const job = await db(c.env).select().from(ingestJobs).where(eq(ingestJobs.id, id)).get();
     if (!job) throw new ApiError(404, "not_found", `Job ${id} not found`);
     return c.json({ jobs: [jobOut(job)] });

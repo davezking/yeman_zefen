@@ -2,6 +2,7 @@
 // TODO(phase 3): add the Firebase auth middleware to the player routes. /v1/packs may stay public.
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { cdnUrl } from "../lib/cdn";
 
 export const v1 = new Hono<AppEnv>();
 
@@ -16,7 +17,6 @@ v1.get("/packs", async (c) => {
     slug: string; name_am: string; name_en: string; generation_id: number | null; genre_id: number | null;
     version: number; manifest_key: string; track_count: number; total_bytes: number; published_at: number;
   }>();
-  const cdn = c.env.CDN_BASE_URL.replace(/\/+$/, "");
   c.header("Cache-Control", "public, max-age=300");
   return c.json({
     packs: results.map((r) => ({
@@ -25,7 +25,7 @@ v1.get("/packs", async (c) => {
       generationId: r.generation_id,
       genreId: r.genre_id,
       version: r.version,
-      manifestUrl: `${cdn}/${r.manifest_key}`,
+      manifestUrl: cdnUrl(c.env.CDN_BASE_URL, r.manifest_key),
       trackCount: r.track_count,
       totalBytes: r.total_bytes,
       publishedAt: r.published_at,

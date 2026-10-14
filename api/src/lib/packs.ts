@@ -4,6 +4,7 @@
 // eligible tracks come back in one query and `pack_tracks` is written from one JSON array with json_each).
 // See test/queryBudget.test.ts.
 import type { Bindings } from "../env";
+import { cdnUrl } from "./cdn";
 import { isUniqueViolation } from "./dbErrors";
 import { ApiError } from "./errors";
 import { manifestKey, MANIFEST_SCHEMA_VERSION, packManifest, type PackManifest } from "./packManifest";
@@ -105,12 +106,13 @@ export async function diffAgainstCurrent(env: Bindings, pack: PackRow) {
     currentVersion: pack.current_version,
     nextVersion,
     eligibleCount: eligible.length,
+    // Exactly the tracks shown: the confirm step publishes these, so tracks approved after it was opened stay out.
+    trackIds: eligible.map((r) => r.id),
     added: eligible.filter((r) => !inCurrent.has(r.id)).map(brief),
     removed: current.results.filter((r) => !inNext.has(r.id)).map(brief),
   };
 }
 
-const cdnUrl = (env: Bindings, key: string) => `${env.CDN_BASE_URL.replace(/\/+$/, "")}/${key}`;
 
 export function buildManifest(env: Bindings, pack: PackRow, version: number, rows: EligibleRow[], now: number): PackManifest {
   const tracks = rows.map((r) => ({
@@ -124,8 +126,8 @@ export function buildManifest(env: Bindings, pack: PackRow, version: number, row
     genreIds: JSON.parse(r.genre_ids ?? "[]") as number[],
     releaseYear: r.release_year,
     clips: {
-      intro: { url: cdnUrl(env, r.intro_key), sha256: r.intro_sha, bytes: r.intro_bytes, lengthMs: r.intro_len },
-      middle: { url: cdnUrl(env, r.middle_key), sha256: r.middle_sha, bytes: r.middle_bytes, lengthMs: r.middle_len },
+      intro: { url: cdnUrl(env.CDN_BASE_URL, r.intro_key), sha256: r.intro_sha, bytes: r.intro_bytes, lengthMs: r.intro_len },
+      middle: { url: cdnUrl(env.CDN_BASE_URL, r.middle_key), sha256: r.middle_sha, bytes: r.middle_bytes, lengthMs: r.middle_len },
     },
   }));
   return {
@@ -171,7 +173,13 @@ const MEMBERS_STILL_ELIGIBLE = `
  * existing version's manifest is ever replaced), then record the version and move `current_version` in one batch.
  * If the batch writes nothing or fails, the manifest it just created is deleted again, so no orphan stays on the CDN.
  */
-export async function publishVersion(env: Bindings, pack: PackRow, trackIds: number[] | undefined, publishedBy: string | null) {
+export async function publishVersion(
+  env: Bindings,
+  pack: PackRow,
+  trackIds: number[] | undefined,
+  publishedBy: string | null,
+  expectedVersion?: number,
+) {
   const rows = await eligibleTracks(env, pack, trackIds);
   if (trackIds) {
     const ok = new Set(rows.map((r) => r.id));
@@ -184,6 +192,10 @@ export async function publishVersion(env: Bindings, pack: PackRow, trackIds: num
 
   const now = Date.now();
   const first = await nextFreeVersion(env, pack);
+  // The confirm step named a version: if another publish has taken it since, say so instead of publishing another number.
+  if (expectedVersion !== undefined && expectedVersion !== first) {
+    throw new ApiError(409, "version_conflict", `This pack is now at v${first - 1}; review the changes again before publishing`);
+  }
   // Validate once: only `version` changes between attempts.
   const checked = packManifest.safeParse(buildManifest(env, pack, first, rows, now));
   if (!checked.success) {
@@ -199,7 +211,11 @@ export async function publishVersion(env: Bindings, pack: PackRow, trackIds: num
       httpMetadata: { contentType: "application/json", cacheControl: "public, max-age=31536000, immutable" },
       onlyIf: { etagDoesNotMatch: "*" },
     });
-    if (written === null) continue; // a manifest is already there: never touch it, try the next number
+    if (written === null) {
+      // A manifest is already there: never touch it. Try the next number, unless the caller named this one.
+      if (expectedVersion !== undefined) throw new ApiError(409, "version_conflict", "Another publish took this version number; review the changes again");
+      continue;
+    }
 
     let inserted: number;
     try {
@@ -230,7 +246,7 @@ export async function publishVersion(env: Bindings, pack: PackRow, trackIds: num
       await deleteQuietly(env, key);
       throw new ApiError(409, "catalog_changed", "A track in this pack was changed while publishing (rejected, or a clip recut); review the changes and publish again");
     }
-    return { version, manifestUrl: cdnUrl(env, key), trackCount: manifest.tracks.length, totalBytes: manifest.totalBytes, publishedAt: now };
+    return { version, manifestUrl: cdnUrl(env.CDN_BASE_URL, key), trackCount: manifest.tracks.length, totalBytes: manifest.totalBytes, publishedAt: now };
   }
   throw new ApiError(409, "version_conflict", "Could not find a free version number; try again");
 }

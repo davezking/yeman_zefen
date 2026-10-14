@@ -263,3 +263,27 @@ describe("publishing safely", () => {
     expect((await json(res)).error.code).toBe("invalid_json");
   });
 });
+
+describe("publishing what the confirm step showed", () => {
+  it("publishes the diff's tracks, not ones approved after it was opened", async () => {
+    const shown = await eligible();
+    const pack = await createPack();
+    const diff = await json(await api(`/admin/packs/${pack.id}/diff`));
+    expect(diff.trackIds).toEqual([shown.id]);
+    await eligible(); // approved while the confirm dialog was open
+    const res = await publish(pack.id, { trackIds: diff.trackIds, expectedVersion: diff.nextVersion });
+    expect(res.status).toBe(201);
+    expect((await json(res)).published).toMatchObject({ version: 1, trackCount: 1 });
+  });
+
+  it("refuses when another publish took the version the confirm step named", async () => {
+    await eligible();
+    const pack = await createPack();
+    const diff = await json(await api(`/admin/packs/${pack.id}/diff`));
+    await publish(pack.id); // someone else published v1 first
+    const res = await publish(pack.id, { trackIds: diff.trackIds, expectedVersion: diff.nextVersion });
+    expect(res.status).toBe(409);
+    expect((await json(res)).error.code).toBe("version_conflict");
+    expect((await env.CLIPS.list({ prefix: "packs/" })).objects.map((o) => o.key)).toEqual(["packs/all/v1/manifest.json"]);
+  });
+});

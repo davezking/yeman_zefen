@@ -21,6 +21,7 @@ import {
 import type { AppEnv } from "../../env";
 import { requireRole } from "../../lib/accessAuth";
 import { isUniqueViolation } from "../../lib/dbErrors";
+import { cdnUrl } from "../../lib/cdn";
 import { ApiError } from "../../lib/errors";
 import { assignGeneration } from "../../lib/era";
 import { isOutOfCatalog } from "../../lib/trackStatus";
@@ -52,7 +53,7 @@ async function requireArtist(d: Db, id: number) {
 
 /** Public URL of a clip's file. Only ready clips have one: a pending clip's file no longer matches its start. */
 export function clipUrl(cdnBase: string, clip: { r2Key: string | null; status: string }): string | null {
-  return clip.r2Key && clip.status === "ready" ? `${cdnBase.replace(/\/+$/, "")}/${clip.r2Key}` : null;
+  return clip.r2Key && clip.status === "ready" ? cdnUrl(cdnBase, clip.r2Key) : null;
 }
 
 async function loadTrackDetail(d: Db, cdnBase: string, id: number) {
