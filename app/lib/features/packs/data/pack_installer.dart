@@ -32,7 +32,8 @@ class PackInstaller {
     required this.supportDirectory,
     this.maxParallelDownloads = 4,
     this.maxDownloadAttempts = 3,
-  });
+    Future<void> Function(Directory dir)? deleteDirectory,
+  }) : _deleteDirectory = deleteDirectory ?? _deleteRecursively;
 
   final AppDb db;
   final ClipDownloader downloader;
@@ -42,6 +43,16 @@ class PackInstaller {
 
   /// Downloads per file, including the first. 3 means one try and two re-fetches.
   final int maxDownloadAttempts;
+
+  /// Removes an old version's folder. Replaceable so a test can make it fail.
+  final Future<void> Function(Directory dir) _deleteDirectory;
+
+  static Future<void> _deleteRecursively(Directory dir) async {
+    if (await dir.exists()) await dir.delete(recursive: true);
+  }
+
+  /// The install running or queued for each slug.
+  final _running = <String, Future<void>>{};
 
   final _controller = StreamController<PackInstallProgress>.broadcast();
   final _latest = <String, PackInstallProgress>{};
@@ -64,21 +75,55 @@ class PackInstaller {
     return row?.version;
   }
 
-  /// Installs [manifest], whose exact text is [manifestJson]. Throws
-  /// [PackInstallException] on failure. In that case the previously installed
-  /// version, if any, is left as it was.
-  Future<void> install(PackManifest manifest, String manifestJson) async {
+  /// Installs [manifest], whose exact text is [manifestJson]. It must be the
+  /// pack and version that were asked for, [expectedSlug] and [expectedVersion],
+  /// as listed by `GET /v1/packs`.
+  ///
+  /// Throws [PackInstallException] on failure. In that case the previously
+  /// installed version, if any, is left as it was. Installs of the same pack run
+  /// one after another, because two at once would write the same files.
+  Future<void> install(
+    PackManifest manifest,
+    String manifestJson, {
+    required String expectedSlug,
+    required int expectedVersion,
+  }) {
+    final previous = _running[expectedSlug] ?? Future<void>.value();
+    final run = previous.then(
+      (_) => _install(manifest, manifestJson, expectedSlug, expectedVersion),
+    );
+    // The queue moves on whether this one succeeds or fails.
+    final settled = run.then<void>((_) {}, onError: (Object _) {});
+    _running[expectedSlug] = settled;
+    unawaited(settled.then((_) {
+      if (identical(_running[expectedSlug], settled)) _running.remove(expectedSlug);
+    }));
+    return run;
+  }
+
+  Future<void> _install(
+    PackManifest manifest,
+    String manifestJson,
+    String expectedSlug,
+    int expectedVersion,
+  ) async {
     final slug = manifest.slug;
+    String? problem;
+    if (slug != expectedSlug || manifest.version != expectedVersion) {
+      problem = 'manifest is $slug v${manifest.version}, expected $expectedSlug v$expectedVersion';
+    } else if (!isValidPackSlug(slug)) {
+      problem = '"$slug" is not a valid pack slug';
+    }
+    if (problem != null) {
+      _emit(PackInstallProgress(slug: expectedSlug, state: PackInstallState.failed, error: problem));
+      throw PackInstallException(problem);
+    }
+
+    final paths = _TrackPaths.of(manifest);
     final files = [
       for (final t in manifest.tracks) ...[
-        _ClipFile(
-          relativePath: 'packs/$slug/v${manifest.version}/${t.id}-intro.mp3',
-          clip: t.intro,
-        ),
-        _ClipFile(
-          relativePath: 'packs/$slug/v${manifest.version}/${t.id}-middle.mp3',
-          clip: t.middle,
-        ),
+        _ClipFile(relativePath: paths.intro(t.id), clip: t.intro),
+        _ClipFile(relativePath: paths.middle(t.id), clip: t.middle),
       ],
     ];
     final tracker = _Tracker(
@@ -89,27 +134,31 @@ class PackInstaller {
     );
 
     _emit(tracker.snapshot(PackInstallState.queued));
+    final Directory base;
+    final int? previousVersion;
     try {
-      final base = await supportDirectory();
-      final previousVersion = await installedVersion(slug);
+      base = await supportDirectory();
+      previousVersion = await installedVersion(slug);
 
       await _forEachLimited(files, maxParallelDownloads, (file) {
         return _fetchVerified(base, file, tracker);
       });
-      await _register(manifest, manifestJson, files);
-
-      // Only after the new version is registered. Removing the old files earlier
-      // could break the installed pack if this install fails.
-      if (previousVersion != null && previousVersion != manifest.version) {
-        final oldDir = Directory(p.join(base.path, 'packs', slug, 'v$previousVersion'));
-        if (await oldDir.exists()) await oldDir.delete(recursive: true);
-      }
-      _emit(tracker.snapshot(PackInstallState.installed));
+      await _register(manifest, manifestJson, paths);
     } catch (e) {
       final message = e is PackInstallException ? e.message : '$e';
       _emit(tracker.snapshot(PackInstallState.failed, error: message));
       throw PackInstallException(message);
     }
+
+    // The new version is installed. The old folder is removed only now, so a
+    // failed install never breaks the installed pack. If removing it fails, the
+    // install still succeeded: the folder only takes space.
+    if (previousVersion != null && previousVersion != manifest.version) {
+      try {
+        await _deleteDirectory(Directory(p.join(base.path, 'packs', slug, 'v$previousVersion')));
+      } catch (_) {}
+    }
+    _emit(tracker.snapshot(PackInstallState.installed));
   }
 
   /// Downloads [file] and checks its SHA-256. Re-fetches on a mismatch, up to
@@ -148,7 +197,7 @@ class PackInstaller {
 
   /// Registers the pack in one transaction. The previous row and its tracks are
   /// replaced only here, so a failure above leaves them untouched.
-  Future<void> _register(PackManifest m, String manifestJson, List<_ClipFile> files) {
+  Future<void> _register(PackManifest m, String manifestJson, _TrackPaths paths) {
     return db.transaction(() async {
       await (db.delete(db.localTracks)..where((t) => t.packSlug.equals(m.slug))).go();
       await db.into(db.installedPacks).insertOnConflictUpdate(
@@ -173,8 +222,8 @@ class PackInstaller {
               artistId: Value(t.artistId),
               generationId: Value(t.generationId),
               releaseYear: Value(t.releaseYear),
-              introPath: Value('packs/${m.slug}/v${m.version}/${t.id}-intro.mp3'),
-              middlePath: Value('packs/${m.slug}/v${m.version}/${t.id}-middle.mp3'),
+              introPath: Value(paths.intro(t.id)),
+              middlePath: Value(paths.middle(t.id)),
             ),
         ]);
       });
@@ -217,6 +266,19 @@ class PackInstaller {
       for (var i = 0; i < limit && i < items.length; i++) worker(),
     ]);
   }
+}
+
+/// Where a version's clip files go, relative to the support directory. The
+/// downloads and the database both take paths from here.
+class _TrackPaths {
+  const _TrackPaths(this._dir);
+
+  factory _TrackPaths.of(PackManifest m) => _TrackPaths('packs/${m.slug}/v${m.version}');
+
+  final String _dir;
+
+  String intro(int trackId) => '$_dir/$trackId-intro.mp3';
+  String middle(int trackId) => '$_dir/$trackId-middle.mp3';
 }
 
 class _ClipFile {

@@ -51,6 +51,9 @@ class JustAudioClipVoice implements ClipVoice {
 
   @override
   Future<void> load(String path, Duration limit) async {
+    // A player that is still "playing" (a finished clip counts as playing) would
+    // start the new source as soon as it loads.
+    await _player.pause();
     // The clip file already starts at the musical moment, so only the end is set.
     // The player enforces the end itself, so the stop is not a Dart timer.
     await _player.setAudioSource(
@@ -64,28 +67,35 @@ class JustAudioClipVoice implements ClipVoice {
 
   @override
   Future<void> start() async {
-    // Created before play() so the first advance is not missed.
-    final positions = _player.createPositionStream(
-      minPeriod: const Duration(milliseconds: 5),
-      maxPeriod: const Duration(milliseconds: 20),
-    );
-    final advanced = positions
-        .firstWhere(
-          (p) =>
-              p > Duration.zero &&
-              _player.playing &&
-              _player.processingState == ProcessingState.ready,
+    // Listened to before play() so the first advance is not missed, and
+    // cancelled however the start ends, so the fast poll does not outlive it.
+    final started = Completer<void>();
+    final positions = _player
+        .createPositionStream(
+          minPeriod: const Duration(milliseconds: 5),
+          maxPeriod: const Duration(milliseconds: 20),
         )
-        .then<void>((_) {});
-    // play() completes when playback ends, so it is not awaited. If it ends
-    // before audio advanced, or fails, the start failed.
-    final ended = _player.play().then<void>(
-      (_) => throw const ClipPlaybackException('playback ended before audio started'),
-    );
-    await Future.any([advanced, ended]).timeout(
-      _startTimeout,
-      onTimeout: () => throw const ClipPlaybackException('audio did not start in time'),
-    );
+        .listen((p) {
+      if (!started.isCompleted &&
+          p > Duration.zero &&
+          _player.playing &&
+          _player.processingState == ProcessingState.ready) {
+        started.complete();
+      }
+    });
+    try {
+      // play() completes when playback ends, so it is not awaited. If it ends
+      // before audio advanced, or fails, the start failed.
+      final ended = _player.play().then<void>(
+            (_) => throw const ClipPlaybackException('playback ended before audio started'),
+          );
+      await Future.any([started.future, ended]).timeout(
+        _startTimeout,
+        onTimeout: () => throw const ClipPlaybackException('audio did not start in time'),
+      );
+    } finally {
+      await positions.cancel();
+    }
   }
 
   @override

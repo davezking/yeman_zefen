@@ -145,6 +145,10 @@ class ClipPlayer {
   }
 
   /// Starts the prepared clip. Completes once audio is actually playing.
+  ///
+  /// A clip plays once: after it stops, finishes or is interrupted, [prepare]
+  /// it again. Throws [ClipPlaybackException] when it is stopped before audio
+  /// started.
   Future<ClipStartInfo> play() async {
     final slot = _active;
     if (slot.clip == null) {
@@ -154,6 +158,8 @@ class ClipPlayer {
 
     _playing = true;
     _playingSlot = slot;
+    // Cleared so a stop before audio starts does not report the last clip's time.
+    _playStopwatch = null;
     _positionSub = slot.voice.position.listen((p) => _elapsed.add(p.inMilliseconds));
     _completedSub = slot.voice.completed.listen((_) => _onCompleted(slot));
 
@@ -161,8 +167,13 @@ class ClipPlayer {
     try {
       await slot.voice.start();
     } catch (_) {
-      _detach();
+      if (identical(_playingSlot, slot)) _detach();
       rethrow;
+    }
+    if (!identical(_playingSlot, slot)) {
+      // stop() or an interruption arrived while starting. Make sure it is silent.
+      await slot.voice.stop();
+      throw const ClipPlaybackException('stopped before audio started');
     }
     final latency = watch.elapsed;
     _playStopwatch = Stopwatch()..start();
@@ -195,6 +206,9 @@ class ClipPlayer {
       playedMs: _playStopwatch?.elapsedMilliseconds ?? 0,
     );
     _detach();
+    // A finished just_audio player still counts as playing, and would start the
+    // next clip loaded into it on its own. Pause it.
+    unawaited(slot.voice.stop().catchError((Object _) {}));
     if (!_completed.isClosed) _completed.add(info);
   }
 
@@ -206,6 +220,8 @@ class ClipPlayer {
   /// Marks nothing as playing and drops the voice listeners. Synchronous, so a
   /// caller can flip the state and act on the voice in the same turn.
   void _detach() {
+    // The clip has been played. The voice has to load it again to replay it.
+    _playingSlot?.clip = null;
     _playing = false;
     _playingSlot = null;
     final position = _positionSub;

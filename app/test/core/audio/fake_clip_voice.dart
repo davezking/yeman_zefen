@@ -9,6 +9,10 @@ class FakeClipVoice implements ClipVoice {
   Object? startError;
 
   final loads = <(String, Duration)>[];
+
+  /// Loads made while the voice was still playing. just_audio would start
+  /// such a clip on its own, so this must stay 0.
+  var loadsWhilePlaying = 0;
   var stops = 0;
   var playing = false;
   var disposed = false;
@@ -19,6 +23,7 @@ class FakeClipVoice implements ClipVoice {
 
   @override
   Future<void> load(String path, Duration limit) async {
+    if (playing) loadsWhilePlaying++;
     await Future<void>.delayed(const Duration(milliseconds: 1));
     final error = loadError;
     if (error != null) throw error;
@@ -60,10 +65,10 @@ class FakeClipVoice implements ClipVoice {
     _positions.add(p);
   }
 
-  /// The clip reaches its limit.
+  /// The clip reaches its limit. Like just_audio, the voice still counts as
+  /// playing until it is paused.
   void finish() {
     if (loads.isNotEmpty) _position = loads.last.$2;
-    playing = false;
     _completed.add(null);
   }
 }

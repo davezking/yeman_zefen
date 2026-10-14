@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/features/packs/data/pack_installer.dart';
+import 'package:yeman_zefen/features/packs/data/pack_manifest.dart';
 import 'package:yeman_zefen/features/packs/domain/pack_install_progress.dart';
 
 import 'pack_fixtures.dart';
@@ -34,7 +35,7 @@ void main() {
 
   Future<void> install({int version = 1, int tracks = 3}) {
     final json = manifestJson(version: version, tracks: tracks);
-    return installer.install(manifestOf(json), json);
+    return installer.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: version);
   }
 
   bool fileExists(String relative) => File(p.join(base.path, relative)).existsSync();
@@ -187,6 +188,116 @@ void main() {
 
     expect(seen.last.state, PackInstallState.failed);
     expect(seen.last.error, contains('connection lost'));
+  });
+
+  group('installs of the same pack', () {
+    test('run one after another, so the second finds the files verified', () async {
+      await Future.wait([install(), install()]);
+
+      expect(downloader.calls, hasLength(6), reason: 'each clip downloaded once');
+      expect(downloader.maxRunning, lessThanOrEqualTo(4));
+      expect(await db.select(db.installedPacks).get(), hasLength(1));
+      expect(await db.select(db.localTracks).get(), hasLength(3));
+    });
+
+    test('keep going after one fails', () async {
+      // The first install uses up the 3 corrupt downloads and fails. The second,
+      // queued behind it, then gets good bytes. Run at once, they would share them.
+      downloader.corruptTimes[clipUrl(1, 'intro', 1)] = 3;
+      final first = install();
+      final second = install();
+
+      await expectLater(first, throwsA(isA<PackInstallException>()));
+      await second;
+      expect((await db.select(db.installedPacks).getSingle()).version, 1);
+    });
+  });
+
+  group('a manifest that is not the one asked for', () {
+    test('another slug is refused before anything is downloaded', () async {
+      final json = manifestJson(slug: 'other-pack');
+      await expectLater(
+        installer.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: 1),
+        throwsA(isA<PackInstallException>()),
+      );
+      expect(downloader.calls, isEmpty);
+      expect(await db.select(db.installedPacks).get(), isEmpty);
+    });
+
+    test('another version is refused', () async {
+      final json = manifestJson(version: 2);
+      await expectLater(
+        installer.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: 3),
+        throwsA(isA<PackInstallException>()),
+      );
+      expect(downloader.calls, isEmpty);
+    });
+
+    test('is reported as a failed install of the pack that was asked for', () async {
+      final seen = <PackInstallProgress>[];
+      final sub = installer.progressFor('golden-era').listen(seen.add);
+      final json = manifestJson(slug: 'other-pack');
+      await expectLater(
+        installer.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: 1),
+        throwsA(isA<PackInstallException>()),
+      );
+      await pumpEventQueue();
+      await sub.cancel();
+      expect(seen.single.state, PackInstallState.failed);
+      expect(seen.single.error, contains('other-pack'));
+    });
+
+    test('a slug that is not a valid pack slug is refused even when it was asked for', () async {
+      // The parser refuses such a slug. The installer checks again, because the
+      // slug becomes part of file paths and of a recursive delete.
+      final m = manifestOf(manifestJson());
+      final bad = PackManifest(
+        slug: '../..',
+        version: 1,
+        publishedAt: m.publishedAt,
+        nameAm: m.nameAm,
+        nameEn: m.nameEn,
+        tracks: m.tracks,
+        totalBytes: m.totalBytes,
+      );
+      await expectLater(
+        installer.install(bad, '{}', expectedSlug: '../..', expectedVersion: 1),
+        throwsA(isA<PackInstallException>()),
+      );
+      expect(downloader.calls, isEmpty);
+    });
+  });
+
+  test('an upgrade still succeeds when the old folder cannot be removed', () async {
+    final stubborn = PackInstaller(
+      db: db,
+      downloader: downloader,
+      supportDirectory: () async => base,
+      deleteDirectory: (_) async => throw const FileSystemException('busy'),
+    );
+    addTearDown(stubborn.dispose);
+    final seen = <PackInstallProgress>[];
+    final sub = stubborn.progressFor('golden-era').listen(seen.add);
+
+    final v1 = manifestJson(version: 1);
+    await stubborn.install(manifestOf(v1), v1, expectedSlug: 'golden-era', expectedVersion: 1);
+    final v2 = manifestJson(version: 2);
+    await stubborn.install(manifestOf(v2), v2, expectedSlug: 'golden-era', expectedVersion: 2);
+    await pumpEventQueue();
+    await sub.cancel();
+
+    expect((await db.select(db.installedPacks).getSingle()).version, 2);
+    expect(seen.last.state, PackInstallState.installed);
+  });
+
+  test('the stored paths are where the files were downloaded', () async {
+    await install();
+    final downloaded = downloader.calls.toSet();
+    for (final t in await db.select(db.localTracks).get()) {
+      expect(fileExists(t.introPath!), isTrue);
+      expect(fileExists(t.middlePath!), isTrue);
+      expect(downloaded, contains(clipUrl(t.id, 'intro', 1)));
+    }
   });
 
   test('a late subscriber gets the latest state first', () async {

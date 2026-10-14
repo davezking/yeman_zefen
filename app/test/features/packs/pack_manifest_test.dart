@@ -42,6 +42,20 @@ void main() {
     expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
   });
 
+  test('rejects a slug that could leave the packs folder', () {
+    for (final slug in ['../..', 'a/b', 'Golden-Era', 'golden_era', '-golden', 'golden--era', '', 'x' * 61]) {
+      final map = manifestMap()..['slug'] = slug;
+      expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()), reason: slug);
+    }
+  });
+
+  test('accepts the slugs the admin API accepts', () {
+    for (final slug in ['golden-era', 'a', '90s', 'pack-2-x', 'x' * 60]) {
+      final map = manifestMap()..['slug'] = slug;
+      expect(PackManifest.parse(jsonEncode(map)).slug, slug);
+    }
+  });
+
   test('ignores unknown fields', () {
     final map = manifestMap(tracks: 1)..['somethingNew'] = true;
     expect(() => PackManifest.parse(jsonEncode(map)), returnsNormally);

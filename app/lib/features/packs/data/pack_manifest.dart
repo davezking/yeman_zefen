@@ -3,6 +3,14 @@ import 'dart:convert';
 /// The only manifest schema this app understands. Newer schemas need a newer app.
 const supportedManifestSchema = 1;
 
+/// A pack slug, as the admin API accepts it (`api/src/routes/admin/packs.ts`).
+/// The slug becomes part of file paths, so nothing else is allowed.
+final packSlugPattern = RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$');
+const packSlugMaxLength = 60;
+
+bool isValidPackSlug(String slug) =>
+    slug.length <= packSlugMaxLength && packSlugPattern.hasMatch(slug);
+
 class PackManifestException implements Exception {
   const PackManifestException(this.message);
   final String message;
@@ -115,6 +123,11 @@ class PackManifest {
       tracks.add(track);
     }
 
+    final slug = _string(decoded, 'slug');
+    if (!isValidPackSlug(slug)) {
+      throw PackManifestException('"$slug" is not a valid pack slug');
+    }
+
     final totalBytes = _int(decoded, 'totalBytes');
     final summed = tracks.fold<int>(
       0,
@@ -125,7 +138,7 @@ class PackManifest {
     }
 
     return PackManifest(
-      slug: _string(decoded, 'slug'),
+      slug: slug,
       version: _int(decoded, 'version'),
       publishedAt: _int(decoded, 'publishedAt'),
       nameAm: _string(names, 'am'),

@@ -19,22 +19,23 @@ abstract class ClipDownloader {
   });
 }
 
-/// Production downloader. Uses `background_downloader`, which keeps going
-/// while the app is backgrounded, retries on network errors, and waits for a
-/// connection instead of failing when the network is off.
+/// Production downloader, using `background_downloader`, which keeps going
+/// while the app is in the background.
+///
+/// Behaviour this relies on, checked in the plugin's source (9.6.4): on Android
+/// a queued download waits for a network connection before it starts, and a
+/// failed download is retried up to [retries] times, waiting 1, 2, 4 ... s
+/// between tries (about 17 minutes for 10). When the retries run out the
+/// install fails, and installing again keeps every file that already verified.
+/// iOS has not been checked yet.
 class BackgroundClipDownloader implements ClipDownloader {
   BackgroundClipDownloader({FileDownloader? downloader})
       : _downloader = downloader ?? FileDownloader();
 
   final FileDownloader _downloader;
 
-  /// Call once at startup. Holds queued downloads until a network is available,
-  /// so a download that was interrupted by losing the connection resumes on reconnect.
-  static Future<void> configure() {
-    return FileDownloader().configure(
-      globalConfig: [(Config.holdingQueue, Config.whenAble)],
-    );
-  }
+  /// The plugin's maximum.
+  static const retries = 10;
 
   @override
   Future<void> download({
@@ -48,7 +49,7 @@ class BackgroundClipDownloader implements ClipDownloader {
       filename: p.posix.basename(relativePath),
       baseDirectory: BaseDirectory.applicationSupport,
       updates: Updates.statusAndProgress,
-      retries: 5,
+      retries: retries,
       allowPause: true,
     );
     final result = await _downloader.download(

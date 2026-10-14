@@ -242,6 +242,106 @@ void main() {
     });
   });
 
+  group('a clip that has played', () {
+    test('is paused when it reaches its limit', () async {
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+      final done = player.completed.first;
+
+      voices[0].finish();
+      await done;
+      await pumpEventQueue();
+
+      expect(voices[0].playing, isFalse);
+      expect(voices[0].stops, 1);
+    });
+
+    test('never leaves a voice playing when the next clip loads into it', () async {
+      // Round 1 on voice 0, round 2 preloaded on voice 1, round 3 preloaded back on voice 0.
+      await player.prepare('1.mp3', 3000);
+      await player.play();
+      await player.preloadNext('2.mp3', 3000);
+      voices[0].finish();
+      await pumpEventQueue();
+
+      await player.prepare('2.mp3', 3000);
+      await player.play();
+      await player.preloadNext('3.mp3', 3000);
+      voices[1].finish();
+      await pumpEventQueue();
+
+      await player.prepare('3.mp3', 3000);
+      await player.play();
+
+      expect(voices.map((v) => v.loadsWhilePlaying), [0, 0]);
+      expect(voices[0].playing, isTrue);
+      expect(voices[1].playing, isFalse);
+    });
+
+    test('must be prepared again after it was stopped', () async {
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+      await player.stop();
+
+      await expectLater(player.play(), throwsStateError);
+    });
+
+    test('must be prepared again after it finished', () async {
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+      voices[0].finish();
+      await pumpEventQueue();
+
+      await expectLater(player.play(), throwsStateError);
+    });
+
+    test('can be replayed by preparing it again', () async {
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+      await player.stop();
+
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+
+      expect(voices[0].loads, hasLength(2));
+      expect(player.isPlaying, isTrue);
+    });
+  });
+
+  group('a stop that arrives while audio is starting', () {
+    test('makes play fail and leaves nothing playing', () async {
+      await player.prepare('a.mp3', 3000);
+      voices[0].startDelay = const Duration(milliseconds: 50);
+
+      final starting = player.play();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final stopped = await player.stop();
+
+      await expectLater(starting, throwsA(isA<ClipPlaybackException>()));
+      expect(stopped, isNotNull);
+      expect(voices[0].playing, isFalse);
+      expect(player.isPlaying, isFalse);
+    });
+
+    test('does not report the previous clip\'s play time', () async {
+      await player.prepare('a.mp3', 3000);
+      await player.play();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await player.stop();
+
+      await player.prepare('b.mp3', 3000);
+      voices[0].startDelay = const Duration(milliseconds: 50);
+      final starting = player.play();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final reported = player.interrupted.first;
+      interruptions.add(null);
+      final info = await reported;
+
+      expect(info.playedMs, 0);
+      await expectLater(starting, throwsA(isA<ClipPlaybackException>()));
+    });
+  });
+
   test('dispose releases both voices', () async {
     await player.dispose();
     expect(voices.every((v) => v.disposed), isTrue);
