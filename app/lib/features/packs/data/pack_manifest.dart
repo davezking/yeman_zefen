@@ -31,6 +31,8 @@ class ManifestTrack {
     required this.id,
     required this.titleAm,
     required this.titleLatin,
+    required this.artistId,
+    required this.generationId,
     required this.artistAm,
     required this.artistLatin,
     required this.releaseYear,
@@ -41,6 +43,10 @@ class ManifestTrack {
   final int id;
   final String? titleAm;
   final String? titleLatin;
+  final int artistId;
+
+  /// The track's era, or null when it has none.
+  final int? generationId;
   final String? artistAm;
   final String? artistLatin;
   final int? releaseYear;
@@ -135,6 +141,8 @@ class PackManifest {
       id: _int(raw, 'id'),
       titleAm: _nullableString(raw, 'titleAm'),
       titleLatin: _nullableString(raw, 'titleLatin'),
+      artistId: _int(raw, 'artistId'),
+      generationId: _nullableInt(raw, 'generationId'),
       artistAm: _nullableString(raw, 'artistAm'),
       artistLatin: _nullableString(raw, 'artistLatin'),
       releaseYear: _nullableInt(raw, 'releaseYear'),

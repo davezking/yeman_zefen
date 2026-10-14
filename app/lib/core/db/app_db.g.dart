@@ -451,6 +451,28 @@ class $LocalTracksTable extends LocalTracks
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _artistIdMeta = const VerificationMeta(
+    'artistId',
+  );
+  @override
+  late final GeneratedColumn<int> artistId = GeneratedColumn<int>(
+    'artist_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _generationIdMeta = const VerificationMeta(
+    'generationId',
+  );
+  @override
+  late final GeneratedColumn<int> generationId = GeneratedColumn<int>(
+    'generation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _releaseYearMeta = const VerificationMeta(
     'releaseYear',
   );
@@ -492,6 +514,8 @@ class $LocalTracksTable extends LocalTracks
     titleLatin,
     artistAm,
     artistLatin,
+    artistId,
+    generationId,
     releaseYear,
     introPath,
     middlePath,
@@ -545,6 +569,21 @@ class $LocalTracksTable extends LocalTracks
         artistLatin.isAcceptableOrUnknown(
           data['artist_latin']!,
           _artistLatinMeta,
+        ),
+      );
+    }
+    if (data.containsKey('artist_id')) {
+      context.handle(
+        _artistIdMeta,
+        artistId.isAcceptableOrUnknown(data['artist_id']!, _artistIdMeta),
+      );
+    }
+    if (data.containsKey('generation_id')) {
+      context.handle(
+        _generationIdMeta,
+        generationId.isAcceptableOrUnknown(
+          data['generation_id']!,
+          _generationIdMeta,
         ),
       );
     }
@@ -602,6 +641,14 @@ class $LocalTracksTable extends LocalTracks
         DriftSqlType.string,
         data['${effectivePrefix}artist_latin'],
       ),
+      artistId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}artist_id'],
+      ),
+      generationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}generation_id'],
+      ),
       releaseYear: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}release_year'],
@@ -630,6 +677,12 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
   final String? titleLatin;
   final String? artistAm;
   final String? artistLatin;
+
+  /// The artist's catalog id and the track's era (generation). The round engine
+  /// needs both to build same-era and distinct-artist options. Nullable because
+  /// rows written before schema 2 do not have them, and an era can be unknown.
+  final int? artistId;
+  final int? generationId;
   final int? releaseYear;
   final String? introPath;
   final String? middlePath;
@@ -640,6 +693,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
     this.titleLatin,
     this.artistAm,
     this.artistLatin,
+    this.artistId,
+    this.generationId,
     this.releaseYear,
     this.introPath,
     this.middlePath,
@@ -660,6 +715,12 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
     }
     if (!nullToAbsent || artistLatin != null) {
       map['artist_latin'] = Variable<String>(artistLatin);
+    }
+    if (!nullToAbsent || artistId != null) {
+      map['artist_id'] = Variable<int>(artistId);
+    }
+    if (!nullToAbsent || generationId != null) {
+      map['generation_id'] = Variable<int>(generationId);
     }
     if (!nullToAbsent || releaseYear != null) {
       map['release_year'] = Variable<int>(releaseYear);
@@ -689,6 +750,12 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
       artistLatin: artistLatin == null && nullToAbsent
           ? const Value.absent()
           : Value(artistLatin),
+      artistId: artistId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artistId),
+      generationId: generationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(generationId),
       releaseYear: releaseYear == null && nullToAbsent
           ? const Value.absent()
           : Value(releaseYear),
@@ -713,6 +780,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
       titleLatin: serializer.fromJson<String?>(json['titleLatin']),
       artistAm: serializer.fromJson<String?>(json['artistAm']),
       artistLatin: serializer.fromJson<String?>(json['artistLatin']),
+      artistId: serializer.fromJson<int?>(json['artistId']),
+      generationId: serializer.fromJson<int?>(json['generationId']),
       releaseYear: serializer.fromJson<int?>(json['releaseYear']),
       introPath: serializer.fromJson<String?>(json['introPath']),
       middlePath: serializer.fromJson<String?>(json['middlePath']),
@@ -728,6 +797,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
       'titleLatin': serializer.toJson<String?>(titleLatin),
       'artistAm': serializer.toJson<String?>(artistAm),
       'artistLatin': serializer.toJson<String?>(artistLatin),
+      'artistId': serializer.toJson<int?>(artistId),
+      'generationId': serializer.toJson<int?>(generationId),
       'releaseYear': serializer.toJson<int?>(releaseYear),
       'introPath': serializer.toJson<String?>(introPath),
       'middlePath': serializer.toJson<String?>(middlePath),
@@ -741,6 +812,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
     Value<String?> titleLatin = const Value.absent(),
     Value<String?> artistAm = const Value.absent(),
     Value<String?> artistLatin = const Value.absent(),
+    Value<int?> artistId = const Value.absent(),
+    Value<int?> generationId = const Value.absent(),
     Value<int?> releaseYear = const Value.absent(),
     Value<String?> introPath = const Value.absent(),
     Value<String?> middlePath = const Value.absent(),
@@ -751,6 +824,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
     titleLatin: titleLatin.present ? titleLatin.value : this.titleLatin,
     artistAm: artistAm.present ? artistAm.value : this.artistAm,
     artistLatin: artistLatin.present ? artistLatin.value : this.artistLatin,
+    artistId: artistId.present ? artistId.value : this.artistId,
+    generationId: generationId.present ? generationId.value : this.generationId,
     releaseYear: releaseYear.present ? releaseYear.value : this.releaseYear,
     introPath: introPath.present ? introPath.value : this.introPath,
     middlePath: middlePath.present ? middlePath.value : this.middlePath,
@@ -767,6 +842,10 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
       artistLatin: data.artistLatin.present
           ? data.artistLatin.value
           : this.artistLatin,
+      artistId: data.artistId.present ? data.artistId.value : this.artistId,
+      generationId: data.generationId.present
+          ? data.generationId.value
+          : this.generationId,
       releaseYear: data.releaseYear.present
           ? data.releaseYear.value
           : this.releaseYear,
@@ -786,6 +865,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
           ..write('titleLatin: $titleLatin, ')
           ..write('artistAm: $artistAm, ')
           ..write('artistLatin: $artistLatin, ')
+          ..write('artistId: $artistId, ')
+          ..write('generationId: $generationId, ')
           ..write('releaseYear: $releaseYear, ')
           ..write('introPath: $introPath, ')
           ..write('middlePath: $middlePath')
@@ -801,6 +882,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
     titleLatin,
     artistAm,
     artistLatin,
+    artistId,
+    generationId,
     releaseYear,
     introPath,
     middlePath,
@@ -815,6 +898,8 @@ class LocalTrack extends DataClass implements Insertable<LocalTrack> {
           other.titleLatin == this.titleLatin &&
           other.artistAm == this.artistAm &&
           other.artistLatin == this.artistLatin &&
+          other.artistId == this.artistId &&
+          other.generationId == this.generationId &&
           other.releaseYear == this.releaseYear &&
           other.introPath == this.introPath &&
           other.middlePath == this.middlePath);
@@ -827,6 +912,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
   final Value<String?> titleLatin;
   final Value<String?> artistAm;
   final Value<String?> artistLatin;
+  final Value<int?> artistId;
+  final Value<int?> generationId;
   final Value<int?> releaseYear;
   final Value<String?> introPath;
   final Value<String?> middlePath;
@@ -838,6 +925,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
     this.titleLatin = const Value.absent(),
     this.artistAm = const Value.absent(),
     this.artistLatin = const Value.absent(),
+    this.artistId = const Value.absent(),
+    this.generationId = const Value.absent(),
     this.releaseYear = const Value.absent(),
     this.introPath = const Value.absent(),
     this.middlePath = const Value.absent(),
@@ -850,6 +939,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
     this.titleLatin = const Value.absent(),
     this.artistAm = const Value.absent(),
     this.artistLatin = const Value.absent(),
+    this.artistId = const Value.absent(),
+    this.generationId = const Value.absent(),
     this.releaseYear = const Value.absent(),
     this.introPath = const Value.absent(),
     this.middlePath = const Value.absent(),
@@ -863,6 +954,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
     Expression<String>? titleLatin,
     Expression<String>? artistAm,
     Expression<String>? artistLatin,
+    Expression<int>? artistId,
+    Expression<int>? generationId,
     Expression<int>? releaseYear,
     Expression<String>? introPath,
     Expression<String>? middlePath,
@@ -875,6 +968,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
       if (titleLatin != null) 'title_latin': titleLatin,
       if (artistAm != null) 'artist_am': artistAm,
       if (artistLatin != null) 'artist_latin': artistLatin,
+      if (artistId != null) 'artist_id': artistId,
+      if (generationId != null) 'generation_id': generationId,
       if (releaseYear != null) 'release_year': releaseYear,
       if (introPath != null) 'intro_path': introPath,
       if (middlePath != null) 'middle_path': middlePath,
@@ -889,6 +984,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
     Value<String?>? titleLatin,
     Value<String?>? artistAm,
     Value<String?>? artistLatin,
+    Value<int?>? artistId,
+    Value<int?>? generationId,
     Value<int?>? releaseYear,
     Value<String?>? introPath,
     Value<String?>? middlePath,
@@ -901,6 +998,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
       titleLatin: titleLatin ?? this.titleLatin,
       artistAm: artistAm ?? this.artistAm,
       artistLatin: artistLatin ?? this.artistLatin,
+      artistId: artistId ?? this.artistId,
+      generationId: generationId ?? this.generationId,
       releaseYear: releaseYear ?? this.releaseYear,
       introPath: introPath ?? this.introPath,
       middlePath: middlePath ?? this.middlePath,
@@ -929,6 +1028,12 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
     if (artistLatin.present) {
       map['artist_latin'] = Variable<String>(artistLatin.value);
     }
+    if (artistId.present) {
+      map['artist_id'] = Variable<int>(artistId.value);
+    }
+    if (generationId.present) {
+      map['generation_id'] = Variable<int>(generationId.value);
+    }
     if (releaseYear.present) {
       map['release_year'] = Variable<int>(releaseYear.value);
     }
@@ -953,6 +1058,8 @@ class LocalTracksCompanion extends UpdateCompanion<LocalTrack> {
           ..write('titleLatin: $titleLatin, ')
           ..write('artistAm: $artistAm, ')
           ..write('artistLatin: $artistLatin, ')
+          ..write('artistId: $artistId, ')
+          ..write('generationId: $generationId, ')
           ..write('releaseYear: $releaseYear, ')
           ..write('introPath: $introPath, ')
           ..write('middlePath: $middlePath, ')
@@ -1571,6 +1678,8 @@ typedef $$LocalTracksTableCreateCompanionBuilder =
       Value<String?> titleLatin,
       Value<String?> artistAm,
       Value<String?> artistLatin,
+      Value<int?> artistId,
+      Value<int?> generationId,
       Value<int?> releaseYear,
       Value<String?> introPath,
       Value<String?> middlePath,
@@ -1584,6 +1693,8 @@ typedef $$LocalTracksTableUpdateCompanionBuilder =
       Value<String?> titleLatin,
       Value<String?> artistAm,
       Value<String?> artistLatin,
+      Value<int?> artistId,
+      Value<int?> generationId,
       Value<int?> releaseYear,
       Value<String?> introPath,
       Value<String?> middlePath,
@@ -1626,6 +1737,16 @@ class $$LocalTracksTableFilterComposer
 
   ColumnFilters<String> get artistLatin => $composableBuilder(
     column: $table.artistLatin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get artistId => $composableBuilder(
+    column: $table.artistId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get generationId => $composableBuilder(
+    column: $table.generationId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1684,6 +1805,16 @@ class $$LocalTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get artistId => $composableBuilder(
+    column: $table.artistId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get generationId => $composableBuilder(
+    column: $table.generationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get releaseYear => $composableBuilder(
     column: $table.releaseYear,
     builder: (column) => ColumnOrderings(column),
@@ -1728,6 +1859,14 @@ class $$LocalTracksTableAnnotationComposer
 
   GeneratedColumn<String> get artistLatin => $composableBuilder(
     column: $table.artistLatin,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get artistId =>
+      $composableBuilder(column: $table.artistId, builder: (column) => column);
+
+  GeneratedColumn<int> get generationId => $composableBuilder(
+    column: $table.generationId,
     builder: (column) => column,
   );
 
@@ -1779,6 +1918,8 @@ class $$LocalTracksTableTableManager
                 Value<String?> titleLatin = const Value.absent(),
                 Value<String?> artistAm = const Value.absent(),
                 Value<String?> artistLatin = const Value.absent(),
+                Value<int?> artistId = const Value.absent(),
+                Value<int?> generationId = const Value.absent(),
                 Value<int?> releaseYear = const Value.absent(),
                 Value<String?> introPath = const Value.absent(),
                 Value<String?> middlePath = const Value.absent(),
@@ -1790,6 +1931,8 @@ class $$LocalTracksTableTableManager
                 titleLatin: titleLatin,
                 artistAm: artistAm,
                 artistLatin: artistLatin,
+                artistId: artistId,
+                generationId: generationId,
                 releaseYear: releaseYear,
                 introPath: introPath,
                 middlePath: middlePath,
@@ -1803,6 +1946,8 @@ class $$LocalTracksTableTableManager
                 Value<String?> titleLatin = const Value.absent(),
                 Value<String?> artistAm = const Value.absent(),
                 Value<String?> artistLatin = const Value.absent(),
+                Value<int?> artistId = const Value.absent(),
+                Value<int?> generationId = const Value.absent(),
                 Value<int?> releaseYear = const Value.absent(),
                 Value<String?> introPath = const Value.absent(),
                 Value<String?> middlePath = const Value.absent(),
@@ -1814,6 +1959,8 @@ class $$LocalTracksTableTableManager
                 titleLatin: titleLatin,
                 artistAm: artistAm,
                 artistLatin: artistLatin,
+                artistId: artistId,
+                generationId: generationId,
                 releaseYear: releaseYear,
                 introPath: introPath,
                 middlePath: middlePath,

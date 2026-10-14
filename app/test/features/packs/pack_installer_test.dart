@@ -50,6 +50,8 @@ void main() {
     final tracks = await db.select(db.localTracks).get();
     expect(tracks, hasLength(3));
     for (final t in tracks) {
+      expect(t.artistId, 7);
+      expect(t.generationId, 2);
       expect(t.introPath, 'packs/golden-era/v1/${t.id}-intro.mp3');
       expect(t.middlePath, 'packs/golden-era/v1/${t.id}-middle.mp3');
       expect(fileExists(t.introPath!), isTrue);

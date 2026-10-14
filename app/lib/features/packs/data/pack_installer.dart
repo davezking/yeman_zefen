@@ -170,6 +170,8 @@ class PackInstaller {
               titleLatin: Value(t.titleLatin),
               artistAm: Value(t.artistAm),
               artistLatin: Value(t.artistLatin),
+              artistId: Value(t.artistId),
+              generationId: Value(t.generationId),
               releaseYear: Value(t.releaseYear),
               introPath: Value('packs/${m.slug}/v${m.version}/${t.id}-intro.mp3'),
               middlePath: Value('packs/${m.slug}/v${m.version}/${t.id}-middle.mp3'),

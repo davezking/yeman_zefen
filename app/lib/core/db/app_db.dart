@@ -30,6 +30,12 @@ class LocalTracks extends Table {
   TextColumn get titleLatin => text().nullable()();
   TextColumn get artistAm => text().nullable()();
   TextColumn get artistLatin => text().nullable()();
+
+  /// The artist's catalog id and the track's era (generation). The round engine
+  /// needs both to build same-era and distinct-artist options. Nullable because
+  /// rows written before schema 2 do not have them, and an era can be unknown.
+  IntColumn get artistId => integer().nullable()();
+  IntColumn get generationId => integer().nullable()();
   IntColumn get releaseYear => integer().nullable()();
   TextColumn get introPath => text().nullable()();
   TextColumn get middlePath => text().nullable()();
@@ -55,11 +61,17 @@ class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(localTracks, localTracks.artistId);
+            await m.addColumn(localTracks, localTracks.generationId);
+          }
+        },
       );
 }
 

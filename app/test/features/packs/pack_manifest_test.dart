@@ -14,6 +14,8 @@ void main() {
     expect(m.tracks, hasLength(2));
     expect(m.tracks.first.titleAm, 'ዘፈን 1');
     expect(m.tracks.first.intro.sha256, hasLength(64));
+    expect(m.tracks.first.artistId, 7);
+    expect(m.tracks.first.generationId, 2);
     expect(m.totalBytes, greaterThan(0));
   });
 
@@ -26,6 +28,18 @@ void main() {
     final m = PackManifest.parse(jsonEncode(map));
     expect(m.tracks.single.titleAm, isNull);
     expect(m.tracks.single.releaseYear, isNull);
+  });
+
+  test('accepts a track with no era', () {
+    final map = manifestMap(tracks: 1);
+    ((map['tracks'] as List).first as Map<String, dynamic>)['generationId'] = null;
+    expect(PackManifest.parse(jsonEncode(map)).tracks.single.generationId, isNull);
+  });
+
+  test('rejects a track with no artist id', () {
+    final map = manifestMap(tracks: 1);
+    ((map['tracks'] as List).first as Map<String, dynamic>).remove('artistId');
+    expect(() => PackManifest.parse(jsonEncode(map)), throwsA(isA<PackManifestException>()));
   });
 
   test('ignores unknown fields', () {
