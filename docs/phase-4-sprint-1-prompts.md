@@ -29,15 +29,42 @@ Goal: the real app shell, running on real data, fully bilingual.
 
 ---
 
+## Task: Play-first clip delivery — starter clips, prefetch, clip cache
+
+**Model:** sonnet — new data plumbing under the existing round engine, with download, cache and fallback rules that must never stall a round.
+
+**Context:** Read "Play-first delivery" in `docs/architecture.md` §3. Today the app plays only from installed packs: `PackInstaller` and `ClipDownloader` (`app/lib/features/packs/data/`) download and checksum clips, `local_tracks` in `app/lib/core/db/app_db.dart` holds installed tracks, and `GameLibrary` (`app/lib/features/game/data/game_library.dart`) feeds `RoundGenerator` from them. Manifests are described in `docs/pack-manifest.md`; the published manifests together are the catalog, so no API change is needed. The goal is that a first launch plays at once from clips bundled in the app, online play downloads clips just ahead of use, and offline packs become an optional Settings feature (wired in a later task).
+
+**Do this:**
+1. **Starter clips.** `app/tool/fetch_starter_pack.dart`: fetches the current `starter` pack (via `GET /v1/packs` for the chosen flavor) and writes its manifest and clips to `app/assets/starter/`, verifying every SHA-256. Register the folder in `pubspec.yaml`. Commit the fetched files only if they're under 10 MB in total; otherwise fetch in CI before the build and document it in `docs/ops.md`. On first start (and after an app update that changes the starter manifest), register the starter tracks in the local catalog, playing straight from the assets with no copy if `just_audio` can, otherwise copying them once.
+2. **Local catalog and clip store.** A drift migration adds:
+   - `catalog_tracks`: track metadata from every known manifest, keyed by track id, with clip URLs, checksums, and sizes. It is refreshed from `/v1/packs` and the manifests on start (when online) and every 12 hours.
+   - `clips`: one row per clip on the device (track id, intro or middle, path, bytes, source `starter | stream | pack`, last played at).
+   
+   Migrate the existing `local_tracks` rows into these tables so installed packs keep working, and make `GameLibrary` read from them.
+3. **Round selection.** Tracks to ask about are those whose clip for the current mode is on the device, plus (when online and prefetch is allowed) tracks from the catalog. Distractors can be any catalog track. Keep the existing rules in `RoundGenerator` (variety, no repeats from `recent_sessions`) and its tests passing.
+4. **Prefetcher** (`app/lib/features/packs/data/clip_prefetcher.dart`): when a session starts, keep the clips for the next 5 rounds downloaded, using `ClipDownloader` and checksum verification. When a round comes up and its clip isn't ready, swap in a track whose clip is on the device, so the round never waits on the network. Respect the "Download upcoming songs on mobile data" setting (default on) using `connectivity_plus`. Download only the clip the mode needs.
+5. **Cache cap.** Clips with source `stream` are capped at 50 MB by default (a setting), evicting the least recently played first after each session. `starter` and `pack` clips are never evicted. Expose `clearStreamCache()` and a storage-usage provider for Settings.
+6. Remove the "install a pack first" gate from the Phase 1 spike's start screen.
+7. Tests: a first launch with no network plays a full session from starter clips; a slow fake downloader causes swaps, not waits; eviction keeps pack and starter clips; the `local_tracks` migration keeps installed packs playable; the data saver on cellular plays only on-device clips.
+
+**Before moving on, check:**
+- A fresh install in airplane mode plays a full session.
+- Online, a 10-round session on a throttled connection (Android emulator network speed "EDGE") never shows a wait between rounds.
+- After many sessions, the stream cache stays under its cap and installed packs are untouched.
+- Royalty data is unchanged: each session's `trackIds` lists exactly what was played, whatever the source.
+
+---
+
 ## Task: Wire home, mode select, era/genre select, and settings screens
 
 **Model:** haiku — moving existing screens and connecting them to existing providers.
 
-**Context:** The four screens exist in `app/lib/prototype/screens/`. Real data comes from existing providers: installed packs, generations and genres (from installed manifests), local best scores, auth state, remote config, and settings.
+**Context:** The four screens exist in `app/lib/prototype/screens/`. Real data comes from existing providers: the local catalog and clip store (previous task), generations and genres (from known manifests), local best scores, auth state, remote config, and settings.
 
 **Do this:**
-1. Move each screen to its feature folder per the phase convention and add the provider wrapper. Disable eras with fewer than 4 installed tracks, as designed.
-2. Settings: wire the language toggle, sound, Wi-Fi only, the account section (state only; actions come in Sprint 3), and the privacy policy link.
+1. Move each screen to its feature folder per the phase convention and add the provider wrapper. Disable an era when fewer than 4 of its tracks are playable right now: on the device, or prefetchable when online and prefetch is allowed. Home never asks the player to download a pack.
+2. Settings: wire the language toggle, sound, the account section (state only; actions come in Sprint 3), the privacy policy link, and the "Offline play" entry (its screen comes in the next task).
 3. Make this the app's real `go_router` route tree, replacing the Phase 1 spike screens. Delete the spike screens.
 
 **Before moving on, check:**
@@ -46,19 +73,21 @@ Goal: the real app shell, running on real data, fully bilingual.
 
 ---
 
-## Task: Wire the pack browse and download screen
+## Task: Wire Settings → Offline play: pack download and data settings
 
 **Model:** sonnet — real download state, update detection, and the Wi-Fi rule all have to stay accurate in the UI.
 
-**Context:** The pack browse screen (all states) exists in `app/lib/prototype/screens/`. `PackInstaller` (progress stream, install, upgrade) and `isUpdateAvailable` exist. FR-17 requires notifying users of new or updated packs. Downloads default to Wi-Fi only.
+**Context:** The Settings → Offline play screen (all states) exists in `app/lib/prototype/screens/`. `PackInstaller` (progress stream, install, upgrade), `isUpdateAvailable`, the clip store, `clearStreamCache()`, and the storage-usage provider exist. Packs are optional and live only here (see "Play-first delivery" in `docs/architecture.md` §3). FR-17 requires notifying users of new or updated packs. Pack downloads default to Wi-Fi only.
 
 **Do this:**
-1. Move the screen per the phase convention and drive every state from `PackInstaller`'s progress stream.
+1. Move the screen per the phase convention and drive every pack state from `PackInstaller`'s progress stream. Installing a pack marks its clips `pack` in the clip store; clips already cached from streaming are reused, not downloaded again.
 2. If "Wi-Fi only" is on and the device is on cellular, show the designed confirm dialog with the size before downloading.
-3. Show the update badge on home and the packs tab when an installed pack has a newer version (check on start and every 12 hours).
-4. Delete-pack action frees storage. Downloads continue if the user leaves the screen, and progress is correct on return.
+3. Show the update badge on the Settings tab and the Offline play entry when an installed pack has a newer version (check on start and every 12 hours). Never show a pack prompt on home or before play.
+4. Wire "Wi-Fi only for pack downloads", "Download upcoming songs on mobile data", the storage-used line (starter, cached, packs), the cache cap, and "Clear cache" (stream clips only).
+5. Delete-pack action frees storage (clips the stream cache could still use move to `stream` and fall under its cap). Downloads continue if the user leaves the screen, and progress is correct on return.
 
 **Before moving on, check:**
 - On cellular with Wi-Fi only on, nothing downloads without confirmation.
 - Publishing a new pack version in the admin site makes the badge appear.
 - Leaving and returning mid-download shows correct progress.
+- With "Download upcoming songs on mobile data" off and the device on cellular, a session downloads nothing.

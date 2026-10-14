@@ -54,6 +54,14 @@ The contract between the pack builder (`api/src/lib/packs.ts`) and the app. The 
 
 Unknown fields are rejected by the writer's schema; readers should ignore ones they do not know.
 
+## How the app uses manifests
+
+The app reads every published manifest as its catalog (see "Play-first delivery" in `docs/architecture.md` §3):
+
+- The `starter` pack's manifest and clips are bundled into the app build, so a first launch plays with no network. Keep it small (about 25 tracks, spread across eras) and republish it only when a new app build should pick it up.
+- While a session runs, the app downloads single clips from any manifest ahead of the round that needs them, checking each against its `sha256`.
+- A pack downloaded from Settings → Offline play keeps all its clips on the device for play with no connection.
+
 ## Who may be in a pack
 
 Only tracks that are `approved` with both clips `ready` (file, checksum and size recorded), and that match the

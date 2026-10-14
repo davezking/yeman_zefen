@@ -1,21 +1,22 @@
 # Yeman Zefen (የማን ዘፈን) — Architecture & Roadmap
 
-**Status:** v1 architecture · **Date:** 2026-10-12 · **Builder:** solo, with Claude Code
+**Status:** v1 architecture · **Date:** 2026-10-12 (play-first delivery: 2026-10-14) · **Builder:** solo, with Claude Code
 **Source:** `prd-amharic-music-game.md` (Final v1)
 
 ---
 
 ## 1. Overview
 
-Yeman Zefen is a free, ad-supported music-guessing game for Amharic music. A player hears a short clip, taken from the intro or from the middle of the song, and picks the song or artist from four options. It runs on Android and iOS from one Flutter codebase, plays offline from downloadable song packs, and works in Amharic or English.
+Yeman Zefen is a free, ad-supported music-guessing game for Amharic music. A player hears a short clip, taken from the intro or from the middle of the song, and picks the song or artist from four options. It runs on Android and iOS from one Flutter codebase and works in Amharic or English. The first round plays straight away from clips bundled in the app, upcoming clips download in the background while the player plays, and players who want to play without a connection can download song packs from Settings.
 
-Two audiences shape the design. Domestic players are mostly on Android with limited data, so the game works offline from packs and starts without sign-up. Diaspora players skew iPhone and are worth more in ad revenue, so the app needs global leaderboards and a quality iOS build.
+Two audiences shape the design. Domestic players are mostly on Android with limited data, so the game starts without sign-up or a download, spends little data per round, and can play fully offline from packs. Diaspora players skew iPhone and are worth more in ad revenue, so the app needs global leaderboards and a quality iOS build.
 
 Behind the app sits a catalog operation. A Python scraper and clip cutter feed a curated, admin-reviewed catalog. Packs are built from that catalog, and every play is logged for royalty reporting to the music association.
 
 **Core goals for v1**
 - Make the core loop feel instant: tap, clip plays, answer, feedback.
-- Offline packs, so play costs zero data after download.
+- Play first: nothing (no sign-up, no download prompt) stands between opening the app and the first round.
+- Small, on-demand downloads while playing, and optional offline packs in Settings that make play cost zero data.
 - A catalog that is accurate before players see it, through a review queue.
 - Leaderboards that are hard to cheat, using server-authoritative scoring.
 - Run at $0 hosting at launch scale.
@@ -51,8 +52,10 @@ flowchart LR
   subgraph Device["Flutter app (Android / iOS)"]
     UI[Screens] --> Engine[Round engine]
     Engine --> Player[just_audio]
-    Engine --> LocalDB[(drift: packs, sessions queue, local stats)]
-    Packs[(Downloaded pack files)] --> Player
+    Engine --> LocalDB[(drift: catalog, clip cache, packs, sessions queue, local stats)]
+    Starter[(Starter clips<br/>bundled in the app)] --> Player
+    Cache[(Clip store:<br/>streamed + pack clips)] --> Player
+    Prefetch[Clip prefetcher] --> Cache
   end
 
   subgraph Firebase
@@ -77,7 +80,7 @@ flowchart LR
 
   UI -- sign in --> FA
   UI -- "API calls + Firebase ID token" --> API
-  Device -- "pack + clip downloads" --> R2C
+  Device -- "manifests, prefetched clips, pack downloads" --> R2C
   API --> D1
   Cron --> D1
   Admin --> Access --> API
@@ -94,11 +97,22 @@ flowchart LR
 1. **Catalog in.** Admin clicks "Run scraper". The Worker creates an `ingest_jobs` row and dispatches the `ingest-scrape` workflow. The scraper normalizes and transliterates records, runs the duplicate check, and uploads source audio to `yz-source`. It then POSTs track batches to `/admin/ingest/*` using a Cloudflare Access service token. The Worker upserts tracks, auto-assigns eras, and writes `review_items` for anything uncertain.
 2. **Clips.** Approving a track, or changing its clip start time, dispatches `ingest-cut`. That workflow cuts a 10 s intro clip and a 10 s middle clip, uploads them to `yz-clips`, and registers them with checksums.
 3. **Packs out.** Admin builds a pack version. The Worker writes an immutable manifest to `yz-clips/packs/{slug}/v{n}/manifest.json` and bumps `packs.current_version`.
-4. **Play.** The app lists packs via `/v1/packs`, downloads the manifest and clips from the CDN, verifies SHA-256 checksums, and plays fully offline. Rounds are generated **on the device** from installed packs. This is one code path for online and offline play.
+4. **Play.** Rounds are generated **on the device** from whatever clips are on it. This is one code path for online and offline play. Clips get onto the device in three ways, all stored and checked the same way (SHA-256 against the manifest):
+   - **Starter clips**, bundled in the app build (see "Play-first delivery" below), so the first round needs no network.
+   - **Prefetched clips.** When online, the app lists packs via `/v1/packs` and downloads their manifests (small JSON with every track's metadata and clip URLs). While a session runs, it downloads the clips for the next few rounds in the background. These live in a size-capped cache.
+   - **Offline packs**, downloaded on request from **Settings → Offline play**. Their clips are pinned and never evicted, so play needs no data at all.
 5. **Score.** At session end the app POSTs the round **events** (not a score) to `/v1/sessions`. If offline, it queues them and sends later. The Worker validates the events, computes the score, stores one `game_sessions` row, and updates leaderboard rows if the user is registered.
 6. **Report.** A nightly cron rolls `game_sessions` up into `royalty_daily`, `ad_events_daily`, and `analytics_daily`. The admin site reads only these roll-ups.
 
 > **Design decision (differs from the PRD's endpoint list):** the PRD's `/rounds/next`, `/plays`, and `/scores` are merged into **`POST /v1/sessions`**. Generating rounds on the device is required for offline play anyway. Sending one payload per session keeps D1 writes per session at about 6 rows instead of about 60, which is the main defense against the 100k-writes-per-day free-tier limit. Per-track royalty counts are still exact, because each session row stores the track IDs it played.
+
+> **Design decision: play-first delivery (differs from the PRD's pack-first wording).** The PRD has players download a pack before playing. Asking for a download before the first round is the worst moment for friction, so the app instead:
+> 1. **Bundles a starter set** of about 25 tracks' intro and middle clips (about 8 MB) in the app. They come from a normal pack, `starter`, built in the admin site; a build script copies its manifest and clips into the app's assets. A first launch with no network still plays a full session.
+> 2. **Prefetches as you play.** Online, the app keeps the next 5 rounds' clips downloaded ahead of the round being played. Only the correct track's clip is needed; the three wrong options are names from the manifests. A round whose clip is not ready when it comes up is swapped for a track whose clip is already on the device. At about 160 KB per round, a 10-round session costs about 1.6 MB.
+> 3. **Caches with a cap.** Prefetched clips stay in a cache of 50 MB by default, evicting the least recently played first. Starter and offline-pack clips never count against it or get evicted.
+> 4. **Moves packs to Settings.** "Offline play" in Settings lists packs to download for play with no connection, with "Wi-Fi only" for pack downloads (on by default), "Download upcoming songs on mobile data" (on by default; off is a data saver that plays only from clips already on the device when on cellular), storage used, and "Clear cache".
+>
+> FR-16 and FR-17 still hold: packs are versioned manifests with checksums, cached for offline play, with a notice (a badge on Settings → Offline play) when an installed pack has an update. No API change is needed: the published pack manifests are the catalog the prefetcher reads. A session's `offline` flag means the device had no connection during the session, not that it played from a pack.
 
 **Clip precision.** Clips are **pre-cut files** whose audio starts exactly at the chosen moment. The app always plays from 0 and stops at 3, 5, or 10 s with `ClippingAudioSource`. No seeking happens inside long files, which removes the PRD's precision concern. Format: MP3, CBR 128 kbps, mono or stereo as sourced, about 160 KB per 10 s.
 
@@ -237,7 +251,9 @@ yeman-zefen/
 
 ## 9. Non-functional requirements
 
-**Performance:** p95 under 300 ms for `/v1/packs`, `/v1/leaderboard`, and `/v1/sessions`. A round has no network path at all, since it plays from local files.
+**Performance:** p95 under 300 ms for `/v1/packs`, `/v1/leaderboard`, and `/v1/sessions`. A round has no network path at all, since it always plays from a local file. The network only runs ahead of play, prefetching later rounds' clips.
+
+**Data and storage on the device:** about 160 KB per round when prefetching (about 1.6 MB per 10-round session), zero with the data saver on cellular or with offline packs. Starter clips add about 8 MB to the app download. The clip cache is capped at 50 MB by default.
 
 **Scale and the D1 write budget:** each session writes about 6 rows (1 session, up to 4 leaderboard upserts, 1 user touch). The nightly cron writes about 1,000 to 2,000 rows (royalty rows are at most one per track played that day). At 1,000 DAU with 2 sessions each, that's about 14k writes per day, against a 100k free limit. The limit becomes tight around **12–15k DAU**. At that point, move to Workers Paid at $5/month, which removes the issue at this scale.
 
@@ -254,7 +270,9 @@ yeman-zefen/
 | # | Risk / question | Impact | Proposed handling |
 |---|---|---|---|
 | R-1 | Written license covering **master recordings** | Blocks public launch, not building | Build Phases 1–4 in parallel; gate open beta on the signed license |
-| A-1 | **Clip URLs are public** on the CDN, so anyone can bulk-download clips | May conflict with license terms | Ask the association whether public 10 s clips are acceptable. If not, switch to short-lived signed URLs from the Worker (small change, adds a request per pack download). |
+| A-1 | **Clip URLs are public** on the CDN, so anyone can bulk-download clips | May conflict with license terms | Ask the association whether public 10 s clips are acceptable. If not, switch to short-lived signed URLs from the Worker. Prefetching fetches clips one at a time, so sign per manifest (one Worker request returns signed URLs for a whole manifest) rather than per clip. |
+| A-8 | **Starter clips ship inside the app binary** (play-first delivery, §3) | The license may not cover distributing clips in a store build | Ask the association alongside A-1. If not allowed, ship no starter clips and download the `starter` pack silently on first launch instead; the first round then needs a connection. |
+| A-9 | Prefetching **uses mobile data** without asking | Cost for domestic players on limited data | Small per-round cost (about 160 KB), a data-saver toggle in Settings, and offline packs over Wi-Fi as the zero-data option |
 | A-2 | **Offline sessions are less verifiable** (no server-issued round list) | Weekly board is easier to game offline | v1: sanity bounds + nightly anomaly flags. If abuse appears, give online sessions a server-signed seed and weight or flag offline-only top scores. |
 | A-3 | Sign in with Apple required on iOS (guideline 4.8) | App Store rejection if missing | Included in Phase 3 Sprint 2 |
 | A-4 | ethiozeima's terms of use for automated scraping | Legal exposure separate from the music license | Confirm the site's terms or get permission; keep scraper polite (rate-limited, identifies itself) |
@@ -277,7 +295,7 @@ Model tiers: **Haiku** handles scaffolding and UI over already-built logic. **So
 **Non-engineering tracks running alongside:** M0 (license in writing), catalog curation (ongoing from Phase 1 Sprint 3), and, during Phase 2, the native-speaker Amharic copy review and short tests of the prototype with real players.
 
 ### Phase 1 — Catalog to first playable round (M2 + clip-playback spike)
-*Exit: ~200 approved tracks across all eras in published packs; a bare Flutter build plays a full offline round on a real Android phone and a real iPhone.*
+*Exit: ~200 approved tracks across all eras in published packs; a bare Flutter build plays a full offline round on a real Android phone and a real iPhone. (Phase 1 installs packs from a list in the spike app. Play-first delivery, §3, replaces that flow in Phase 4 Sprint 1 and reuses its download and checksum code.)*
 
 **Sprint 1 — Foundations**
 1. Scaffold monorepo, Worker hello-world, and CLAUDE.md (haiku)
@@ -322,9 +340,9 @@ Model tiers: **Haiku** handles scaffolding and UI over already-built logic. **So
 
 **Sprint 2 — UI: theme, hi-fi screens & clickable prototype**
 1. Flutter theme and component library from tokens (sonnet)
-2. Hi-fi screens, part 1: home, mode, era/genre, packs, settings (sonnet)
+2. Hi-fi screens, part 1: home, mode, era/genre, settings with offline play (sonnet)
 3. Hi-fi screens, part 2: round, feedback, results, leaderboard, sign-in (sonnet)
-4. Edge states: first launch, consent, offline, empty, update, errors (haiku)
+4. Edge states: first launch, consent, offline, out of songs, update, errors (haiku)
 5. Clickable prototype and screenshot export for sign-off (sonnet)
 
 ### Phase 3 — Accounts, scoring & leaderboards (M3)
@@ -356,14 +374,15 @@ Model tiers: **Haiku** handles scaffolding and UI over already-built logic. **So
 
 **Sprint 1 — Production shell & localization**
 1. Production localization and live language toggle (sonnet)
-2. Wire home, mode select, era/genre select, and settings screens (haiku)
-3. Wire the pack browse and download screen (sonnet)
+2. Play-first clip delivery: starter clips, prefetch, clip cache (sonnet)
+3. Wire home, mode select, era/genre select, and settings screens (haiku)
+4. Wire Settings → Offline play: pack download and data settings (sonnet)
 
 **Sprint 2 — Game experience**
 1. Round screen wired to the real engine and audio (sonnet)
 2. Modes, difficulties, and the generation-guess bonus mode (sonnet)
 3. Wire the results screen (haiku)
-4. Edge-case handling: bad audio, corrupt packs, no network (sonnet)
+4. Edge-case handling: bad audio, corrupt clips, no network (sonnet)
 
 **Sprint 3 — Account settings & ads**
 1. Account settings, sign-out, and account deletion (sonnet)

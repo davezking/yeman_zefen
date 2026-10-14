@@ -27,15 +27,15 @@ Goal: turn the designs you approved in artifacts (Sprint 1 handoff package in `d
 
 ---
 
-## Task: Hi-fi screens, part 1 — home, mode, era/genre, packs, settings
+## Task: Hi-fi screens, part 1 — home, mode, era/genre, settings with offline play
 
 **Model:** sonnet — composing polished screens from components to match the approved designs, in two scripts.
 
 **Context:** The approved designs are in `docs/design/artifacts/` (HTML source; read exact sizes and spacing from it) and `docs/design/screens/` (images), with specs in `screens.md`, copy in `copy.md`, and components in `app/lib/core/widgets/`. The prototype runs on **mock data only**, with no services. Move every string from `copy.md` into `app/lib/l10n/app_en.arb` and `app_am.arb` now; the production phase reuses them.
 
 **Do this:**
-1. `app/lib/prototype/mock_data.dart`: realistic mock data with about 20 real-looking tracks across all five eras (Fidel and Latin names), 4 packs in different download states, and a mock user (guest and registered variants).
-2. Screens in `app/lib/prototype/screens/`, each a widget taking plain data plus callbacks (no providers inside), so Phase 4 can wire them up directly: home (guest and returning variants), mode select (intro / middle / era-guess, plus difficulty), era & genre select (including disabled eras with "download a pack"), pack browse (not installed, downloading, installed, update available, delete confirm, cellular confirm), and settings (language toggle, sounds, Wi-Fi only, account section in guest and registered variants, privacy options entry).
+1. `app/lib/prototype/mock_data.dart`: realistic mock data with about 20 real-looking tracks across all five eras (Fidel and Latin names), 4 packs in different download states, clip-cache usage (MB used of the cap), and a mock user (guest and registered variants).
+2. Screens in `app/lib/prototype/screens/`, each a widget taking plain data plus callbacks (no providers inside), so Phase 4 can wire them up directly: home (guest and returning variants), mode select (intro / middle / era-guess, plus difficulty), era & genre select (eras with too few songs available are disabled, offline only, with "download a pack in Settings"), settings (language toggle, sounds, account section in guest and registered variants, privacy options entry, and an "Offline play" entry with an update badge variant), and **Settings → Offline play** (pack list: not installed, downloading, installed, update available, delete confirm, cellular confirm; plus "Wi-Fi only for pack downloads", "Download upcoming songs on mobile data", storage used, and "Clear cache"). Home has no pack prompt; see "Play-first delivery" in `docs/architecture.md` §3.
 3. Use the ARB strings, with a live `am`/`en` switch.
 
 **Before moving on, check:**
@@ -76,7 +76,7 @@ Goal: turn the designs you approved in artifacts (Sprint 1 handoff package in `d
 **Context:** `screens.md` lists the implied states. Components and the screen pattern from parts 1 and 2 exist in `app/lib/prototype/screens/`.
 
 **Do this:**
-1. Add prototype screens for: first launch (what a guest sees before the first round, with nothing blocking play), an ad-consent placeholder (where the UMP form appears, and the in-settings privacy options entry), forced update, offline banners and full-screen offline states, no packs installed, generic error with retry, and loading skeletons for the leaderboard and pack list.
+1. Add prototype screens for: first launch (what a guest sees before the first round: straight into play from the bundled starter clips, with no download or sign-up prompt), an ad-consent placeholder (where the UMP form appears, and the in-settings privacy options entry), forced update, offline banners and full-screen offline states, out of songs (offline and every clip on the device recently played, with a link to Settings → Offline play), next clip still downloading (a short wait on a slow connection), generic error with retry, and loading skeletons for the leaderboard and the offline-play pack list.
 2. Use only existing components and tokens. If a new component is truly needed, add it to `app/lib/core/widgets/` and the gallery.
 
 **Before moving on, check:**
@@ -92,7 +92,7 @@ Goal: turn the designs you approved in artifacts (Sprint 1 handoff package in `d
 **Context:** All prototype screens exist in `app/lib/prototype/screens/` with mock data. The navigation between screens is described in `docs/design/screens.md`. The sign-off review needs screenshots in both languages and two sizes, and a prototype to try on a phone. Golden tests render text as blank boxes unless real fonts are loaded in the test.
 
 **Do this:**
-1. `app/lib/main_prototype.dart`: wire every flow with `go_router` over mock data (first launch → session → results → register; packs; leaderboard; settings toggle; account deletion). Add a hidden debug menu to jump to any screen or state, and to switch guest/registered, online/offline, and `en`/`am`. Make it buildable as its own entry point on both platforms.
+1. `app/lib/main_prototype.dart`: wire every flow with `go_router` over mock data (first launch → session → results → register; settings → offline play → pack download; leaderboard; settings toggle; account deletion). Add a hidden debug menu to jump to any screen or state, and to switch guest/registered, online/offline, and `en`/`am`. Make it buildable as its own entry point on both platforms.
 2. Golden tests in `app/test/design/`: render every screen and state in `en` and `am`, at 360×780 and 430×932. Load Noto Sans Ethiopic and the Latin family with `FontLoader` so Fidel renders. Add a script `app/tool/export_screens.sh` that updates the goldens and copies them to `docs/design/flutter/<screen>-<state>-<lang>-<size>.png`.
 3. `docs/design/review.md`: a gallery page placing each Flutter screenshot next to its approved artifact design plus a sign-off checklist covering: every PRD key screen in both languages; native-speaker Amharic review done; 3–5 target users (domestic and diaspora) tried the prototype, with notes; accessibility checks; and your approval line with date.
 

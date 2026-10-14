@@ -9,10 +9,10 @@ Work through the steps in order, in one chat or a Project, so the context carrie
 ## Step 1 — Brief, screen list, and copy
 
 Ask Claude to draft, from the PRD (attach it):
-- **A short design brief:** the two personas, tone (warm and nostalgic, never childish), principles (one-thumb play, Fidel-first typography, nothing blocks the first round), and accessibility targets (WCAG AA contrast, 48 dp touch targets, text scale up to 1.3).
+- **A short design brief:** the two personas, tone (warm and nostalgic, never childish), principles (one-thumb play, Fidel-first typography, nothing blocks the first round: no sign-up and no download prompt, see "Play-first delivery" in `docs/architecture.md` §3), and accessibility targets (WCAG AA contrast, 48 dp touch targets, text scale up to 1.3).
 - **The full screen list, with states for each:**
-  - The PRD's key screens: home, mode select, era & genre select, round, correct/wrong feedback, results, leaderboard, pack browse & download, sign-in / register prompt, and settings with the language toggle.
-  - Screens the PRD implies but doesn't list: first launch, ad-consent placement, forced update, offline, no packs installed, errors, and loading.
+  - The PRD's key screens: home, mode select, era & genre select, round, correct/wrong feedback, results, leaderboard, sign-in / register prompt, and settings with the language toggle. Pack browse & download lives **inside settings** as "Offline play", not on home or in onboarding.
+  - Screens the PRD implies but doesn't list: first launch (straight into play from the bundled starter clips), ad-consent placement, forced update, offline, out of songs (offline and every clip on the device recently played, pointing to Settings → Offline play), next clip still downloading, errors, and loading.
 - **A copy deck:** every string in English and Amharic.
 
 You review the Amharic yourself or with a native speaker you trust.

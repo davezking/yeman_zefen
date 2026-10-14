@@ -10,7 +10,7 @@ Goal: the core loop at production quality, with all modes and difficulties, the 
 
 **Model:** sonnet — the most important screen; real audio timing has to match the designed motion and pacing.
 
-**Context:** `ClipPlayer` (preloading, start latency already measured in `docs/spikes/clip-playback.md`), `RoundGenerator`, `Scorer`, and `SessionRecorder` exist. The approved round screen, with all its states, is in `app/lib/prototype/screens/` (plain data plus callbacks; it currently runs on a fake timer). Follow the phase convention from Sprint 1: move it to `features/game/ui/` and wire it, don't restyle. Rules: the answer window is clip length + 5 s, and the response timer starts when audio actually starts.
+**Context:** `ClipPlayer` (preloading, start latency already measured in `docs/spikes/clip-playback.md`), `RoundGenerator`, `Scorer`, `SessionRecorder`, and the clip prefetcher (downloads upcoming rounds' clips and swaps in an on-device track when one isn't ready) exist. The approved round screen, with all its states, is in `app/lib/prototype/screens/` (plain data plus callbacks; it currently runs on a fake timer). Follow the phase convention from Sprint 1: move it to `features/game/ui/` and wire it, don't restyle. Rules: the answer window is clip length + 5 s, and the response timer starts when audio actually starts.
 
 **Do this:**
 1. Move the round screen and drive each of its states from the real engine:
@@ -19,7 +19,7 @@ Goal: the core loop at production quality, with all modes and difficulties, the 
    - A countdown bar for the answer window.
    - Four option tiles using the shared component.
    - A "replay" button only if the approved screen includes it. If it does, record replays in the round event as `replays` and agree with yourself whether replays affect points; update `docs/scoring.md` and both scorers' fixtures if so.
-2. Answer flow: stop audio immediately, lock input, animate correct and wrong states (and reveal the correct option), show points earned, then advance after the designed delay. The next clip is already preloaded.
+2. Answer flow: stop audio immediately, lock input, animate correct and wrong states (and reveal the correct option), show points earned, then advance after the designed delay. The next clip is already downloaded (prefetcher) and preloaded (`ClipPlayer`).
 3. Handle app backgrounding mid-round: pause audio and timer, and show a resume overlay on return. A backgrounded round doesn't count toward response time.
 4. Optional haptics and sound effects, gated by settings.
 
@@ -66,20 +66,20 @@ Goal: the core loop at production quality, with all modes and difficulties, the 
 
 ---
 
-## Task: Edge-case handling — bad audio, corrupt packs, no network
+## Task: Edge-case handling — bad audio, corrupt clips, no network
 
 **Model:** sonnet — several failure paths that must degrade gracefully and report back.
 
-**Context:** The PRD lists these cases: missing or short audio (skip the track and flag it to admin), a corrupted pack download (re-fetch on checksum mismatch), duplicate score submissions (already idempotent), clock skew (server time wins, already handled), no network at launch (play cached packs), and guest-to-account link failure (keep local scores and retry the link).
+**Context:** The PRD lists these cases: missing or short audio (skip the track and flag it to admin), a corrupted pack download (re-fetch on checksum mismatch), duplicate score submissions (already idempotent), clock skew (server time wins, already handled), no network at launch (play clips already on the device: starter, cached, and offline packs; see "Play-first delivery" in `docs/architecture.md` §3), and guest-to-account link failure (keep local scores and retry the link).
 
 **Do this:**
-1. Audio failure during a round (file missing, decode error, or under 1 s of audio): skip the round without penalty, mark the track `broken` locally so it's excluded until the pack is re-verified, and report it via a new `POST /v1/reports/clip { trackId, clipType, error }` that creates a deduplicated `review_items` row (`missing_audio`). Add a rate limit of 10 reports per user per day.
-2. On app start, re-verify installed packs' checksums in the background, once per pack version, then weekly. On a mismatch, re-download just the bad files.
-3. No network at launch: the app goes straight to home with installed packs. The leaderboard and packs screens show an offline state with retry.
+1. Audio failure during a round (file missing, decode error, or under 1 s of audio): skip the round without penalty, mark the clip `broken` locally so it's excluded until it's re-downloaded and verified, and report it via a new `POST /v1/reports/clip { trackId, clipType, error }` that creates a deduplicated `review_items` row (`missing_audio`). Add a rate limit of 10 reports per user per day.
+2. On app start, re-verify clip checksums in the background: pack clips once per pack version, then weekly; cached clips weekly. On a mismatch, re-download just the bad files (a cached clip can simply be dropped). A starter clip that fails is excluded until the next app update.
+3. No network at launch: the app goes straight to home and plays from clips on the device. A prefetch that fails mid-session swaps rounds silently, never blocking. The leaderboard and Settings → Offline play show an offline state with retry.
 4. Link failures: show a friendly error, keep guest data intact, and offer a retry. Never leave the app signed out.
-5. Zero installed packs and offline: show a clear empty state explaining that a first download is needed.
+5. Offline with every on-device clip played recently: keep playing (repeats are better than nothing) but show the designed "out of songs" note pointing to Settings → Offline play.
 
 **Before moving on, check:**
 - Manually deleting a clip file mid-session skips that round and later shows up in the admin review queue.
 - Corrupting one byte of a clip file gets it repaired on the next launch.
-- Airplane-mode cold start reaches a playable home screen.
+- Airplane-mode cold start on a fresh install reaches a playable home screen and plays a full session from the starter clips.

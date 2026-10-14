@@ -20,7 +20,7 @@ Goal: every player, guest included, has a Firebase identity. The Worker verifies
 
 **Before moving on, check:**
 - A fresh install on both platforms gets an anonymous UID with no UI shown.
-- Launching in airplane mode still reaches the game and plays installed packs.
+- Launching in airplane mode still reaches the game and plays the clips already on the device (starter clips, cached clips, offline packs).
 - The UID persists across app restarts.
 
 ---
