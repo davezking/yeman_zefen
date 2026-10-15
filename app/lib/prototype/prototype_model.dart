@@ -8,6 +8,41 @@ import 'models.dart';
 /// What the next sign-in attempt does, for trying the error states.
 enum SignInOutcome { works, linkFails }
 
+/// How the second round's clip arrives, for trying the "next song loading"
+/// state: on the phone already, after 3 s, or never (skipped after 10 s).
+enum ClipArrival { onTime, slow, never }
+
+/// A short notice for the bottom of the screen.
+sealed class Toast {
+  const Toast();
+}
+
+/// The connection dropped during a game.
+class OfflineToast extends Toast {
+  const OfflineToast();
+}
+
+/// Games finished offline, waiting to be sent.
+class PendingToast extends Toast {
+  const PendingToast(this.count);
+  final int count;
+}
+
+/// Back online, and the waiting games were sent.
+class SyncedToast extends Toast {
+  const SyncedToast();
+}
+
+/// Back online, but sending the waiting games failed.
+class SyncFailedToast extends Toast {
+  const SyncFailedToast();
+}
+
+/// A round was skipped because its clip did not arrive.
+class SkippedToast extends Toast {
+  const SkippedToast();
+}
+
 /// The prototype's whole state, on mock data. It stands in for the services
 /// that Phase 4 wires to the screens, and exists only here: no screen imports it.
 class PrototypeModel extends ChangeNotifier {
@@ -62,6 +97,73 @@ class PrototypeModel extends ChangeNotifier {
   /// Apple's button is iOS only; the lab can show it anywhere.
   bool showApple = defaultTargetPlatform == TargetPlatform.iOS;
 
+  // ---- edge states ----
+
+  /// The first launch: language, then welcome, then straight into a game.
+  bool firstLaunch = false;
+
+  /// Google's UMP says consent is required here (the EEA, the UK).
+  bool consentRequired = true;
+  bool consentDone = false;
+
+  /// `/v1/config` asks for a newer version than this one.
+  bool updateRequired = false;
+
+  /// Offline, every song on the phone was played recently.
+  bool allSongsPlayed = false;
+  ClipArrival nextClip = ClipArrival.onTime;
+
+  /// The leaderboard and the pack list take 2 s to load.
+  bool slowLists = false;
+
+  /// The next leaderboard load fails (once).
+  bool boardFails = false;
+
+  /// Sending games played offline fails when the connection comes back.
+  bool syncFails = false;
+  int pendingGames = 0;
+
+  /// A game is on screen (the connection dropping is worth a notice then).
+  bool inGame = false;
+
+  final _toasts = StreamController<Toast>.broadcast();
+
+  /// Short notices for the bottom of the screen.
+  Stream<Toast> get toasts => _toasts.stream;
+  void toast(Toast t) => _toasts.add(t);
+
+  /// How long round [index]'s clip takes to arrive (only the second round's
+  /// is ever late, so the first round always plays).
+  Duration? clipLoadTime(int index) => index != 1
+      ? null
+      : switch (nextClip) {
+          ClipArrival.onTime => null,
+          ClipArrival.slow => const Duration(seconds: 3),
+          ClipArrival.never => const Duration(seconds: 30),
+        };
+
+  /// The connection changes. Coming back online sends the games played
+  /// offline; dropping during a game is noted.
+  void setConnection(Connection value) {
+    final before = connection;
+    connection = value;
+    if (before == Connection.offline &&
+        value != Connection.offline &&
+        pendingGames > 0) {
+      if (syncFails) {
+        toast(const SyncFailedToast());
+      } else {
+        pendingGames = 0;
+        toast(const SyncedToast());
+      }
+    } else if (before != Connection.offline &&
+        value == Connection.offline &&
+        inGame) {
+      toast(const OfflineToast());
+    }
+    notifyListeners();
+  }
+
   final _tickers = <String, Timer>{};
 
   bool get offline => connection == Connection.offline;
@@ -98,6 +200,10 @@ class PrototypeModel extends ChangeNotifier {
   /// Returns what Results shows.
   ResultsView finishGame(List<RoundResult> rounds, int score, bool newBest) {
     gamesFinished++;
+    if (offline && forcedSync == null) {
+      pendingGames++;
+      toast(PendingToast(pendingGames));
+    }
     final before = user;
     if (newBest) {
       user = before.isGuest
@@ -257,6 +363,7 @@ class PrototypeModel extends ChangeNotifier {
     for (final t in _tickers.values) {
       t.cancel();
     }
+    _toasts.close();
     super.dispose();
   }
 }

@@ -80,7 +80,8 @@ Compare it with the screenshots in `docs/design/screens/`. There is no dark them
 
 The hi-fi screens on mock data, with no services or config. Home, Mode select, Era & genre, Settings, Settings ›
 Offline play, the round (all its states), Results, the leaderboard and the sign-in sheets (account choice, email,
-display name) are in; edge states (first launch, consent, offline, empty, update, errors) are next.
+display name) are in, with the edge states: first launch, ad consent, forced update, offline notices, out of songs,
+a late next song, a generic error and loading skeletons.
 
 ```sh
 flutter run -t lib/main_prototype.dart
@@ -93,7 +94,20 @@ stopped, and an ad follows every 3rd round. Backgrounding the app pauses it. Wit
 reveal pop, the score count-up, the sheet slide and the cassette reels become plain fades or stand still.
 
 The flask icon at the top right opens a dev-only sheet for trying the variants: signed in, first run, offline, mobile
-data, a failing download or sign-in, the state of the score on Results, an empty or saved leaderboard.
+data, a failing download or sign-in, the state of the score on Results, an empty or saved leaderboard. Its "Edge
+states" part sets the rest:
+
+- First launch: `main_prototype.dart` starts here (wordmark, then language, welcome, and straight into a game from the
+  built-in songs, with no download or sign-up asked). The toggle replays it.
+- Ad consent required: after the first finished game, the consent screen and then a placeholder where Google's UMP form
+  appears, then Results. Settings › Ad privacy choices opens the same placeholder.
+- Update required: the forced-update screen replaces Home; "Play offline" plays the songs on the phone.
+- Every song played recently: offline, Play shows "out of songs" (browse packs, or play them again).
+- Round 2's clip: on time, after 3 s ("Getting the next song…"), or never (skipped after 10 s, with a notice).
+- Lists load slowly: the leaderboard and Offline play's pack list show their loading state for 2 s (skeletons after
+  300 ms). Leaderboard fails: the next load shows the error, and Try again loads it.
+- Sending offline games fails: games finished offline wait ("1 games waiting to be sent"); coming back online sends them,
+  or says it will try again. Going offline mid-game shows a short notice.
 
 - `lib/prototype/screens/`: one widget per screen (or sheet). Each takes plain data (`models.dart`) and callbacks, and imports no
   provider or service (`test/prototype/prototype_guards_test.dart` checks the imports). Phase 4 builds the same data
@@ -104,7 +118,7 @@ data, a failing download or sign-in, the state of the score on Results, an empty
   fails when they differ). A key `round.hint.watch` is `roundHintWatch`. After editing an ARB file, `flutter gen-l10n`
   regenerates `lib/l10n/app_localizations*.dart` (they are committed).
 - `test/prototype/screens_layout_test.dart` renders every screen variant in both languages at text scale 1.0 and 1.3
-  on a 360 dp phone and fails on any overflow.
+  on a 360 dp phone and fails on any overflow. `test/prototype/edge_states_test.dart` walks each edge state.
 
 ## Fonts
 

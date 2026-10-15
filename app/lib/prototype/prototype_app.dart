@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
@@ -8,6 +10,8 @@ import 'prototype_lab.dart';
 import 'prototype_flow.dart';
 import 'prototype_model.dart';
 import 'screens/home_screen.dart';
+import 'screens/message_screens.dart';
+import 'screens/onboarding_screens.dart';
 import 'screens/mode_select_screen.dart';
 import 'screens/offline_play_screen.dart';
 import 'screens/settings_screen.dart';
@@ -18,13 +22,18 @@ import 'screens/setup_screen.dart';
 /// `flutter run -t lib/main_prototype.dart`.
 ///
 /// Play and Start play a game on a fake clock (no audio), then Results and the
-/// leaderboard; Settings and Results open the sign-in sheets. Only the About,
-/// privacy and ad-privacy rows are still stubs.
+/// leaderboard; Settings and Results open the sign-in sheets. The edge states
+/// (first launch, consent, forced update, offline, out of songs, loading,
+/// errors) are reached from the dev sheet. Only the About and privacy policy
+/// rows are stubs.
 class PrototypeApp extends StatefulWidget {
-  const PrototypeApp({super.key, this.model});
+  const PrototypeApp({super.key, this.model, this.showAppStart = false});
 
   /// Tests pass their own model to start in a given state.
   final PrototypeModel? model;
+
+  /// Show the app-start screen for a moment first.
+  final bool showAppStart;
 
   @override
   State<PrototypeApp> createState() => _PrototypeAppState();
@@ -35,11 +44,61 @@ class _PrototypeAppState extends State<PrototypeApp> {
   final _navigator = GlobalKey<NavigatorState>();
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _themes = <String, ThemeData>{};
+  late bool _starting = widget.showAppStart;
+  Timer? _startTimer;
+  StreamSubscription<Toast>? _toasts;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_starting) {
+      _startTimer = Timer(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => _starting = false);
+      });
+    }
+    _toasts = _model.toasts.listen(_showToast);
+  }
 
   @override
   void dispose() {
+    _startTimer?.cancel();
+    _toasts?.cancel();
     if (widget.model == null) _model.dispose();
     super.dispose();
+  }
+
+  void _showToast(Toast toast) {
+    final context = _navigator.currentContext;
+    if (context == null) return;
+    final l10n = AppLocalizations.of(context);
+    final text = switch (toast) {
+      OfflineToast() => l10n.offlineBannerShort,
+      PendingToast(:final count) => l10n.offlinePending(count),
+      SyncedToast() => l10n.offlineSynced,
+      SyncFailedToast() => l10n.errorSync,
+      SkippedToast() => l10n.feedbackSkipped,
+    };
+    _messenger.currentState
+      ?..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// What the first page is: app start, the forced update, first launch, or Home.
+  Widget _firstPage() {
+    if (_starting) return const AppStartScreen();
+    if (_model.updateRequired) {
+      return ForcedUpdateScreen(
+        ios: _model.showApple,
+        onUpdate: _notBuilt,
+        // Plays the songs on the phone, with no network features.
+        onPlayOffline: () => _model.update(() {
+          _model.updateRequired = false;
+          _model.setConnection(Connection.offline);
+        }),
+      );
+    }
+    if (_model.firstLaunch) return _FirstLaunch(model: _model);
+    return _HomeRoute(model: _model, onNotBuilt: _notBuilt);
   }
 
   ThemeData _themeFor(Locale locale) =>
@@ -73,7 +132,7 @@ class _PrototypeAppState extends State<PrototypeApp> {
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) =>
               PrototypeLab(model: _model, navigator: _navigator, child: child!),
-          home: _HomeRoute(model: _model, onNotBuilt: _notBuilt),
+          home: _firstPage(),
         );
       },
     );
@@ -205,7 +264,7 @@ class _SettingsRoute extends StatelessWidget {
         onOfflinePlay: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => _OfflineRoute(model: model)),
         ),
-        onAdPrivacy: onNotBuilt,
+        onAdPrivacy: () => showUmpForm(context, model),
         onPrivacy: onNotBuilt,
         onAbout: onNotBuilt,
         onHome: () => Navigator.of(context).pop(),
@@ -215,16 +274,44 @@ class _SettingsRoute extends StatelessWidget {
   }
 }
 
-class _OfflineRoute extends StatelessWidget {
+/// Settings › Offline play. With slow lists on, the packs to download take 2 s
+/// to appear (a skeleton shows meanwhile).
+class _OfflineRoute extends StatefulWidget {
   const _OfflineRoute({required this.model});
 
   final PrototypeModel model;
 
   @override
+  State<_OfflineRoute> createState() => _OfflineRouteState();
+}
+
+class _OfflineRouteState extends State<_OfflineRoute> {
+  late bool _loading = widget.model.slowLists && !widget.model.offline;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_loading) {
+      _timer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _loading = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final model = widget.model;
     return ListenableBuilder(
       listenable: model,
       builder: (context, _) => OfflinePlayScreen(
+        loadingPacks: _loading,
         wifiOnly: model.wifiOnly,
         mobilePrefetch: model.mobilePrefetch,
         cache: model.cache,
@@ -246,19 +333,78 @@ class _OfflineRoute extends StatelessWidget {
   }
 }
 
+/// First launch: the language, then the welcome, then round 1 of an
+/// All eras · Intro · Easy game from the songs that come with the app.
+class _FirstLaunch extends StatefulWidget {
+  const _FirstLaunch({required this.model});
+
+  final PrototypeModel model;
+
+  @override
+  State<_FirstLaunch> createState() => _FirstLaunchState();
+}
+
+class _FirstLaunchState extends State<_FirstLaunch> {
+  bool _welcome = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final model = widget.model;
+    if (!_welcome) {
+      return LanguageScreen(
+        languageCode: model.languageCode,
+        onLanguage: (code) => model.update(() => model.languageCode = code),
+        onNext: () => setState(() => _welcome = true),
+      );
+    }
+    final locale = Localizations.localeOf(context);
+    return WelcomeScreen(
+      sampleAnswers: [
+        for (final t in mockTracks.take(1)) t.artist(locale),
+        mockWelcomeSecondAnswer(locale),
+      ],
+      onStart: () {
+        model.update(() {
+          model.quickPlay = const PlaySettings();
+          model.firstLaunch = false;
+        });
+        _startGame(context, model);
+      },
+    );
+  }
+}
+
 /// Plays a game with what the Play button starts. "Change era or mode" on its
 /// Results goes back to Home and opens Mode select, whichever screen started it.
 void _startGame(BuildContext context, PrototypeModel model) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => RoundRoute(
-        model: model,
-        onChangeSettings: (context) => Navigator.of(context)
-          ..popUntil((route) => route.isFirst)
-          ..push(
-            MaterialPageRoute<void>(builder: (_) => _ModeRoute(model: model)),
+  // Offline with every song on the phone heard recently: nothing new to play.
+  if (model.offline && model.allSongsPlayed) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => OutOfSongsScreen(
+          onBrowsePacks: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => _OfflineRoute(model: model),
+            ),
           ),
+          // A game that allows the recently played songs.
+          onReplay: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => _roundPage(model)),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+    return;
+  }
+  Navigator.of(context)
+      .push(MaterialPageRoute<void>(builder: (_) => _roundPage(model)));
 }
+
+/// A game of what Play starts. "Change era or mode" on its Results goes back
+/// to Home and opens Mode select, whichever screen started it.
+Widget _roundPage(PrototypeModel model) => RoundRoute(
+  model: model,
+  onChangeSettings: (context) => Navigator.of(context)
+    ..popUntil((route) => route.isFirst)
+    ..push(MaterialPageRoute<void>(builder: (_) => _ModeRoute(model: model))),
+);

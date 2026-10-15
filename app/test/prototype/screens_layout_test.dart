@@ -5,6 +5,8 @@ import 'package:yeman_zefen/prototype/mock_data.dart';
 import 'package:yeman_zefen/prototype/models.dart';
 import 'package:yeman_zefen/prototype/screens/home_screen.dart';
 import 'package:yeman_zefen/prototype/screens/leaderboard_screen.dart';
+import 'package:yeman_zefen/prototype/screens/message_screens.dart';
+import 'package:yeman_zefen/prototype/screens/onboarding_screens.dart';
 import 'package:yeman_zefen/prototype/screens/mode_select_screen.dart';
 import 'package:yeman_zefen/prototype/screens/offline_play_screen.dart';
 import 'package:yeman_zefen/prototype/screens/results_screen.dart';
@@ -259,6 +261,51 @@ void main() {
   );
 
   final screens = <String, Widget Function()>{
+    'app start': () => const AppStartScreen(),
+    'first launch: language, English': () => LanguageScreen(
+      languageCode: 'en',
+      onLanguage: _noopString,
+      onNext: _noop,
+    ),
+    'first launch: language, Amharic': () => LanguageScreen(
+      languageCode: 'am',
+      onLanguage: _noopString,
+      onNext: _noop,
+    ),
+    'first launch: welcome': () => WelcomeScreen(
+      sampleAnswers: const ['Mahmoud Ahmed', 'Aster Aweke'],
+      onStart: _noop,
+    ),
+    'ad consent': () => ConsentScreen(onContinue: _noop),
+    "ad consent: Google's form": () => sheet(UmpFormPlaceholder(onDone: _noop)),
+    'forced update, Android': () =>
+        ForcedUpdateScreen(ios: false, onUpdate: _noop, onPlayOffline: _noop),
+    'forced update, iOS': () =>
+        ForcedUpdateScreen(ios: true, onUpdate: _noop, onPlayOffline: _noop),
+    'out of songs': () =>
+        OutOfSongsScreen(onBrowsePacks: _noop, onReplay: _noop),
+    'generic error': () => ErrorScreen(onRetry: _noop),
+    'round: next song loading': () => round(
+      roundView(phase: RoundPhase.loading, playing: false, secondsLeft: 15),
+    ),
+    'leaderboard: loading': () => board(state: LeaderboardState.loading),
+    'offline play: packs loading': () => OfflinePlayScreen(
+      loadingPacks: true,
+      wifiOnly: true,
+      mobilePrefetch: true,
+      cache: mockCache,
+      builtInSongCount: mockBuiltInSongCount,
+      packs: mockPacks,
+      connection: Connection.wifi,
+      onBack: _noop,
+      onWifiOnly: _noopBool,
+      onMobilePrefetch: _noopBool,
+      onClearCache: _noop,
+      onDownload: _noopString,
+      onCancel: _noopString,
+      onRetry: _noopString,
+      onRemove: _noopString,
+    ),
     'round: clip playing': () => round(roundView()),
     'round: clip ended, still answering': () =>
         round(roundView(playing: false, secondsLeft: 3)),
@@ -476,7 +523,10 @@ void main() {
             locale: locale,
             textScale: scale,
           );
+          // Skeletons appear after a short delay; lay them out too.
+          await tester.pump(const Duration(milliseconds: 400));
           expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
         });
       }
     }
