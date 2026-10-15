@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_text.dart';
-import '../theme/theme_context.dart';
 import '../theme/tokens.dart';
 
 /// The page layout most screens share: a yellow [hero] with a curved bottom, and
@@ -89,9 +88,11 @@ class HeroScaffold extends StatelessWidget {
       final theme = Theme.of(context);
       final locale = Localizations.localeOf(context);
       page = Theme(
+        // Swaps the text styles only; every other extension is kept.
         data: theme.copyWith(
           extensions: [
-            context.game,
+            for (final e in theme.extensions.values)
+              if (e is! AppTextStyles) e,
             AppTextStyles.forLocale(locale, dense: true),
           ],
         ),

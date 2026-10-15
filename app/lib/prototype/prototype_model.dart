@@ -13,7 +13,16 @@ class PrototypeModel extends ChangeNotifier {
     this.user = mockGuest,
     this.connection = Connection.wifi,
     List<PackItem> packs = mockPacks,
-  }) : packs = List.of(packs);
+    bool resumeDownloads = true,
+  }) : packs = List.of(packs) {
+    // The mock data has a download under way: keep it moving. Tests that do
+    // not want timers running pass false.
+    if (resumeDownloads) {
+      for (final p in this.packs) {
+        if (p.status == PackStatus.downloading) _startTicker(p.id);
+      }
+    }
+  }
 
   String languageCode;
   bool soundOn = true;
@@ -75,41 +84,49 @@ class PrototypeModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Downloads a pack, or the update of one already on the phone.
   void download(String id) {
     final problem = failNextDownload;
     failNextDownload = null;
     setPack(
       id,
-      (p) => PackItem(
-        id: p.id,
-        nameAm: p.nameAm,
-        nameEn: p.nameEn,
-        generationId: p.generationId,
-        songCount: p.songCount,
-        sizeMb: p.sizeMb,
+      (p) => p.copyWith(
         status: PackStatus.downloading,
         progress: 0,
-        updateSizeMb: p.updateSizeMb,
+        updating: p.isOnPhone,
+        clearProblem: true,
       ),
     );
     _startTicker(id, failWith: problem);
   }
 
+  /// Stops a download. An update goes back to waiting; the installed version stays.
   void cancel(String id) {
     _tickers.remove(id)?.cancel();
     setPack(
       id,
-      (p) => p.copyWith(status: PackStatus.notInstalled, clearProgress: true),
+      (p) => p.updating ? _backToUpdateAvailable(p) : _notInstalled(p),
     );
   }
 
   void remove(String id) {
     _tickers.remove(id)?.cancel();
-    setPack(
-      id,
-      (p) => p.copyWith(status: PackStatus.notInstalled, clearProgress: true),
-    );
+    setPack(id, _notInstalled);
   }
+
+  PackItem _notInstalled(PackItem p) => p.copyWith(
+    status: PackStatus.notInstalled,
+    clearProgress: true,
+    clearProblem: true,
+    updating: false,
+  );
+
+  PackItem _backToUpdateAvailable(PackItem p) => p.copyWith(
+    status: PackStatus.updateAvailable,
+    clearProgress: true,
+    clearProblem: true,
+    updating: false,
+  );
 
   void _startTicker(String id, {PackProblem? failWith}) {
     _tickers.remove(id)?.cancel();
@@ -127,6 +144,13 @@ class PrototypeModel extends ChangeNotifier {
             shortfallMb: failWith == PackProblem.storageFull ? 8 : null,
           ),
         );
+        // A corrupt file is fetched again without asking, as the error says.
+        if (failWith == PackProblem.corrupt) {
+          _tickers[id] = Timer(const Duration(seconds: 2), () {
+            _tickers.remove(id);
+            download(id);
+          });
+        }
       } else if (next >= 1) {
         timer.cancel();
         _tickers.remove(id);
@@ -138,8 +162,11 @@ class PrototypeModel extends ChangeNotifier {
           _tickers.remove(id);
           setPack(
             id,
-            (p) =>
-                p.copyWith(status: PackStatus.installed, clearProgress: true),
+            (p) => p.copyWith(
+              status: PackStatus.installed,
+              clearProgress: true,
+              clearUpdate: true,
+            ),
           );
         });
       } else {

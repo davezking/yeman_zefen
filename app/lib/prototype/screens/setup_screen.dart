@@ -160,7 +160,10 @@ class SetupScreen extends StatelessWidget {
         ],
         footer: PrimaryButton(
           label: l10n.setupStart(totalRounds),
-          onPressed: tooFewSongs ? null : onStart,
+          // Nothing to start with too few songs, or with an era the phone cannot play.
+          onPressed: tooFewSongs || disabledEras.contains(generationId)
+              ? null
+              : onStart,
         ),
       ),
     );

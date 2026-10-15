@@ -147,6 +147,7 @@ class PackItem {
     this.status = PackStatus.notInstalled,
     this.progress,
     this.updateSizeMb,
+    this.updating = false,
     this.problem,
     this.shortfallMb,
   });
@@ -166,22 +167,35 @@ class PackItem {
 
   /// For [PackStatus.updateAvailable]: the size of the update in MB.
   final int? updateSizeMb;
+
+  /// The download under way (or failed) is an update: the installed version
+  /// stays on the phone and playable until the new one is in.
+  final bool updating;
   final PackProblem? problem;
   final int? shortfallMb;
 
   String name(Locale locale) => locale.languageCode == 'am' ? nameAm : nameEn;
 
-  /// On the phone and playable: installed, or installed with an update waiting.
+  /// On the phone and playable: installed, with an update waiting, or being updated.
   bool get isOnPhone =>
-      status == PackStatus.installed || status == PackStatus.updateAvailable;
+      status == PackStatus.installed ||
+      status == PackStatus.updateAvailable ||
+      updating;
+
+  /// What the next download costs: the update, or the whole pack.
+  int get downloadSizeMb => (status == PackStatus.updateAvailable || updating)
+      ? (updateSizeMb ?? sizeMb)
+      : sizeMb;
 
   PackItem copyWith({
     PackStatus? status,
     double? progress,
+    bool? updating,
     PackProblem? problem,
     int? shortfallMb,
     bool clearProgress = false,
     bool clearProblem = false,
+    bool clearUpdate = false,
   }) => PackItem(
     id: id,
     nameAm: nameAm,
@@ -191,9 +205,10 @@ class PackItem {
     sizeMb: sizeMb,
     status: status ?? this.status,
     progress: clearProgress ? null : (progress ?? this.progress),
-    updateSizeMb: updateSizeMb,
+    updateSizeMb: clearUpdate ? null : updateSizeMb,
+    updating: clearUpdate ? false : (updating ?? this.updating),
     problem: clearProblem ? null : (problem ?? this.problem),
-    shortfallMb: shortfallMb ?? this.shortfallMb,
+    shortfallMb: clearProblem ? null : (shortfallMb ?? this.shortfallMb),
   );
 }
 

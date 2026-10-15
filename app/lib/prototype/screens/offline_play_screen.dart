@@ -53,19 +53,25 @@ class OfflinePlayScreen extends StatelessWidget {
   /// Remove the pack with this id (after the confirmation).
   final ValueChanged<String> onRemove;
 
-  Future<void> _download(BuildContext context, PackItem pack) async {
+  /// Starts [start] for [pack] (a download, an update or a retry), asking
+  /// first when it would use mobile data while "Wi-Fi only" is on.
+  Future<void> _download(
+    BuildContext context,
+    PackItem pack,
+    ValueChanged<String> start,
+  ) async {
     if (connection == Connection.mobile && wifiOnly) {
       final l10n = AppLocalizations.of(context);
       final go = await showAppDialog(
         context,
         title: l10n.packsMobileDataTitle,
-        body: l10n.packsMobileDataBody(_downloadSize(pack)),
+        body: l10n.packsMobileDataBody(pack.downloadSizeMb),
         confirmLabel: l10n.packsMobileDataConfirm,
         cancelLabel: l10n.packsMobileDataWait,
       );
       if (go != true) return;
     }
-    onDownload(pack.id);
+    start(pack.id);
   }
 
   Future<void> _remove(BuildContext context, PackItem pack) async {
@@ -81,15 +87,10 @@ class OfflinePlayScreen extends StatelessWidget {
     if (sure == true) onRemove(pack.id);
   }
 
-  int _downloadSize(PackItem pack) => pack.status == PackStatus.updateAvailable
-      ? (pack.updateSizeMb ?? pack.sizeMb)
-      : pack.sizeMb;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final text = context.text;
-    final locale = Localizations.localeOf(context);
     final offline = connection == Connection.offline;
     final heading = AppTextStyles.withWeight(text.label, FontWeight.w800);
 
@@ -167,22 +168,16 @@ class OfflinePlayScreen extends StatelessWidget {
             statusLabel: l10n.packsAlways,
           ),
           for (final pack in onPhone)
-            _RemovablePack(
-              id: pack.id,
-              label: l10n.packsRemove,
-              onRemove: () => _remove(context, pack),
-              child: PackCard(
-                name: pack.name(locale),
-                meta: _meta(l10n, pack),
-                status: pack.status,
-                generationId: pack.generationId,
-                statusLabel: pack.status == PackStatus.updateAvailable
-                    ? l10n.packsUpdateAvailable
-                    : l10n.packsDownloaded,
-                actionLabel: l10n.packsUpdate(_downloadSize(pack)),
-                onAction: offline ? null : () => _download(context, pack),
-              ),
-            ),
+            // Only a pack at rest can be removed; one being updated is cancelled.
+            pack.status == PackStatus.installed ||
+                    pack.status == PackStatus.updateAvailable
+                ? _RemovablePack(
+                    id: pack.id,
+                    label: l10n.packsRemove,
+                    onRemove: () => _remove(context, pack),
+                    child: _card(context, pack),
+                  )
+                : _card(context, pack),
           Semantics(
             header: true,
             child: Padding(
@@ -201,33 +196,50 @@ class OfflinePlayScreen extends StatelessWidget {
                 style: text.caption.copyWith(color: ColorTokens.textSecondary),
               ),
             ),
-          for (final pack in available)
-            PackCard(
-              name: pack.name(locale),
-              meta: _meta(l10n, pack),
-              status: pack.status,
-              generationId: pack.generationId,
-              progress: pack.progress,
-              statusLabel: l10n.packsVerifying,
-              actionLabel: l10n.packsDownload,
-              cancelLabel: l10n.packsCancel,
-              errorMessage: _errorMessage(l10n, pack),
-              retryLabel: pack.problem == PackProblem.corrupt
-                  ? null
-                  : l10n.errorRetry,
-              onAction: offline ? null : () => _download(context, pack),
-              onCancel: () => onCancel(pack.id),
-              onRetry: () => onRetry(pack.id),
-            ),
+          for (final pack in available) _card(context, pack),
         ],
       ),
     );
   }
 
-  /// "40 songs · 12 MB", with "42% · " in front while downloading.
+  /// One pack row, in whatever state the pack is in.
+  Widget _card(BuildContext context, PackItem pack) {
+    final l10n = AppLocalizations.of(context);
+    final offline = connection == Connection.offline;
+    final String statusLabel;
+    switch (pack.status) {
+      case PackStatus.installed:
+        statusLabel = l10n.packsDownloaded;
+      case PackStatus.updateAvailable:
+        statusLabel = l10n.packsUpdateAvailable;
+      default:
+        statusLabel = l10n.packsVerifying;
+    }
+    return PackCard(
+      name: pack.name(Localizations.localeOf(context)),
+      meta: _meta(l10n, pack),
+      status: pack.status,
+      generationId: pack.generationId,
+      progress: pack.progress,
+      statusLabel: statusLabel,
+      actionLabel: pack.status == PackStatus.updateAvailable
+          ? l10n.packsUpdate(pack.downloadSizeMb)
+          : l10n.packsDownload,
+      cancelLabel: l10n.packsCancel,
+      errorMessage: _errorMessage(l10n, pack),
+      // A corrupt download is fetched again by itself: nothing to press.
+      retryLabel: pack.problem == PackProblem.corrupt ? null : l10n.errorRetry,
+      onAction: offline ? null : () => _download(context, pack, onDownload),
+      onCancel: () => onCancel(pack.id),
+      onRetry: offline ? null : () => _download(context, pack, onRetry),
+    );
+  }
+
+  /// "40 songs · 12 MB", with "42% · " in front while downloading. An update
+  /// shows the size of the update.
   String _meta(AppLocalizations l10n, PackItem pack) {
-    final base =
-        '${l10n.packsSongs(pack.songCount)} · ${l10n.packsSize(pack.sizeMb)}';
+    final size = pack.updating ? pack.downloadSizeMb : pack.sizeMb;
+    final base = '${l10n.packsSongs(pack.songCount)} · ${l10n.packsSize(size)}';
     if (pack.status == PackStatus.downloading && pack.progress != null) {
       final percent = (pack.progress! * 100).round();
       return '${l10n.packsProgress(percent)} · $base';

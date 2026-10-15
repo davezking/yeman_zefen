@@ -33,7 +33,7 @@ void main() {
   testWidgets(
     'a mode row opens Mode select with that mode chosen, then era setup',
     (tester) async {
-      final model = PrototypeModel();
+      final model = PrototypeModel(resumeDownloads: false);
       await start(tester, model);
 
       await tester.tap(find.text('Guess from the Middle'));
@@ -50,7 +50,7 @@ void main() {
   );
 
   testWidgets('Which Era? hides the song-or-artist choice', (tester) async {
-    final model = PrototypeModel();
+    final model = PrototypeModel(resumeDownloads: false);
     await start(tester, model);
 
     await tester.tap(find.text('Which Era?'));
@@ -64,7 +64,7 @@ void main() {
   });
 
   testWidgets('the language switch changes every screen live', (tester) async {
-    final model = PrototypeModel();
+    final model = PrototypeModel(resumeDownloads: false);
     await start(tester, model);
     expect(find.text('Ready for a song?'), findsOneWidget);
 
@@ -84,6 +84,7 @@ void main() {
     'Home has no pack or download prompt, even offline with nothing downloaded',
     (tester) async {
       final model = PrototypeModel(
+        resumeDownloads: false,
         connection: Connection.offline,
         packs: [
           for (final p in mockPacks)
@@ -102,7 +103,10 @@ void main() {
   testWidgets('offline, eras without enough songs on the phone are disabled', (
     tester,
   ) async {
-    final model = PrototypeModel(connection: Connection.offline);
+    final model = PrototypeModel(
+      resumeDownloads: false,
+      connection: Connection.offline,
+    );
     await start(tester, model);
 
     // The built-in songs have five per era. The '80s and 2000s packs are on the phone.
@@ -123,7 +127,7 @@ void main() {
   testWidgets('a combination with too few songs switches Start off', (
     tester,
   ) async {
-    final model = PrototypeModel();
+    final model = PrototypeModel(resumeDownloads: false);
     model.quickPlay = const PlaySettings(
       generationId: EraId.golden,
       genre: Genre.hiphop,
@@ -153,7 +157,7 @@ void main() {
     testWidgets('the Settings row shows the packs and an update badge', (
       tester,
     ) async {
-      final model = PrototypeModel();
+      final model = PrototypeModel(resumeDownloads: false);
       await start(tester, model);
       await openSettings(tester);
       // The '80s (12 MB) is installed, the 2000s (15 MB) is installed with an update waiting.
@@ -165,7 +169,10 @@ void main() {
     testWidgets('Download on mobile data asks first when Wi-Fi only is on', (
       tester,
     ) async {
-      final model = PrototypeModel(connection: Connection.mobile);
+      final model = PrototypeModel(
+        resumeDownloads: false,
+        connection: Connection.mobile,
+      );
       await start(tester, model);
       await openOffline(tester);
 
@@ -195,7 +202,10 @@ void main() {
     testWidgets('on Wi-Fi, Download starts at once and runs to Downloaded', (
       tester,
     ) async {
-      final model = PrototypeModel(connection: Connection.wifi);
+      final model = PrototypeModel(
+        resumeDownloads: false,
+        connection: Connection.wifi,
+      );
       await start(tester, model);
       await openOffline(tester);
 
@@ -215,7 +225,7 @@ void main() {
     testWidgets(
       'a failing download shows its error card, and Try again restarts it',
       (tester) async {
-        final model = PrototypeModel()
+        final model = PrototypeModel(resumeDownloads: false)
           ..failNextDownload = PackProblem.downloadFailed;
         await start(tester, model);
         await openOffline(tester);
@@ -242,7 +252,7 @@ void main() {
     testWidgets('removing a pack asks first, and Cancel keeps it', (
       tester,
     ) async {
-      final model = PrototypeModel();
+      final model = PrototypeModel(resumeDownloads: false);
       await start(tester, model);
       await openOffline(tester);
 
@@ -273,7 +283,10 @@ void main() {
     testWidgets('offline, Download is switched off and the page says why', (
       tester,
     ) async {
-      final model = PrototypeModel(connection: Connection.offline);
+      final model = PrototypeModel(
+        resumeDownloads: false,
+        connection: Connection.offline,
+      );
       await start(tester, model);
       await openOffline(tester);
 
@@ -293,7 +306,7 @@ void main() {
     testWidgets('the data toggles flip, and Clear cache empties the cache', (
       tester,
     ) async {
-      final model = PrototypeModel();
+      final model = PrototypeModel(resumeDownloads: false);
       await start(tester, model);
       await openOffline(tester);
 
@@ -314,8 +327,143 @@ void main() {
     });
   });
 
+  group('review fixes', () {
+    PackItem pack(PrototypeModel m, String id) =>
+        m.packs.firstWhere((p) => p.id == id);
+
+    testWidgets(
+      'an update keeps the pack on the phone, and Cancel returns it to waiting',
+      (tester) async {
+        final model = PrototypeModel(resumeDownloads: false);
+        await start(tester, model);
+        await openSettings(tester);
+        await tester.tap(find.textContaining('Offline play ·'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Update · 3 MB'));
+        await tester.pump();
+        final updating = pack(model, 'p-2000s');
+        expect(updating.status, PackStatus.downloading);
+        expect(updating.isOnPhone, isTrue);
+        expect(model.installedPackCount, 2);
+        // The row shows the size of the update, not the whole pack.
+        expect(find.text('0% · 50 songs · 3 MB'), findsOneWidget);
+
+        model.cancel('p-2000s');
+        await tester.pump();
+        expect(pack(model, 'p-2000s').status, PackStatus.updateAvailable);
+        await finish(tester, model);
+      },
+    );
+
+    testWidgets(
+      'a finished update leaves the pack installed with no update waiting',
+      (tester) async {
+        final model = PrototypeModel(resumeDownloads: false);
+        await start(tester, model);
+        model.download('p-2000s');
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pump(const Duration(seconds: 2));
+        final done = pack(model, 'p-2000s');
+        expect(done.status, PackStatus.installed);
+        expect(done.updating, isFalse);
+        expect(model.updateAvailable, isFalse);
+        await finish(tester, model);
+      },
+    );
+
+    testWidgets('a failed update keeps the installed pack', (tester) async {
+      final model = PrototypeModel(resumeDownloads: false)
+        ..failNextDownload = PackProblem.downloadFailed;
+      await start(tester, model);
+      model.download('p-2000s');
+      await tester.pump(const Duration(seconds: 3));
+      expect(pack(model, 'p-2000s').status, PackStatus.failed);
+      expect(pack(model, 'p-2000s').isOnPhone, isTrue);
+      await finish(tester, model);
+    });
+
+    testWidgets('Try again is off when offline and asks first on mobile data', (
+      tester,
+    ) async {
+      final model = PrototypeModel(
+        resumeDownloads: false,
+        connection: Connection.mobile,
+      )..failNextDownload = PackProblem.downloadFailed;
+      await start(tester, model);
+      model.download('p-90s');
+      await tester.pump(const Duration(seconds: 3));
+      await openSettings(tester);
+      await tester.tap(find.textContaining('Offline play ·'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Try again'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Download on mobile data?'), findsOneWidget);
+      await tester.tap(find.text('Wait for Wi-Fi'));
+      await tester.pumpAndSettle();
+      expect(pack(model, 'p-90s').status, PackStatus.failed);
+
+      model.update(() => model.connection = Connection.offline);
+      await tester.pump();
+      await tester.tap(find.text('Try again'));
+      await tester.pump();
+      expect(pack(model, 'p-90s').status, PackStatus.failed);
+      await finish(tester, model);
+    });
+
+    testWidgets('a corrupt download is fetched again by itself', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false)
+        ..failNextDownload = PackProblem.corrupt;
+      await start(tester, model);
+      model.download('p-90s');
+      await tester.pump(const Duration(seconds: 3));
+      expect(pack(model, 'p-90s').problem, PackProblem.corrupt);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(pack(model, 'p-90s').status, PackStatus.downloading);
+      expect(pack(model, 'p-90s').problem, isNull);
+      await finish(tester, model);
+    });
+
+    testWidgets('the mock download under way keeps moving', (tester) async {
+      final model = PrototypeModel();
+      await start(tester, model);
+      final before = pack(model, 'p-golden').progress!;
+      await tester.pump(const Duration(seconds: 1));
+      expect(pack(model, 'p-golden').progress!, greaterThan(before));
+      await finish(tester, model);
+    });
+
+    testWidgets('Start is off when the chosen era went unavailable offline', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      model.quickPlay = const PlaySettings(generationId: EraId.golden);
+      await start(tester, model);
+      await tester.tap(find.text('Guess the Intro'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      model.update(() => model.connection = Connection.offline);
+      await tester.pump();
+
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(RegExp('^Start'))),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+      );
+      handle.dispose();
+      await finish(tester, model);
+    });
+  });
+
   testWidgets('sign out and delete account both ask first', (tester) async {
-    final model = PrototypeModel(user: mockSignedIn);
+    final model = PrototypeModel(resumeDownloads: false, user: mockSignedIn);
     await start(tester, model);
     await openSettings(tester);
 
@@ -339,7 +487,7 @@ void main() {
   });
 
   testWidgets('the toggles are announced as switches', (tester) async {
-    final model = PrototypeModel();
+    final model = PrototypeModel(resumeDownloads: false);
     await start(tester, model);
     await openSettings(tester);
 

@@ -121,25 +121,29 @@ class _LabSheet extends StatelessWidget {
                 ),
                 ListTile(
                   title: const Text('Next download'),
-                  trailing: DropdownButton<PackProblem?>(
-                    value: model.failNextDownload,
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('succeeds')),
-                      DropdownMenuItem(
-                        value: PackProblem.downloadFailed,
-                        child: Text('fails'),
+                  // Keyed by name: a null value would show as no selection.
+                  trailing: DropdownButton<String>(
+                    value: model.failNextDownload?.name ?? 'ok',
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'ok',
+                        child: Text('succeeds'),
                       ),
-                      DropdownMenuItem(
-                        value: PackProblem.corrupt,
-                        child: Text('is corrupt'),
-                      ),
-                      DropdownMenuItem(
-                        value: PackProblem.storageFull,
-                        child: Text('storage full'),
-                      ),
+                      for (final (problem, label) in const [
+                        (PackProblem.downloadFailed, 'fails'),
+                        (PackProblem.corrupt, 'is corrupt'),
+                        (PackProblem.storageFull, 'storage full'),
+                      ])
+                        DropdownMenuItem(
+                          value: problem.name,
+                          child: Text(label),
+                        ),
                     ],
-                    onChanged: (v) =>
-                        model.update(() => model.failNextDownload = v),
+                    onChanged: (v) => model.update(
+                      () => model.failNextDownload = PackProblem.values
+                          .where((p) => p.name == v)
+                          .firstOrNull,
+                    ),
                   ),
                 ),
               ],
