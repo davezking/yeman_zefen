@@ -223,7 +223,6 @@ class _LabSheet extends StatelessWidget {
                   (v) => model.update(() {
                     model.consentRequired = v;
                     model.consentDone = false;
-                    model.gamesFinished = 0;
                   }),
                 ),
                 toggle(

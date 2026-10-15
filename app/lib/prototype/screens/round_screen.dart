@@ -124,7 +124,9 @@ class RoundScreen extends StatelessWidget {
                     fraction: v.timeFraction,
                     // Waiting for the clip: a full bar and no seconds.
                     label: v.phase == RoundPhase.loading ? null : pill,
-                    semanticLabel: v.timerPaused
+                    semanticLabel: v.phase == RoundPhase.loading
+                        ? l10n.roundLoading
+                        : v.timerPaused
                         ? l10n.roundTimerPaused
                         : l10n.a11yTimer(v.secondsLeft),
                   ),
@@ -171,9 +173,15 @@ class RoundScreen extends StatelessWidget {
   ) {
     final v = view;
     if (v.phase == RoundPhase.loading) {
-      return const SkeletonBox(
+      // The box keeps the grid's height while the skeleton waits to appear.
+      return const SizedBox(
         height: SizeTokens.answerTileMinHeight,
-        radius: RadiusTokens.large,
+        child: SkeletonDelay(
+          child: SkeletonBox(
+            height: SizeTokens.answerTileMinHeight,
+            radius: RadiusTokens.large,
+          ),
+        ),
       );
     }
     final label = l10n.optionLabel(v.options[i], v.kind, locale);

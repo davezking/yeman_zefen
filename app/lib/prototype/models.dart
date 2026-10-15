@@ -363,8 +363,12 @@ class RoundResult {
     required this.points,
     this.hintUsed = false,
     this.timedOut = false,
+    this.number,
   });
 
+  /// The round's number as played (a skipped round leaves a gap); null
+  /// numbers the rows in order.
+  final int? number;
   final Track track;
   final bool correct;
   final int points;

@@ -59,12 +59,12 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _sim.addListener(_changed);
-    widget.model.inGame = true;
+    widget.model.roundsOnScreen++;
   }
 
   @override
   void dispose() {
-    widget.model.inGame = false;
+    widget.model.roundsOnScreen--;
     WidgetsBinding.instance.removeObserver(this);
     _sim.removeListener(_changed);
     _sim.dispose();
@@ -107,11 +107,8 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
         ),
       );
       // After the first finished game, and only where consent is required,
-      // ad consent comes before Results.
-      final askConsent =
-          model.gamesFinished == 1 &&
-          model.consentRequired &&
-          !model.consentDone;
+      // ad consent comes before Results (and again until it is answered).
+      final askConsent = model.consentRequired && !model.consentDone;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => askConsent
@@ -289,6 +286,7 @@ class _LeaderboardRouteState extends State<LeaderboardRoute> {
     final model = widget.model;
     if (_failed) {
       return ErrorScreen(
+        onBack: () => Navigator.of(context).pop(),
         onRetry: () {
           setState(() => _failed = false);
           _load();
@@ -332,13 +330,18 @@ class ConsentRoute extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConsentScreen(
-      onContinue: () async {
-        await showUmpForm(context, model);
-        if (!context.mounted) return;
-        Navigator.of(context)
-            .pushReplacement(MaterialPageRoute<void>(builder: (_) => next()));
-      },
+    // Consent has to be answered: back does not skip it (or Results).
+    return PopScope(
+      canPop: false,
+      child: ConsentScreen(
+        onContinue: () async {
+          await showUmpForm(context, model);
+          // Closing the form without answering stays here.
+          if (!context.mounted || !model.consentDone) return;
+          Navigator.of(context)
+              .pushReplacement(MaterialPageRoute<void>(builder: (_) => next()));
+        },
+      ),
     );
   }
 }

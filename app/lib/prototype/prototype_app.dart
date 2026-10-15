@@ -47,6 +47,7 @@ class _PrototypeAppState extends State<PrototypeApp> {
   late bool _starting = widget.showAppStart;
   Timer? _startTimer;
   StreamSubscription<Toast>? _toasts;
+  late bool _gated = _model.updateGate;
 
   @override
   void initState() {
@@ -57,12 +58,24 @@ class _PrototypeAppState extends State<PrototypeApp> {
       });
     }
     _toasts = _model.toasts.listen(_showToast);
+    _model.addListener(_checkUpdateGate);
+  }
+
+  /// When the forced update comes back (online again after "Play offline"),
+  /// it replaces whatever was open, not just the page under it.
+  void _checkUpdateGate() {
+    final gated = _model.updateGate;
+    if (gated && !_gated) {
+      _navigator.currentState?.popUntil((route) => route.isFirst);
+    }
+    _gated = gated;
   }
 
   @override
   void dispose() {
     _startTimer?.cancel();
     _toasts?.cancel();
+    _model.removeListener(_checkUpdateGate);
     if (widget.model == null) _model.dispose();
     super.dispose();
   }
@@ -86,15 +99,15 @@ class _PrototypeAppState extends State<PrototypeApp> {
   /// What the first page is: app start, the forced update, first launch, or Home.
   Widget _firstPage() {
     if (_starting) return const AppStartScreen();
-    if (_model.updateRequired) {
+    if (_model.updateGate) {
       return ForcedUpdateScreen(
         ios: _model.showApple,
         onUpdate: _notBuilt,
         // Plays the songs on the phone, with no network features.
-        onPlayOffline: () => _model.update(() {
-          _model.updateRequired = false;
+        onPlayOffline: () {
+          _model.playingOutdated = true;
           _model.setConnection(Connection.offline);
-        }),
+        },
       );
     }
     if (_model.firstLaunch) return _FirstLaunch(model: _model);

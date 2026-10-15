@@ -109,6 +109,13 @@ class PrototypeModel extends ChangeNotifier {
   /// `/v1/config` asks for a newer version than this one.
   bool updateRequired = false;
 
+  /// The player chose "Play offline" on the forced update: the songs on the
+  /// phone play while offline, and the update screen returns with the network.
+  bool playingOutdated = false;
+
+  /// The forced update is what the app shows now.
+  bool get updateGate => updateRequired && !(playingOutdated && offline);
+
   /// Offline, every song on the phone was played recently.
   bool allSongsPlayed = false;
   ClipArrival nextClip = ClipArrival.onTime;
@@ -123,8 +130,12 @@ class PrototypeModel extends ChangeNotifier {
   bool syncFails = false;
   int pendingGames = 0;
 
+  /// Round screens open. A counter, not a flag: a game left a moment ago can
+  /// still be closing while the next one opens.
+  int roundsOnScreen = 0;
+
   /// A game is on screen (the connection dropping is worth a notice then).
-  bool inGame = false;
+  bool get inGame => roundsOnScreen > 0;
 
   final _toasts = StreamController<Toast>.broadcast();
 

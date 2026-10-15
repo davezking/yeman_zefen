@@ -151,7 +151,7 @@ class ResultsScreen extends StatelessWidget {
           ),
           for (var i = 0; i < v.rounds.length; i++)
             _RoundRow(
-              number: i + 1,
+              number: v.rounds[i].number ?? i + 1,
               result: v.rounds[i],
               line: l10n.trackLine(v.rounds[i].track, locale),
               correctLabel: l10n.feedbackCorrect,

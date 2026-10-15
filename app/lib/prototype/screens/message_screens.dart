@@ -90,9 +90,12 @@ class OutOfSongsScreen extends StatelessWidget {
 
 /// Something went wrong: try again.
 class ErrorScreen extends StatelessWidget {
-  const ErrorScreen({super.key, required this.onRetry});
+  const ErrorScreen({super.key, required this.onRetry, this.onBack});
 
   final VoidCallback onRetry;
+
+  /// Leaves the screen that failed (there is no app bar here).
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +107,8 @@ class ErrorScreen extends StatelessWidget {
       body: l10n.errorGenericBody,
       primaryLabel: l10n.errorRetry,
       onPrimary: onRetry,
+      linkLabel: onBack == null ? null : l10n.navBack,
+      onLink: onBack,
     );
   }
 }

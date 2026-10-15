@@ -43,7 +43,8 @@ class _SkeletonBoxState extends State<SkeletonBox>
       duration: context.game.shimmerDuration,
     );
     if (context.reduceMotion) {
-      _sweep!.stop();
+      // Back to the flat base color, not a highlight frozen mid-sweep.
+      _sweep!.reset();
     } else if (!_sweep!.isAnimating) {
       _sweep!.repeat();
     }

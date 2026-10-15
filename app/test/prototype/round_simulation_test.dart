@@ -558,8 +558,10 @@ void main() {
       expect(sim.skipped, 1);
       expect(sim.view.roundNumber, 3);
       expect(sim.view.phase, RoundPhase.answering);
-      // The skipped round is not in the results.
+      // The skipped round is not in the results; the rest keep their numbers.
       expect(sim.results.length, 1);
+      sim.answer(sim.view.correctIndex);
+      expect(sim.results.map((r) => r.number), [1, 3]);
       sim.dispose();
     });
 

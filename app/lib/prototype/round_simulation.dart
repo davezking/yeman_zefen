@@ -191,6 +191,7 @@ class RoundSimulation extends ChangeNotifier {
         correct: correct,
         points: scored.points,
         hintUsed: _hintUsed,
+        number: _round + 1,
       ),
     );
     _changed();
@@ -319,6 +320,7 @@ class RoundSimulation extends ChangeNotifier {
             points: 0,
             hintUsed: _hintUsed,
             timedOut: true,
+            number: _round + 1,
           ),
         );
       }

@@ -117,6 +117,20 @@ void main() {
         findsOneWidget,
       );
 
+      // Back does not skip consent.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Ads keep this game free'), findsOneWidget);
+
+      // Closing Google's form without answering stays on consent.
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.byType(UmpFormPlaceholder), findsOneWidget);
+      await tester.tapAt(const Offset(180, 20));
+      await tester.pumpAndSettle();
+      expect(find.byType(UmpFormPlaceholder), findsNothing);
+      expect(find.text('Ads keep this game free'), findsOneWidget);
+
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       // The placeholder where Google's UMP form appears.
@@ -177,6 +191,14 @@ void main() {
         find.textContaining("You're offline. You can still play"),
         findsOneWidget,
       );
+
+      // Back online, the update screen returns over whatever is open.
+      await tester.tap(find.bySemanticsLabel('Settings'));
+      await tester.pumpAndSettle();
+      model.setConnection(Connection.wifi);
+      await tester.pumpAndSettle();
+      expect(find.text('Time to update'), findsOneWidget);
+      expect(find.text('Ready for a song?'), findsNothing);
       await finish(tester, model);
     });
 
@@ -313,6 +335,17 @@ void main() {
         await finish(tester, model);
       },
     );
+
+    testWidgets('the error has a way back', (tester) async {
+      final model = model0()..boardFails = true;
+      await start(tester, model);
+      await tester.tap(find.text('Sign in to get a rank'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ready for a song?'), findsOneWidget);
+      await finish(tester, model);
+    });
 
     testWidgets('a slow pack list shows row skeletons, then the packs', (
       tester,
