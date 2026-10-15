@@ -72,7 +72,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `nav.settings` | Settings | ቅንብሮች |
 | `nav.back` | Back | ይመለሱ |
 
-> **Short labels for the Play line** (added in Phase 2 · Sprint 2). The Home boards show "The '80s · Intro · Easy" and "የ80ዎቹ · መግቢያ · ቀላል", but the deck only had the long names ("Guess the Intro", "Easy · 10 s"). The six `home.quickPlay.mode.*` and `difficulty.*.short` rows are those short forms. "መግቢያ" and "ቀላል" are on the approved board; the other Amharic labels are the reviewed long names without their verb or clip length. **Have a native speaker confirm the Amharic ones before release.**
+> **Short labels for the Play line** (added in Phase 2 · Sprint 2). The Home boards show "The '80s · Intro · Easy" and "የ80ዎቹ · መግቢያ · ቀላል", but the deck only had the long names ("Guess the Intro", "Easy · 10 s"). The six `home.quickPlay.mode.*` and `difficulty.*.short` rows are those short forms. **Reviewed by a native speaker**, as is the changed `feedback.revealEra` (the era names already start with የ, so it no longer adds one).
 
 ## Mode select
 
