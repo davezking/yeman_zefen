@@ -15,6 +15,8 @@ void main() {
       [
             ...Directory('lib/core/widgets').listSync().whereType<File>(),
             ...Directory('lib/core/theme').listSync().whereType<File>(),
+            // The prototype screens too: Phase 4 reuses them as they are.
+            ...Directory('lib/prototype/screens').listSync().whereType<File>(),
           ]
           .where(
             (f) =>
