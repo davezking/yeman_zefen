@@ -2,7 +2,7 @@
 
 Every user-facing string in the app, keyed for the Flutter ARB files (`app_en.arb`, `app_am.arb`). The hi-fi screens in `artifacts/` use these strings; where a screen shows sample data (names, scores, sizes), the key with its `{placeholder}` is what ships.
 
-**Amharic status: first draft, not yet reviewed.** A native speaker must review every Amharic string before this package merges (sprint exit criterion). Mark reviewed sections in the PR.
+**Amharic status: reviewed by a native speaker.** Keep it that way: have any new or changed Amharic string reviewed before it ships.
 
 ## Rules
 

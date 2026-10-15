@@ -35,8 +35,22 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+  # Family names are the ones in docs/design/tokens.json (typography.family).
   fonts:
-    - family: NotoSansEthiopic
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-ExtraBold.ttf
+          weight: 800
+    # One variable font (weights 100-900); AppTextStyles picks the weight with fontVariations.
+    - family: Noto Sans Ethiopic
       fonts:
         - asset: assets/fonts/NotoSansEthiopic.ttf
 

@@ -6,7 +6,7 @@ The approved design for Yeman Zefen, in direction **F · Adey**: sunny yellow, c
 |---|---|
 | `tokens.json` | Colors (semantic, correct/wrong, timer, era accents), typography with separate Fidel and Latin line heights, spacing, radii, elevation, sizes, motion, and game timings. Light theme only. |
 | `screens.md` | Every screen and state: layout, components, content keys, and behavior. Start here. |
-| `copy.md` | Every string in English and Amharic, keyed for the ARB files. **The Amharic is a first draft awaiting native-speaker review.** |
+| `copy.md` | Every string in English and Amharic, keyed for the ARB files. **The Amharic has been reviewed by a native speaker.** |
 | `artifacts/` | The HTML source of each approved board (`H01`–`H21`) and the interactive round prototype (`P00`). Read exact sizes, colors and spacing from these. |
 | `screens/` | A screenshot of each board, English and Amharic side by side (WebP, 2×). |
 
@@ -33,7 +33,6 @@ The Step 1 copy deck, the Step 2 wireframes and the Step 3 directions are still 
 
 ## Open items
 
-- **Amharic review** by a native speaker (sprint exit criterion).
 - **No dark theme** was designed. The theme extension should still take one later.
 - **Interstitial frequency:** `/v1/config` defaults to 3 rounds, and the architecture and later sprint prompts are updated to match. This is a decision made in Sprint 1, and it differs from the PRD's FR-19, which says 4. The PRD is left as written.
 - **Paused time:** the scoring doc now says that `response_ms` excludes the paused time. The app's scorer must measure it that way when the hint is built.
