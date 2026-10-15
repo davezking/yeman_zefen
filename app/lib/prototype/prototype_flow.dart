@@ -23,9 +23,17 @@ import 'screens/sign_in_sheet.dart';
 /// Plays one game of [PrototypeModel.quickPlay]. When it ends it is replaced
 /// by [ResultsRoute]; "Leave" pops it.
 class RoundRoute extends StatefulWidget {
-  const RoundRoute({super.key, required this.model, this.simulation});
+  const RoundRoute({
+    super.key,
+    required this.model,
+    this.simulation,
+    this.onChangeSettings,
+  });
 
   final PrototypeModel model;
+
+  /// Results' "Change era or mode": opens the choices again. Null just goes back.
+  final void Function(BuildContext context)? onChangeSettings;
 
   /// Tests pass a seeded game to know the answers.
   final RoundSimulation? simulation;
@@ -80,9 +88,13 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
           builder: (_) => ResultsRoute(
             model: widget.model,
             results: results,
+            onChangeSettings: widget.onChangeSettings,
             onPlayAgain: (context) => Navigator.of(context).pushReplacement(
               MaterialPageRoute<void>(
-                builder: (_) => RoundRoute(model: widget.model),
+                builder: (_) => RoundRoute(
+                  model: widget.model,
+                  onChangeSettings: widget.onChangeSettings,
+                ),
               ),
             ),
           ),
@@ -127,10 +139,14 @@ class ResultsRoute extends StatefulWidget {
     required this.model,
     required this.results,
     required this.onPlayAgain,
+    this.onChangeSettings,
   });
 
   final PrototypeModel model;
   final ResultsView results;
+
+  /// "Change era or mode". Null just goes back.
+  final void Function(BuildContext context)? onChangeSettings;
 
   /// Starts another game with the same settings (replacing this route).
   final void Function(BuildContext context) onPlayAgain;
@@ -146,7 +162,8 @@ class _ResultsRouteState extends State<ResultsRoute> {
   @override
   void initState() {
     super.initState();
-    if (_sync == ScoreSync.provisional) {
+    // A state forced from the dev sheet stays as it is.
+    if (_sync == ScoreSync.provisional && widget.model.forcedSync == null) {
       _server = Timer(const Duration(milliseconds: 1500), () {
         if (mounted) setState(() => _sync = ScoreSync.synced);
       });
@@ -178,7 +195,9 @@ class _ResultsRouteState extends State<ResultsRoute> {
           sync: _sync,
         ),
         onPlayAgain: () => widget.onPlayAgain(context),
-        onChange: () => Navigator.of(context).pop(),
+        onChange: () => widget.onChangeSettings == null
+            ? Navigator.of(context).pop()
+            : widget.onChangeSettings!(context),
         onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
         onSignIn: () => showSignInFlow(context, widget.model),
         onLeaderboard: () => Navigator.of(context).push(
@@ -289,7 +308,7 @@ class _SignInFlowState extends State<_SignInFlow> {
   void _submitEmail(String email, String password) {
     if (!email.contains('@') || !email.contains('.')) {
       setState(() => _emailError = EmailError.email);
-    } else if (password.length < 6 && !_creating) {
+    } else if (password.length < 6) {
       setState(() => _emailError = EmailError.password);
     } else {
       _signIn(SignInProvider.email);

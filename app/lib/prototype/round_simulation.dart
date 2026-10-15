@@ -50,7 +50,7 @@ class RoundSimulation extends ChangeNotifier {
   late final List<_RoundData> _rounds;
   late final Timer _timer;
 
-  static const _tickMs = 100;
+  static final _tickMs = MotionTokens.durationTimerTick.inMilliseconds;
   static const _rewardedAdMs = 3000;
   static const _interstitialMs = 2500;
 
@@ -105,6 +105,11 @@ class RoundSimulation extends ChangeNotifier {
 
   int get _windowMs => _scorer.windowMs(_domainMode, _domainDifficulty);
 
+  /// Which Era? asks for the era, so it never filters by one (the answer would
+  /// always be the chosen era) and its chip reads "All eras".
+  int get _eraFilter =>
+      settings.mode == GameMode.era ? EraId.all : settings.generationId;
+
   bool get _timerStopped => _backgrounded || _overlay != RoundOverlay.none;
 
   /// What the round screen shows now.
@@ -116,7 +121,7 @@ class RoundSimulation extends ChangeNotifier {
       roundNumber: _round + 1,
       totalRounds: totalRounds,
       score: _score,
-      eraFilterId: settings.generationId,
+      eraFilterId: _eraFilter,
       difficulty: settings.difficulty,
       kind: data.kind,
       options: data.options,
@@ -335,7 +340,7 @@ class RoundSimulation extends ChangeNotifier {
 
   Set<int> _twoWrongAnswers() {
     final wrong = [
-      for (var i = 0; i < 4; i++)
+      for (var i = 0; i < _rounds[_round].options.length; i++)
         if (i != _rounds[_round].correctIndex) i,
     ]..shuffle(_random);
     return wrong.take(2).toSet();
@@ -357,8 +362,7 @@ class RoundSimulation extends ChangeNotifier {
   List<_RoundData> _buildRounds(List<Track> catalog) {
     var pool = [
       for (final t in catalog)
-        if ((settings.generationId == EraId.all ||
-                t.generationId == settings.generationId) &&
+        if ((_eraFilter == EraId.all || t.generationId == _eraFilter) &&
             (settings.genre == Genre.any || t.genre == settings.genre))
           t,
     ];
@@ -371,13 +375,22 @@ class RoundSimulation extends ChangeNotifier {
               ? QuestionKind.artist
               : QuestionKind.song);
 
+    // The mock catalog is small (four songs an era), so a filtered game
+    // repeats its songs; the real catalog has enough.
     return [
       for (var i = 0; i < totalRounds; i++)
-        _buildRound(pool[i % pool.length], kinds, catalog),
+        _buildRound(pool[i % pool.length], kinds, pool, catalog),
     ];
   }
 
-  _RoundData _buildRound(Track track, QuestionKind kind, List<Track> catalog) {
+  /// Wrong answers come from [pool] (the same era and genre) first, so they
+  /// cannot be ruled out by era alone, then from the rest of [catalog].
+  _RoundData _buildRound(
+    Track track,
+    QuestionKind kind,
+    List<Track> pool,
+    List<Track> catalog,
+  ) {
     final List<RoundOption> options;
     if (kind == QuestionKind.era) {
       final eras = [
@@ -393,7 +406,10 @@ class RoundSimulation extends ChangeNotifier {
           kind == QuestionKind.artist ? t.artistLatin : t.titleLatin;
       final others = <Track>[];
       final seen = {key(track)};
-      for (final t in List.of(catalog)..shuffle(_random)) {
+      for (final t in [
+        ...List.of(pool)..shuffle(_random),
+        ...List.of(catalog)..shuffle(_random),
+      ]) {
         if (seen.add(key(t))) others.add(t);
         if (others.length == 3) break;
       }

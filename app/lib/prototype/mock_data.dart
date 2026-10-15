@@ -320,11 +320,21 @@ List<LeaderboardEntry> mockLeaderboard(
   ];
 }
 
-/// The signed-in player's own row on that board.
-LeaderboardEntry mockMyEntry(LeaderboardScope scope, int generationId) =>
-    LeaderboardEntry(
-      rank: scope == LeaderboardScope.allTime ? 19 : 7,
-      name: 'Meron T.',
-      points: scope == LeaderboardScope.allTime ? 21480 : 7640,
-      colorIndex: 5,
-    );
+/// The signed-in player's own row on that board: [weeklyRank] this week,
+/// further down all time, and lower on a single era's board.
+LeaderboardEntry mockMyEntry(
+  LeaderboardScope scope,
+  int generationId,
+  int weeklyRank,
+) {
+  final allTime = scope == LeaderboardScope.allTime;
+  final rank = (allTime ? weeklyRank + 12 : weeklyRank) + generationId;
+  final weekly = 7640 - (weeklyRank - 7) * 300;
+  return LeaderboardEntry(
+    rank: rank,
+    name: 'Meron T.',
+    points: ((allTime ? weekly * 3 : weekly) * (generationId == 0 ? 1 : 0.6))
+        .round(),
+    colorIndex: 5,
+  );
+}

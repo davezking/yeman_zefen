@@ -8,6 +8,7 @@ import 'package:yeman_zefen/prototype/models.dart';
 import 'package:yeman_zefen/prototype/prototype_flow.dart';
 import 'package:yeman_zefen/prototype/prototype_model.dart';
 import 'package:yeman_zefen/prototype/round_simulation.dart';
+import 'package:yeman_zefen/prototype/screens/results_screen.dart';
 
 import 'screen_kit.dart';
 
@@ -595,6 +596,38 @@ void main() {
       await finish(tester, model);
     });
 
+    testWidgets('a score state forced from the dev sheet stays put', (
+      tester,
+    ) async {
+      final sim = newSim(rounds: 1, every: 0);
+      final model = newModel()..forcedSync = ScoreSync.provisional;
+      await openRound(tester, model, sim);
+      await play(tester, sim, rounds: 1);
+      await tester.pump(const Duration(seconds: 3));
+      final results = tester.widget<ResultsScreen>(find.byType(ResultsScreen));
+      expect(results.view.sync, ScoreSync.provisional);
+      await finish(tester, model);
+    });
+
+    testWidgets('online, the provisional score is confirmed a moment later', (
+      tester,
+    ) async {
+      final sim = newSim(rounds: 1, every: 0);
+      final model = newModel();
+      await openRound(tester, model, sim);
+      await play(tester, sim, rounds: 1);
+      expect(
+        tester.widget<ResultsScreen>(find.byType(ResultsScreen)).view.sync,
+        ScoreSync.provisional,
+      );
+      await tester.pump(const Duration(seconds: 2));
+      expect(
+        tester.widget<ResultsScreen>(find.byType(ResultsScreen)).view.sync,
+        ScoreSync.synced,
+      );
+      await finish(tester, model);
+    });
+
     testWidgets('a guest\'s 5th game opens the sign-in sheet over Results', (
       tester,
     ) async {
@@ -753,6 +786,21 @@ void main() {
       expect(find.text('Signing in…'), findsOneWidget);
       await tester.pump(const Duration(seconds: 2));
       expect(find.text('Pick a display name'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    testWidgets('email: a new account needs a password of 6 or more', (
+      tester,
+    ) async {
+      final model = await openSheet(tester);
+      await tester.tap(find.text('Continue with email'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 50));
+      await tester.tap(find.text('New here? Create an account'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField).first, 'meron@example.com');
+      await tester.tap(find.widgetWithText(PrimaryButton, 'Next'));
+      await tester.pump();
+      expect(find.text('Wrong email or password.'), findsOneWidget);
       await finish(tester, model);
     });
 

@@ -370,6 +370,51 @@ void main() {
       await finish(tester, model);
     });
 
+    testWidgets('Change era or mode on Results opens Mode select', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      await start(tester, model);
+      await tester.tap(find.bySemanticsLabel('Play'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      // Let the ten rounds run out (time-outs), with the ads between them.
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(seconds: 6));
+      }
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Game complete'), findsOneWidget);
+
+      // Ten rows push the buttons below the fold.
+      await tester.ensureVisible(find.text('Change era or mode'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Change era or mode'));
+      await tester.pumpAndSettle();
+      expect(find.text('How do you want to play?'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ready for a song?'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    test(
+      'the player\'s own row follows their rank and only shows on a board',
+      () {
+        final model = PrototypeModel(
+          user: mockSignedIn,
+          resumeDownloads: false,
+        );
+        expect(model.leaderboard.me!.rank, mockSignedIn.weeklyRank);
+        model.boardEmpty = true;
+        expect(model.leaderboard.me, isNull);
+        model.boardEmpty = false;
+        model.connection = Connection.offline;
+        model.boardCached = false;
+        expect(model.leaderboard.me, isNull);
+        model.dispose();
+      },
+    );
+
     testWidgets('the Leaderboard row on Home opens the board', (tester) async {
       final model = PrototypeModel(resumeDownloads: false);
       await start(tester, model);

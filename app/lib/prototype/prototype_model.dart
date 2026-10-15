@@ -112,7 +112,7 @@ class PrototypeModel extends ChangeNotifier {
     return ResultsView(
       score: score,
       rounds: rounds,
-      user: before,
+      user: user,
       newBest: newBest,
       sync:
           forcedSync ??
@@ -138,7 +138,14 @@ class PrototypeModel extends ChangeNotifier {
           ? mockLeaderboard(leaderboardScope, leaderboardEra)
           : const [],
       user: user,
-      me: user.isGuest ? null : mockMyEntry(leaderboardScope, leaderboardEra),
+      // Only a board with rows has a row for the player.
+      me:
+          user.isGuest ||
+              user.weeklyRank == null ||
+              !(state == LeaderboardState.ready ||
+                  state == LeaderboardState.offlineCached)
+          ? null
+          : mockMyEntry(leaderboardScope, leaderboardEra, user.weeklyRank!),
       state: state,
       cachedAt: '3:20 PM',
     );

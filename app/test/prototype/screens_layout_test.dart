@@ -239,7 +239,7 @@ void main() {
           ? mockLeaderboard(scope, era)
           : const [],
       user: user,
-      me: user.isGuest || noRow ? null : mockMyEntry(scope, era),
+      me: user.isGuest || noRow ? null : mockMyEntry(scope, era, 7),
       state: state,
       cachedAt: '3:20 PM',
     ),

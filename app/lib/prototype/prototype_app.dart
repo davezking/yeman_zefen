@@ -246,8 +246,19 @@ class _OfflineRoute extends StatelessWidget {
   }
 }
 
-/// Plays a game with what the Play button starts.
+/// Plays a game with what the Play button starts. "Change era or mode" on its
+/// Results goes back to Home and opens Mode select, whichever screen started it.
 void _startGame(BuildContext context, PrototypeModel model) {
-  Navigator.of(context)
-      .push(MaterialPageRoute<void>(builder: (_) => RoundRoute(model: model)));
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => RoundRoute(
+        model: model,
+        onChangeSettings: (context) => Navigator.of(context)
+          ..popUntil((route) => route.isFirst)
+          ..push(
+            MaterialPageRoute<void>(builder: (_) => _ModeRoute(model: model)),
+          ),
+      ),
+    ),
+  );
 }

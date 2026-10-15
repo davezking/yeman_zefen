@@ -469,4 +469,43 @@ void main() {
       expect(sim.view.points, 179);
     }, settings: const PlaySettings(mode: GameMode.middle));
   });
+
+  group('review fixes', () {
+    simTest(
+      'Which Era? ignores the era filter, so the answer is not always that era',
+      (tester, sim) async {
+        expect(sim.view.eraFilterId, EraId.all);
+        final answers = <int>{};
+        for (var r = 0; r < 10; r++) {
+          answers.add(sim.view.track.generationId);
+          sim.answer(sim.view.correctIndex);
+          await tester.pump(second);
+        }
+        expect(answers.length, greaterThan(1));
+      },
+      settings: const PlaySettings(
+        mode: GameMode.era,
+        generationId: EraId.eighties,
+      ),
+      every: 0,
+    );
+
+    simTest(
+      'in an era game the wrong answers come from the same era',
+      (tester, sim) async {
+        for (var r = 0; r < 4; r++) {
+          for (final o in sim.view.options) {
+            expect(o.track!.generationId, EraId.golden);
+          }
+          sim.answer(sim.view.correctIndex);
+          await tester.pump(second);
+        }
+      },
+      settings: const PlaySettings(
+        generationId: EraId.golden,
+        guess: GuessTarget.artist,
+      ),
+      every: 0,
+    );
+  });
 }
