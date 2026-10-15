@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/widgets/widgets.dart';
 import 'package:yeman_zefen/prototype/mock_data.dart';
 import 'package:yeman_zefen/prototype/models.dart';
 import 'package:yeman_zefen/prototype/prototype_app.dart';
@@ -323,6 +324,94 @@ void main() {
       await tester.tap(find.text('Clear cache'));
       await tester.pump();
       expect(find.text('Cache 0 MB'), findsOneWidget);
+      await finish(tester, model);
+    });
+  });
+
+  group('playing from the prototype', () {
+    testWidgets('Play on Home starts a game with what Play shows', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      await start(tester, model);
+
+      await tester.tap(find.bySemanticsLabel('Play'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('1 / 10'), findsOneWidget);
+      // The '80s · Intro · Easy is what Play was showing.
+      expect(find.text("The '80s"), findsOneWidget);
+      expect(find.text('Easy · 10 s'), findsOneWidget);
+      expect(find.text('Which song is this?'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Leave game'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Leave'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Ready for a song?'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    testWidgets('Start on era setup plays the era and mode that were chosen', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      await start(tester, model);
+      await tester.tap(find.text('Which Era?'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start · 10 rounds'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Which era is this song from?'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    testWidgets('the Leaderboard row on Home opens the board', (tester) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      await start(tester, model);
+      await tester.tap(find.text('Sign in to get a rank'));
+      await tester.pumpAndSettle();
+      expect(find.text('Want your name up here?'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ready for a song?'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    testWidgets('Sign in on Settings opens the sheet and signs in', (
+      tester,
+    ) async {
+      final model = PrototypeModel(resumeDownloads: false);
+      await start(tester, model);
+      await openSettings(tester);
+      await tester.tap(find.widgetWithText(PrimaryButton, 'Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Keep your scores'), findsOneWidget);
+
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Meron');
+      await tester.tap(find.text('Save name'));
+      await tester.pumpAndSettle();
+      expect(model.user.displayName, 'Meron');
+      expect(find.text('Meron'), findsOneWidget);
+      await finish(tester, model);
+    });
+
+    testWidgets('the whole game reads in Amharic', (tester) async {
+      final model = PrototypeModel(resumeDownloads: false, languageCode: 'am');
+      await start(tester, model);
+      await tester.tap(find.bySemanticsLabel('ይጫወቱ'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('ይህ የትኛው ዘፈን ነው?'), findsOneWidget);
+      expect(find.text('ፍንጭ'), findsOneWidget);
+      expect(find.text('1 / 10'), findsOneWidget);
       await finish(tester, model);
     });
   });

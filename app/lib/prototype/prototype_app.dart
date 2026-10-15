@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import 'mock_data.dart';
 import 'models.dart';
 import 'prototype_lab.dart';
+import 'prototype_flow.dart';
 import 'prototype_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/mode_select_screen.dart';
@@ -16,7 +17,9 @@ import 'screens/setup_screen.dart';
 /// Amharic/English switch (Settings › Language). Run it with
 /// `flutter run -t lib/main_prototype.dart`.
 ///
-/// Play and Start stop at a message: the round screens are the next task.
+/// Play and Start play a game on a fake clock (no audio), then Results and the
+/// leaderboard; Settings and Results open the sign-in sheets. Only the About,
+/// privacy and ad-privacy rows are still stubs.
 class PrototypeApp extends StatefulWidget {
   const PrototypeApp({super.key, this.model});
 
@@ -42,12 +45,13 @@ class _PrototypeAppState extends State<PrototypeApp> {
   ThemeData _themeFor(Locale locale) =>
       _themes.putIfAbsent(locale.languageCode, () => buildAppTheme(locale));
 
-  void _roundComesNext() {
+  /// Rows whose screens are not designed yet (privacy, about, ad choices).
+  void _notBuilt() {
     _messenger.currentState
       ?..clearSnackBars()
       ..showSnackBar(
         const SnackBar(
-          content: Text('The round screens come in the next task.'),
+          content: Text('This screen is not part of the prototype.'),
         ),
       );
   }
@@ -69,11 +73,7 @@ class _PrototypeAppState extends State<PrototypeApp> {
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) =>
               PrototypeLab(model: _model, navigator: _navigator, child: child!),
-          home: _HomeRoute(
-            model: _model,
-            onPlay: _roundComesNext,
-            onStart: _roundComesNext,
-          ),
+          home: _HomeRoute(model: _model, onNotBuilt: _notBuilt),
         );
       },
     );
@@ -81,15 +81,10 @@ class _PrototypeAppState extends State<PrototypeApp> {
 }
 
 class _HomeRoute extends StatelessWidget {
-  const _HomeRoute({
-    required this.model,
-    required this.onPlay,
-    required this.onStart,
-  });
+  const _HomeRoute({required this.model, required this.onNotBuilt});
 
   final PrototypeModel model;
-  final VoidCallback onPlay;
-  final VoidCallback onStart;
+  final VoidCallback onNotBuilt;
 
   @override
   Widget build(BuildContext context) {
@@ -99,22 +94,22 @@ class _HomeRoute extends StatelessWidget {
       offline: model.offline,
       hasDownloadedPacks: model.hasDownloadedPacks,
       builtInSongCount: mockBuiltInSongCount,
-      onPlay: onPlay,
+      onPlay: () => _startGame(context, model),
       onModeSelected: (mode) {
         model.update(
           () => model.quickPlay = model.quickPlay.copyWith(mode: mode),
         );
         Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => _ModeRoute(model: model, onStart: onStart),
-          ),
+          MaterialPageRoute<void>(builder: (_) => _ModeRoute(model: model)),
         );
       },
-      onLeaderboard: onPlay,
+      onLeaderboard: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => LeaderboardRoute(model: model)),
+      ),
       onSettings: () => Navigator.of(context).push(
         PageRouteBuilder<void>(
           pageBuilder: (_, _, _) =>
-              _SettingsRoute(model: model, onPlay: onPlay),
+              _SettingsRoute(model: model, onNotBuilt: onNotBuilt),
           transitionDuration: Duration.zero,
         ),
       ),
@@ -123,10 +118,9 @@ class _HomeRoute extends StatelessWidget {
 }
 
 class _ModeRoute extends StatelessWidget {
-  const _ModeRoute({required this.model, required this.onStart});
+  const _ModeRoute({required this.model});
 
   final PrototypeModel model;
-  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -143,9 +137,7 @@ class _ModeRoute extends StatelessWidget {
         ),
         onBack: () => Navigator.of(context).pop(),
         onNext: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => _SetupRoute(model: model, onStart: onStart),
-          ),
+          MaterialPageRoute<void>(builder: (_) => _SetupRoute(model: model)),
         ),
       ),
     );
@@ -153,10 +145,9 @@ class _ModeRoute extends StatelessWidget {
 }
 
 class _SetupRoute extends StatelessWidget {
-  const _SetupRoute({required this.model, required this.onStart});
+  const _SetupRoute({required this.model});
 
   final PrototypeModel model;
-  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +170,7 @@ class _SetupRoute extends StatelessWidget {
           onDifficulty: (d) =>
               model.update(() => model.quickPlay = s.copyWith(difficulty: d)),
           onBack: () => Navigator.of(context).pop(),
-          onStart: onStart,
+          onStart: () => _startGame(context, model),
         );
       },
     );
@@ -187,10 +178,10 @@ class _SetupRoute extends StatelessWidget {
 }
 
 class _SettingsRoute extends StatelessWidget {
-  const _SettingsRoute({required this.model, required this.onPlay});
+  const _SettingsRoute({required this.model, required this.onNotBuilt});
 
   final PrototypeModel model;
-  final VoidCallback onPlay;
+  final VoidCallback onNotBuilt;
 
   @override
   Widget build(BuildContext context) {
@@ -208,17 +199,17 @@ class _SettingsRoute extends StatelessWidget {
         onLanguage: (code) => model.update(() => model.languageCode = code),
         onSound: (v) => model.update(() => model.soundOn = v),
         onHaptics: (v) => model.update(() => model.hapticsOn = v),
-        onSignIn: () => model.update(() => model.user = mockSignedIn),
+        onSignIn: () => showSignInFlow(context, model),
         onSignOut: () => model.update(() => model.user = mockGuest),
         onDeleteAccount: () => model.update(() => model.user = mockNewGuest),
         onOfflinePlay: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => _OfflineRoute(model: model)),
         ),
-        onAdPrivacy: onPlay,
-        onPrivacy: onPlay,
-        onAbout: onPlay,
+        onAdPrivacy: onNotBuilt,
+        onPrivacy: onNotBuilt,
+        onAbout: onNotBuilt,
         onHome: () => Navigator.of(context).pop(),
-        onPlay: onPlay,
+        onPlay: () => _startGame(context, model),
       ),
     );
   }
@@ -253,4 +244,10 @@ class _OfflineRoute extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Plays a game with what the Play button starts.
+void _startGame(BuildContext context, PrototypeModel model) {
+  Navigator.of(context)
+      .push(MaterialPageRoute<void>(builder: (_) => RoundRoute(model: model)));
 }

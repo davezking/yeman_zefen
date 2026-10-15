@@ -78,17 +78,24 @@ Compare it with the screenshots in `docs/design/screens/`. There is no dark them
 
 ### Prototype screens (Phase 2)
 
-The hi-fi screens on mock data, with no services or config. Home, Mode select, Era & genre, Settings and Settings ›
-Offline play are in; the round, results, leaderboard and sign-in screens follow.
+The hi-fi screens on mock data, with no services or config. Home, Mode select, Era & genre, Settings, Settings ›
+Offline play, the round (all its states), Results, the leaderboard and the sign-in sheets (account choice, email,
+display name) are in; edge states (first launch, consent, offline, empty, update, errors) are next.
 
 ```sh
 flutter run -t lib/main_prototype.dart
 ```
 
-Settings › Language switches Amharic/English live. The flask icon at the top right opens a dev-only sheet for trying
-the variants (signed in, first run, offline, mobile data, a failing download).
+Settings › Language switches Amharic/English live. Play starts a game on a fake clock with no audio
+(`lib/prototype/round_simulation.dart`): the real scorer counts the points, the answer window is the clip plus 5 s,
+a right answer shows for 1 s, a wrong one for 5 s (a tap skips), the hint sheet closes after 8 s with the timer
+stopped, and an ad follows every 3rd round. Backgrounding the app pauses it. With the system's "reduce motion" on, the
+reveal pop, the score count-up, the sheet slide and the cassette reels become plain fades or stand still.
 
-- `lib/prototype/screens/`: one widget per screen. Each takes plain data (`models.dart`) and callbacks, and imports no
+The flask icon at the top right opens a dev-only sheet for trying the variants: signed in, first run, offline, mobile
+data, a failing download or sign-in, the state of the score on Results, an empty or saved leaderboard.
+
+- `lib/prototype/screens/`: one widget per screen (or sheet). Each takes plain data (`models.dart`) and callbacks, and imports no
   provider or service (`test/prototype/prototype_guards_test.dart` checks the imports). Phase 4 builds the same data
   from the real services and reuses these widgets.
 - `lib/prototype/mock_data.dart`: 20 invented tracks across the five eras, four packs in four states, cache use and

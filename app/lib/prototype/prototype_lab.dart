@@ -146,6 +146,67 @@ class _LabSheet extends StatelessWidget {
                     ),
                   ),
                 ),
+                ListTile(
+                  title: const Text('Next sign-in'),
+                  trailing: DropdownButton<SignInOutcome>(
+                    value: model.nextSignIn,
+                    items: const [
+                      DropdownMenuItem(
+                        value: SignInOutcome.works,
+                        child: Text('works'),
+                      ),
+                      DropdownMenuItem(
+                        value: SignInOutcome.linkFails,
+                        child: Text('scores fail to link'),
+                      ),
+                    ],
+                    onChanged: (v) => model.update(
+                      () => model.nextSignIn = v ?? SignInOutcome.works,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Score on Results'),
+                  trailing: DropdownButton<String>(
+                    value: model.forcedSync?.name ?? 'auto',
+                    items: const [
+                      DropdownMenuItem(value: 'auto', child: Text('automatic')),
+                      DropdownMenuItem(
+                        value: 'provisional',
+                        child: Text('provisional'),
+                      ),
+                      DropdownMenuItem(value: 'synced', child: Text('synced')),
+                      DropdownMenuItem(
+                        value: 'savedOffline',
+                        child: Text('saved offline'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'rejected',
+                        child: Text('not counted'),
+                      ),
+                    ],
+                    onChanged: (v) => model.update(
+                      () => model.forcedSync = ScoreSync.values
+                          .where((s) => s.name == v)
+                          .firstOrNull,
+                    ),
+                  ),
+                ),
+                toggle(
+                  'Apple button (iOS only)',
+                  model.showApple,
+                  (v) => model.update(() => model.showApple = v),
+                ),
+                toggle(
+                  'Leaderboard is empty',
+                  model.boardEmpty,
+                  (v) => model.update(() => model.boardEmpty = v),
+                ),
+                toggle(
+                  'Offline: a saved board exists',
+                  model.boardCached,
+                  (v) => model.update(() => model.boardCached = v),
+                ),
               ],
             ),
           ),

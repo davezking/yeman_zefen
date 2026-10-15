@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'mock_data.dart';
 import 'models.dart';
 
+/// What the next sign-in attempt does, for trying the error states.
+enum SignInOutcome { works, linkFails }
+
 /// The prototype's whole state, on mock data. It stands in for the services
 /// that Phase 4 wires to the screens, and exists only here: no screen imports it.
 class PrototypeModel extends ChangeNotifier {
@@ -42,6 +45,23 @@ class PrototypeModel extends ChangeNotifier {
   /// What the next download does: complete (null) or fail in this way.
   PackProblem? failNextDownload;
 
+  /// Games finished this run: after the 5th, a guest is asked to sign in.
+  int gamesFinished = 0;
+
+  LeaderboardScope leaderboardScope = LeaderboardScope.weekly;
+  int leaderboardEra = EraId.all;
+
+  /// Offline, whether a copy of the board was saved earlier.
+  bool boardCached = true;
+  bool boardEmpty = false;
+
+  /// Forces the state of the score on Results (null: from the connection).
+  ScoreSync? forcedSync;
+  SignInOutcome nextSignIn = SignInOutcome.works;
+
+  /// Apple's button is iOS only; the lab can show it anywhere.
+  bool showApple = defaultTargetPlatform == TargetPlatform.iOS;
+
   final _tickers = <String, Timer>{};
 
   bool get offline => connection == Connection.offline;
@@ -71,6 +91,56 @@ class PrototypeModel extends ChangeNotifier {
     if (s.genre == Genre.any || s.generationId == EraId.all) return false;
     return !mockTracks.any(
       (t) => t.generationId == s.generationId && t.genre == s.genre,
+    );
+  }
+
+  /// Records a finished game: counts it, and raises the best score if beaten.
+  /// Returns what Results shows.
+  ResultsView finishGame(List<RoundResult> rounds, int score, bool newBest) {
+    gamesFinished++;
+    final before = user;
+    if (newBest) {
+      user = before.isGuest
+          ? UserInfo.guest(bestScore: score)
+          : UserInfo.signedIn(
+              displayName: before.displayName!,
+              bestScore: score,
+              weeklyRank: before.weeklyRank,
+            );
+      notifyListeners();
+    }
+    return ResultsView(
+      score: score,
+      rounds: rounds,
+      user: before,
+      newBest: newBest,
+      sync:
+          forcedSync ??
+          (offline ? ScoreSync.savedOffline : ScoreSync.provisional),
+    );
+  }
+
+  /// The board for the chosen scope and era, in its current state.
+  LeaderboardView get leaderboard {
+    final state = boardEmpty
+        ? LeaderboardState.empty
+        : (offline
+              ? (boardCached
+                    ? LeaderboardState.offlineCached
+                    : LeaderboardState.offlineNone)
+              : LeaderboardState.ready);
+    return LeaderboardView(
+      scope: leaderboardScope,
+      generationId: leaderboardEra,
+      entries:
+          state == LeaderboardState.ready ||
+              state == LeaderboardState.offlineCached
+          ? mockLeaderboard(leaderboardScope, leaderboardEra)
+          : const [],
+      user: user,
+      me: user.isGuest ? null : mockMyEntry(leaderboardScope, leaderboardEra),
+      state: state,
+      cachedAt: '3:20 PM',
     );
   }
 

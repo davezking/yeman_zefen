@@ -82,6 +82,26 @@ extension PrototypeLabels on AppLocalizations {
     GuessTarget.artist => modeGuessArtist,
   };
 
+  String questionText(QuestionKind kind) => switch (kind) {
+    QuestionKind.song => roundQuestionSong,
+    QuestionKind.artist => roundQuestionArtist,
+    QuestionKind.era => roundQuestionEra,
+  };
+
+  /// The text of an answer: the song, the singer or the era, in [locale]'s script.
+  String optionLabel(RoundOption option, QuestionKind kind, Locale locale) {
+    final id = option.generationId;
+    if (id != null) return eraLabel(id);
+    final track = option.track!;
+    return kind == QuestionKind.artist
+        ? track.artist(locale)
+        : track.title(locale);
+  }
+
+  /// "Ere Mela Mela · Mahmoud Ahmed".
+  String trackLine(Track track, Locale locale) =>
+      '${track.title(locale)} · ${track.artist(locale)}';
+
   /// "The '80s · Intro · Easy", the line under "Play button starts".
   String quickPlaySummary(PlaySettings s) => homeQuickPlaySettings(
     eraLabel(s.generationId),
