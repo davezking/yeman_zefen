@@ -1,12 +1,15 @@
 /// The designed components. Import this one file: `import '.../core/widgets/widgets.dart'`.
 library;
 
+export 'ad_overlay.dart';
+export 'animated_count.dart';
 export 'answer_tile.dart';
 export 'app_bottom_bar.dart';
 export 'app_bottom_sheet.dart';
 export 'app_button.dart';
 export 'app_dialog.dart';
 export 'app_switch.dart';
+export 'avatar_tile.dart';
 export 'choice_chip.dart';
 export 'edge_shadow.dart';
 export 'equal_height_grid.dart';
@@ -22,4 +25,5 @@ export 'raised_surface.dart';
 export 'score_badge.dart';
 export 'segmented_control.dart';
 export 'settings_group.dart';
+export 'sso_button.dart';
 export 'timer_bar.dart';

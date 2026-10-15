@@ -266,3 +266,75 @@ const mockSignedIn = UserInfo.signedIn(
 );
 
 const mockAppVersion = '1.0.0';
+
+/// A leaderboard of invented players. The board differs a little by era and is
+/// larger for all time, so the filters can be seen to do something.
+List<LeaderboardEntry> mockLeaderboard(
+  LeaderboardScope scope,
+  int generationId,
+) {
+  const names = [
+    'Selam T.',
+    'Dawit A.',
+    'Hanna G.',
+    'Yonas M.',
+    'Meron K.',
+    'Abel W.',
+    'Liya B.',
+    'Kidus H.',
+    'Rahel D.',
+    'Samson F.',
+    'Bethel S.',
+    'Natnael Z.',
+  ];
+  const weekly = [
+    9860,
+    9412,
+    8975,
+    8630,
+    8204,
+    7991,
+    7640,
+    7302,
+    6988,
+    6540,
+    6120,
+    5733,
+  ];
+  final factor = scope == LeaderboardScope.allTime ? 7 : 1;
+  // Each era starts the list at a different player.
+  final shift = generationId % names.length;
+  return [
+    for (var i = 0; i < names.length; i++)
+      LeaderboardEntry(
+        rank: i + 1,
+        name: names[(i + shift) % names.length],
+        points: (weekly[i] * factor * (generationId == 0 ? 1 : 0.6)).round(),
+        colorIndex: switch (i) {
+          0 => 3,
+          1 => 1,
+          2 => 2,
+          _ => i,
+        },
+      ),
+  ];
+}
+
+/// The signed-in player's own row on that board: [weeklyRank] this week,
+/// further down all time, and lower on a single era's board.
+LeaderboardEntry mockMyEntry(
+  LeaderboardScope scope,
+  int generationId,
+  int weeklyRank,
+) {
+  final allTime = scope == LeaderboardScope.allTime;
+  final rank = (allTime ? weeklyRank + 12 : weeklyRank) + generationId;
+  final weekly = 7640 - (weeklyRank - 7) * 300;
+  return LeaderboardEntry(
+    rank: rank,
+    name: 'Meron T.',
+    points: ((allTime ? weekly * 3 : weekly) * (generationId == 0 ? 1 : 0.6))
+        .round(),
+    colorIndex: 5,
+  );
+}

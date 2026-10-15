@@ -642,6 +642,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authErrorPassword => 'Wrong email or password.';
 
   @override
+  String get authNameTitle => 'Pick a display name';
+
+  @override
+  String get authNameBody =>
+      'This is the name other players see on the leaderboard.';
+
+  @override
+  String get authNameLabel => 'Display name';
+
+  @override
+  String get authNameSave => 'Save name';
+
+  @override
+  String get authNameErrorShort => 'Use at least 2 characters.';
+
+  @override
+  String get authNameErrorTaken => 'That name is taken. Try another.';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

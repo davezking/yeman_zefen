@@ -222,3 +222,266 @@ class CacheUsage {
 
 /// What the phone is connected to, for the pack-download rules.
 enum Connection { wifi, mobile, offline }
+
+// ---------------------------------------------------------------------------
+// The round
+
+/// What a round asks: the song, the singer, or the era (Which Era? mode).
+enum QuestionKind { song, artist, era }
+
+/// Where a round is. The reveal states carry an icon and a word as well as color.
+enum RoundPhase {
+  /// The clip plays and the timer runs; the player can answer.
+  answering,
+
+  /// The player picked the right one.
+  correct,
+
+  /// The player picked a wrong one; the right one is shown.
+  wrong,
+
+  /// The window ran out with no pick; the right one is shown.
+  timeout,
+}
+
+/// What covers the round screen, if anything. The timer is stopped under
+/// every one of these.
+enum RoundOverlay {
+  none,
+
+  /// "Hint: remove 2 answers", closing itself after 8 s.
+  hintSheet,
+
+  /// The rewarded ad behind the hint.
+  rewardedAd,
+
+  /// The mandatory ad between rounds.
+  interstitial,
+
+  /// "Leave this game?"
+  leaveDialog,
+}
+
+/// One of the four answers: a track (its song or its singer is the text) or,
+/// in Which Era?, an era.
+class RoundOption {
+  const RoundOption.track(Track this.track) : generationId = null;
+  const RoundOption.era(int this.generationId) : track = null;
+
+  final Track? track;
+  final int? generationId;
+}
+
+/// Everything the round screen shows at one moment. The simulation (and in
+/// Phase 4 the real engine) builds a new one whenever anything changes.
+class RoundView {
+  const RoundView({
+    required this.roundNumber,
+    required this.totalRounds,
+    required this.score,
+    required this.eraFilterId,
+    required this.difficulty,
+    required this.kind,
+    required this.options,
+    required this.correctIndex,
+    required this.track,
+    required this.phase,
+    required this.clipPlaying,
+    required this.timeFraction,
+    required this.secondsLeft,
+    this.timerPaused = false,
+    this.pickedIndex,
+    this.removed = const {},
+    this.hintAvailable = false,
+    this.hintUsed = false,
+    this.points = 0,
+    this.speedBonus = 0,
+    this.feedbackSecondsLeft = 0,
+    this.overlay = RoundOverlay.none,
+    this.overlaySeconds = 0,
+  });
+
+  /// 1-based, for "4 / 10".
+  final int roundNumber;
+  final int totalRounds;
+
+  /// The running score, including the round just answered.
+  final int score;
+
+  /// The era chip: the session's era, 0 for all.
+  final int eraFilterId;
+  final Difficulty difficulty;
+  final QuestionKind kind;
+  final List<RoundOption> options;
+  final int correctIndex;
+
+  /// The round's song, for "It was Song · Artist".
+  final Track track;
+  final RoundPhase phase;
+
+  /// The reels turn while the clip plays.
+  final bool clipPlaying;
+
+  /// What is left of the answer window, 1 down to 0.
+  final double timeFraction;
+  final int secondsLeft;
+
+  /// The timer is stopped (hint sheet, ad, leave dialog, app in the background):
+  /// the pill reads "Paused".
+  final bool timerPaused;
+  final int? pickedIndex;
+
+  /// Answers the hint took away: faded and not tappable.
+  final Set<int> removed;
+  final bool hintAvailable;
+  final bool hintUsed;
+
+  /// Points for this round, once answered.
+  final int points;
+  final int speedBonus;
+
+  /// The "Tap to continue · 5 s" countdown, in the wrong and time-out states.
+  final int feedbackSecondsLeft;
+  final RoundOverlay overlay;
+
+  /// The seconds left on the hint sheet or the ad.
+  final int overlaySeconds;
+
+  bool get revealed => phase != RoundPhase.answering;
+}
+
+/// How one round went, for the results list.
+class RoundResult {
+  const RoundResult({
+    required this.track,
+    required this.correct,
+    required this.points,
+    this.hintUsed = false,
+    this.timedOut = false,
+  });
+
+  final Track track;
+  final bool correct;
+  final int points;
+  final bool hintUsed;
+  final bool timedOut;
+}
+
+// ---------------------------------------------------------------------------
+// Results
+
+/// Whether the score on Results is still the phone's own count.
+enum ScoreSync {
+  /// Counted on the phone; the server's answer is awaited.
+  provisional,
+
+  /// The server's score, which replaced the provisional one.
+  synced,
+
+  /// No connection: the game is queued and will be sent later.
+  savedOffline,
+
+  /// The server could not check the game, so it does not count for rankings.
+  rejected,
+}
+
+class ResultsView {
+  const ResultsView({
+    required this.score,
+    required this.rounds,
+    required this.user,
+    this.newBest = false,
+    this.sync = ScoreSync.provisional,
+  });
+
+  final int score;
+  final List<RoundResult> rounds;
+  final UserInfo user;
+  final bool newBest;
+  final ScoreSync sync;
+
+  int get correctCount => rounds.where((r) => r.correct).length;
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboard
+
+enum LeaderboardScope { weekly, allTime }
+
+/// What the board has to show.
+enum LeaderboardState {
+  ready,
+
+  /// Nobody has a score yet.
+  empty,
+
+  /// No connection; an earlier copy of the board is shown, with its time.
+  offlineCached,
+
+  /// No connection and nothing saved.
+  offlineNone,
+}
+
+class LeaderboardEntry {
+  const LeaderboardEntry({
+    required this.rank,
+    required this.name,
+    required this.points,
+    this.colorIndex = 0,
+  });
+
+  final int rank;
+  final String name;
+  final int points;
+
+  /// Picks the avatar tile's color.
+  final int colorIndex;
+}
+
+class LeaderboardView {
+  const LeaderboardView({
+    required this.scope,
+    required this.generationId,
+    required this.entries,
+    required this.user,
+    this.me,
+    this.state = LeaderboardState.ready,
+    this.cachedAt,
+  });
+
+  final LeaderboardScope scope;
+
+  /// The era filter; 0 for all eras.
+  final int generationId;
+
+  /// Everyone ranked, best first.
+  final List<LeaderboardEntry> entries;
+  final UserInfo user;
+
+  /// The signed-in player's own row (null: not ranked this week).
+  final LeaderboardEntry? me;
+  final LeaderboardState state;
+
+  /// "3:20 PM", when [state] is [LeaderboardState.offlineCached].
+  final String? cachedAt;
+}
+
+// ---------------------------------------------------------------------------
+// Sign in
+
+enum SignInProvider { apple, google, email }
+
+/// The sign-in sheet's progress.
+enum SignInStatus {
+  idle,
+
+  /// Waiting on the provider: the buttons are off, the pressed one spins.
+  signingIn,
+
+  /// Signed in, but the scores could not be attached to the account yet.
+  linkFailed,
+}
+
+enum EmailError { none, email, password }
+
+enum NameError { none, tooShort, taken }

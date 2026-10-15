@@ -83,13 +83,16 @@ class SecondaryButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.expand = true,
+    this.expand,
     this.small = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
-  final bool expand;
+
+  /// Fill the width. Defaults to true, except for [small] buttons, which size
+  /// to their label (pass true to share a row, as on Results).
+  final bool? expand;
 
   /// The 44 dp row button instead of the 54 dp full-size one.
   final bool small;
@@ -102,7 +105,7 @@ class SecondaryButton extends StatelessWidget {
       child: RaisedSurface(
         onTap: onPressed,
         inertButton: true,
-        expand: expand && !small,
+        expand: expand ?? !small,
         minHeight: small
             ? SizeTokens.smallButtonMinHeight
             : SizeTokens.secondaryButtonMinHeight,

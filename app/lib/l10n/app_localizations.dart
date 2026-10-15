@@ -1184,6 +1184,42 @@ abstract class AppLocalizations {
   /// **'Wrong email or password.'**
   String get authErrorPassword;
 
+  /// No description provided for @authNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a display name'**
+  String get authNameTitle;
+
+  /// No description provided for @authNameBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the name other players see on the leaderboard.'**
+  String get authNameBody;
+
+  /// No description provided for @authNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get authNameLabel;
+
+  /// No description provided for @authNameSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save name'**
+  String get authNameSave;
+
+  /// No description provided for @authNameErrorShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at least 2 characters.'**
+  String get authNameErrorShort;
+
+  /// No description provided for @authNameErrorTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'That name is taken. Try another.'**
+  String get authNameErrorTaken;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

@@ -259,6 +259,14 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `auth.linkFailed` | We couldn't link your account. Your scores are safe on this phone, and we'll try again. | መለያዎን ማገናኘት አልተቻለም። ውጤቶችዎ በዚህ ስልክ ላይ ደህና ናቸው፤ እንደገና እንሞክራለን። |
 | `auth.error.email` | Check your email address. | የኢሜይል አድራሻዎን ያረጋግጡ። |
 | `auth.error.password` | Wrong email or password. | ኢሜይሉ ወይም የይለፍ ቃሉ ትክክል አይደለም። |
+| `auth.name.title` | Pick a display name | የሚታይ ስም ይምረጡ |
+| `auth.name.body` | This is the name other players see on the leaderboard. | ይህ በደረጃ ሰንጠረዡ ላይ ሌሎች ተጫዋቾች የሚያዩት ስም ነው። |
+| `auth.name.label` | Display name | የሚታይ ስም |
+| `auth.name.save` | Save name | ስሙን ያስቀምጡ |
+| `auth.name.error.short` | Use at least 2 characters. | ቢያንስ 2 ፊደላት ይጠቀሙ። |
+| `auth.name.error.taken` | That name is taken. Try another. | ይህ ስም ተይዟል። ሌላ ይሞክሩ። |
+
+> **Display-name step** (added in Phase 2 · Sprint 2). Step 4 had no screen for choosing the name that shows on the leaderboard, so the six `auth.name.*` rows are new. **The Amharic needs native-speaker review before release.**
 
 ## Settings
 

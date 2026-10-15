@@ -16,6 +16,7 @@ Future<void> pumpScreen(
   Widget screen, {
   Locale locale = const Locale('en'),
   double textScale = 1.0,
+  bool disableAnimations = false,
 }) async {
   tester.view.physicalSize = phoneSize;
   tester.view.devicePixelRatio = 1;
@@ -28,8 +29,10 @@ Future<void> pumpScreen(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context)
-            .copyWith(textScaler: TextScaler.linear(textScale)),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+          disableAnimations: disableAnimations,
+        ),
         child: child!,
       ),
       home: screen,

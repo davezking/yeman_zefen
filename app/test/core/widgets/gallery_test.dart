@@ -51,6 +51,9 @@ void main() {
           expect(find.byType(StatTile), findsNWidgets(2));
           expect(find.byType(LogoTiles), findsOneWidget);
           expect(find.byType(AppBottomBar), findsNWidgets(2));
+          expect(find.byType(SsoButton), findsNWidgets(4));
+          expect(find.byType(AvatarTile), findsNWidgets(4));
+          expect(find.byType(AdOverlay), findsOneWidget);
           await tester.pumpWidget(const SizedBox()); // stop the reels
         },
       );
