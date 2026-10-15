@@ -82,12 +82,19 @@ class _PrototypeLabState extends State<PrototypeLab> {
     widget.model.update(() => target.prepare?.call(widget.model));
     widget.router.go(target.path);
     final then = target.then;
-    if (then != null) {
-      // After the page transition, so the sheet opens over the new screen.
-      Future<void>.delayed(const Duration(milliseconds: 400), () {
-        final context = widget.navigator.currentContext;
-        if (context != null && context.mounted) then(context, widget.model);
-      });
+    if (then != null) _openOver(then);
+  }
+
+  /// Opens a sheet once the jump's screen is in place: the router applies a
+  /// new location on the next frame, so after the one following it.
+  Future<void> _openOver(
+    void Function(BuildContext context, PrototypeModel model) then,
+  ) async {
+    await WidgetsBinding.instance.endOfFrame;
+    await WidgetsBinding.instance.endOfFrame;
+    final context = widget.navigator.currentContext;
+    if (mounted && context != null && context.mounted) {
+      then(context, widget.model);
     }
   }
 

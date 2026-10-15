@@ -242,13 +242,14 @@ class PrototypeModel extends ChangeNotifier {
 
   /// Puts every edge-state switch back to normal (the dev menu does this
   /// before it jumps, so one jump does not leave another's state behind). The
-  /// player, the connection and the language stay as they are.
+  /// player, the connection, the language and the player's own answers (ad
+  /// consent) stay as they are.
   void resetStates() {
     firstLaunch = false;
     updateRequired = false;
     playingOutdated = false;
     consentRequired = true;
-    consentDone = false;
+    lastResults = null;
     allSongsPlayed = false;
     nextClip = ClipArrival.onTime;
     slowLists = false;

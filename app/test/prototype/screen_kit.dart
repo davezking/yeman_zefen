@@ -8,6 +8,23 @@ export '../core/widgets/widget_kit.dart' show loadAppFonts;
 /// The design's phone: 360 x 780 dp.
 const phoneSize = Size(360, 780);
 
+/// Sets the test's screen to [size] dp (1 dp per pixel) for the rest of the
+/// test, and the system's "reduce motion" when [disableAnimations].
+void setUpPhone(
+  WidgetTester tester, {
+  Size size = phoneSize,
+  bool disableAnimations = false,
+}) {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  if (disableAnimations) {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+  }
+}
+
 /// Pumps a whole screen on the design's phone, in [locale], at [textScale].
 /// Layout overflow is thrown by Flutter in tests, so a screen that does not
 /// fit fails right here (check `tester.takeException()`).
@@ -19,9 +36,7 @@ Future<void> pumpScreen(
   bool disableAnimations = false,
   Size size = phoneSize,
 }) async {
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
+  setUpPhone(tester, size: size);
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,

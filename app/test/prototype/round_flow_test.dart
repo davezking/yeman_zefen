@@ -40,16 +40,7 @@ void main() {
     Locale locale = const Locale('en'),
     bool disableAnimations = false,
   }) async {
-    tester.view.physicalSize = phoneSize;
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    if (disableAnimations) {
-      tester.platformDispatcher.accessibilityFeaturesTestValue =
-          const FakeAccessibilityFeatures(disableAnimations: true);
-      addTearDown(
-        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
-      );
-    }
+    setUpPhone(tester, disableAnimations: disableAnimations);
     model.languageCode = locale.languageCode;
     await tester.pumpWidget(
       PrototypeApp(model: model, initialLocation: path, simulation: sim),

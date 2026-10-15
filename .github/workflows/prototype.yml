@@ -2,8 +2,8 @@
 # services, for the Phase 2 sign-off. The `dev` flavor gives it its own application id
 # (com.yemanzefen.yeman_zefen.dev, "Yeman Zefen DEV"), so it installs next to a real build.
 #
-# - Pull requests that touch the prototype or the Android project build the Android APK, so the entry
-#   point cannot quietly stop building.
+# - Pull requests that touch the app's code, assets or Android project build the Android APK, so the
+#   entry point cannot quietly stop building.
 # - Run it by hand (Actions > prototype > Run workflow) to get the APK to install on a phone: it is
 #   attached to the run as the "prototype-android" artifact, signed with the debug key.
 # - Tick "ios" for a compile check on macOS (no code signing, so no installable app: install on an
@@ -19,10 +19,12 @@ on:
         default: false
   pull_request:
     paths:
-      - app/lib/main_prototype.dart
-      - app/lib/prototype/**
+      # Everything the prototype is built from, shared widgets and strings included.
+      - app/lib/**
+      - app/assets/**
       - app/android/**
       - app/pubspec.yaml
+      - app/pubspec.lock
       - .github/workflows/prototype.yml
 
 concurrency:

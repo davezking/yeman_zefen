@@ -47,20 +47,29 @@ GoRouter buildPrototypeRouter(
       ? NoTransitionPage<void>(key: state.pageKey, child: child)
       : MaterialPage<void>(key: state.pageKey, child: child);
 
+  /// [path] is the full path; a route under another takes the part after
+  /// its parent's ([parent]), so `go` builds the parent's page beneath it.
   GoRoute route(
     String path,
     Widget Function(BuildContext context) builder, {
     bool instant = false,
+    String? parent,
+    List<GoRoute> routes = const [],
   }) => GoRoute(
-    path: path,
+    path: parent == null
+        ? path
+        : path.substring(parent == ProtoPath.home ? 1 : parent.length + 1),
     pageBuilder: (context, state) =>
         page(state, builder(context), instant: instant),
+    routes: routes,
   );
 
   return GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: initialLocation,
-    refreshListenable: model,
+    // Only what the redirect reads: the model itself changes several times a
+    // second while a pack downloads.
+    refreshListenable: _RedirectInputs(model),
     redirect: (context, state) {
       final location = state.matchedLocation;
       if (location == ProtoPath.splash) return null;
@@ -79,24 +88,6 @@ GoRouter buildPrototypeRouter(
       route(ProtoPath.splash, (_) => const _SplashRoute()),
       route(ProtoPath.language, (_) => _LanguageRoute(model: model)),
       route(ProtoPath.welcome, (_) => _WelcomeRoute(model: model)),
-      route(ProtoPath.home, (_) => _HomeRoute(model: model)),
-      route(ProtoPath.mode, (_) => _ModeRoute(model: model)),
-      route(ProtoPath.setup, (_) => _SetupRoute(model: model)),
-      route(ProtoPath.round, (_) {
-        final sim = pendingSimulation;
-        pendingSimulation = null;
-        return RoundRoute(model: model, simulation: sim);
-      }),
-      route(ProtoPath.consent, (_) => ConsentRoute(model: model)),
-      route(ProtoPath.results, (_) => ResultsRoute(model: model)),
-      route(ProtoPath.leaderboard, (_) => LeaderboardRoute(model: model)),
-      // Settings is a tab: it replaces Home without a slide.
-      route(
-        ProtoPath.settings,
-        (_) => _SettingsRoute(model: model, onNotBuilt: notBuilt),
-        instant: true,
-      ),
-      route(ProtoPath.offlinePlay, (_) => _OfflineRoute(model: model)),
       route(
         ProtoPath.update,
         (_) => ForcedUpdateScreen(
@@ -109,20 +100,94 @@ GoRouter buildPrototypeRouter(
           },
         ),
       ),
+      // Everything else sits on Home, so `go` to any of them leaves Home
+      // beneath and the system back gesture goes there instead of closing
+      // the app.
       route(
-        ProtoPath.outOfSongs,
-        (context) => OutOfSongsScreen(
-          onBrowsePacks: () => context.pushReplacement(ProtoPath.offlinePlay),
-          // A game that allows the recently played songs.
-          onReplay: () => context.pushReplacement(ProtoPath.round),
-        ),
-      ),
-      route(
-        ProtoPath.error,
-        (context) => ErrorScreen(onRetry: context.popOrHome),
+        ProtoPath.home,
+        (_) => _HomeRoute(model: model),
+        routes: [
+          route(
+            ProtoPath.mode,
+            (_) => _ModeRoute(model: model),
+            parent: ProtoPath.home,
+          ),
+          route(
+            ProtoPath.setup,
+            (_) => _SetupRoute(model: model),
+            parent: ProtoPath.home,
+          ),
+          route(ProtoPath.round, (_) {
+            final sim = pendingSimulation;
+            pendingSimulation = null;
+            return RoundRoute(model: model, simulation: sim);
+          }, parent: ProtoPath.home),
+          route(
+            ProtoPath.consent,
+            (_) => ConsentRoute(model: model),
+            parent: ProtoPath.home,
+          ),
+          route(
+            ProtoPath.results,
+            (_) => ResultsRoute(model: model),
+            parent: ProtoPath.home,
+          ),
+          route(
+            ProtoPath.leaderboard,
+            (_) => LeaderboardRoute(model: model),
+            parent: ProtoPath.home,
+          ),
+          route(
+            ProtoPath.outOfSongs,
+            (context) => OutOfSongsScreen(
+              onBrowsePacks: () =>
+                  context.pushReplacement(ProtoPath.offlinePlay),
+              // A game that allows the recently played songs.
+              onReplay: () => context.pushReplacement(ProtoPath.round),
+            ),
+            parent: ProtoPath.home,
+          ),
+          route(
+            ProtoPath.error,
+            (context) => ErrorScreen(onRetry: context.popOrHome),
+            parent: ProtoPath.home,
+          ),
+          // Settings is a tab: it replaces Home without a slide.
+          route(
+            ProtoPath.settings,
+            (_) => _SettingsRoute(model: model, onNotBuilt: notBuilt),
+            instant: true,
+            parent: ProtoPath.home,
+            routes: [
+              route(
+                ProtoPath.offlinePlay,
+                (_) => _OfflineRoute(model: model),
+                parent: ProtoPath.settings,
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );
+}
+
+/// Tells the router when the forced update or the first launch turns on or
+/// off. It lives as long as the model it listens to.
+class _RedirectInputs extends ChangeNotifier {
+  _RedirectInputs(this.model) : _last = (model.updateGate, model.firstLaunch) {
+    model.addListener(_check);
+  }
+
+  final PrototypeModel model;
+  (bool, bool) _last;
+
+  void _check() {
+    final now = (model.updateGate, model.firstLaunch);
+    if (now == _last) return;
+    _last = now;
+    notifyListeners();
+  }
 }
 
 /// The Play button: a game with the settings last used. Offline with every
@@ -201,7 +266,7 @@ class _WelcomeRoute extends StatelessWidget {
           model.quickPlay = const PlaySettings();
           model.firstLaunch = false;
         });
-        // Leaving the game ends up on Home.
+        // Home is beneath the game.
         context.go(ProtoPath.round);
       },
     );

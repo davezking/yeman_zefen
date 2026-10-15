@@ -32,9 +32,7 @@ void main() {
     RoundSimulation? sim,
     bool showAppStart = false,
   }) async {
-    tester.view.physicalSize = phoneSize;
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+    setUpPhone(tester);
     await tester.pumpWidget(
       PrototypeApp(
         model: model,
@@ -121,6 +119,64 @@ void main() {
     expect(location(tester), ProtoPath.home);
     expect(find.byType(HomeScreen), findsOneWidget);
     await finish(tester, model);
+  });
+
+  testWidgets('after the first launch, system back on Results goes to Home', (
+    tester,
+  ) async {
+    final model = newModel(user: mockNewGuest)..firstLaunch = true;
+    final sim = RoundSimulation(
+      settings: const PlaySettings(),
+      totalRounds: 1,
+      interstitialEvery: 0,
+      random: Random(3),
+    );
+    await start(tester, model, sim: sim);
+    await tester.tap(find.text('Next'));
+    await settle(tester);
+    await tester.tap(find.text('Start playing'));
+    await settle(tester);
+    await tester.pump(const Duration(seconds: 2));
+    sim.answer(sim.view.correctIndex);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(location(tester), ProtoPath.results);
+
+    // Not out of the app: Home is beneath.
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await settle(tester);
+    expect(location(tester), ProtoPath.home);
+    await tester.pump(const Duration(seconds: 2));
+    await finish(tester, model);
+  });
+
+  testWidgets('Change era or mode leaves Home beneath Mode select', (
+    tester,
+  ) async {
+    final model = newModel();
+    await start(tester, model, path: ProtoPath.results);
+    await tester.ensureVisible(find.text('Change era or mode'));
+    await tester.pump();
+    await tester.tap(find.text('Change era or mode'));
+    await settle(tester);
+    expect(location(tester), ProtoPath.mode);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await settle(tester);
+    expect(location(tester), ProtoPath.home);
+    await tester.pump(const Duration(seconds: 2));
+    await finish(tester, model);
+  });
+
+  testWidgets('a jump keeps an answered consent and drops old Results', (
+    tester,
+  ) async {
+    final model = newModel()
+      ..consentDone = true
+      ..lastResults = mockResults(sync: ScoreSync.rejected);
+    model.resetStates();
+    expect(model.consentDone, isTrue);
+    expect(model.lastResults, isNull);
+    model.dispose();
   });
 
   testWidgets('app start shows for a moment, then Home', (tester) async {

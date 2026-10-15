@@ -51,7 +51,9 @@ final prototypeJumps = <JumpTarget>[
     'Home',
     'Home, no best score yet',
     ProtoPath.home,
-    prepare: (m) => m.user = m.user.isGuest ? mockNewGuest : mockSignedIn,
+    prepare: (m) => m.user = m.user.isGuest
+        ? mockNewGuest
+        : const UserInfo.signedIn(displayName: 'Meron T.', weeklyRank: 7),
   ),
 
   const JumpTarget('Play', 'Mode select', ProtoPath.mode),
@@ -80,12 +82,13 @@ final prototypeJumps = <JumpTarget>[
     'After a game',
     'Ad consent',
     ProtoPath.consent,
-    prepare: (m) => m.consentRequired = true,
+    prepare: (m) => m.consentDone = false,
   ),
   JumpTarget(
     'After a game',
     "Ad consent: Google's form",
     ProtoPath.consent,
+    prepare: (m) => m.consentDone = false,
     then: showUmpForm,
   ),
   JumpTarget(
