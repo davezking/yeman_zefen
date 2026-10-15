@@ -429,7 +429,10 @@ class ComponentGallery extends StatelessWidget {
                     'Offline play · 2 packs · 27 MB',
                     'ያለ ኢንተርኔት መጫወት · 2 ጥቅሎች · 27 ሜባ',
                   ), // settings.offline
-                  subtitle: _t('Update available', 'ማሻሻያ አለ'), // packs.updateAvailable
+                  subtitle: _t(
+                    'Update available',
+                    'ማሻሻያ አለ',
+                  ), // packs.updateAvailable
                   subtitleColor: ColorTokens.correctText,
                   badge: true,
                   onTap: _noop,
@@ -466,12 +469,18 @@ class ComponentGallery extends StatelessWidget {
               selected: 1,
               onChanged: (_) {},
               options: [
-                SegmentOption(value: 0, label: _t('Easy · 10 s', 'ቀላል · 10 ሰከንድ')),
+                SegmentOption(
+                  value: 0,
+                  label: _t('Easy · 10 s', 'ቀላል · 10 ሰከንድ'),
+                ),
                 SegmentOption(
                   value: 1,
                   label: _t('Medium · 5 s', 'መካከለኛ · 5 ሰከንድ'),
                 ),
-                SegmentOption(value: 2, label: _t('Hard · 3 s', 'ከባድ · 3 ሰከንድ')),
+                SegmentOption(
+                  value: 2,
+                  label: _t('Hard · 3 s', 'ከባድ · 3 ሰከንድ'),
+                ),
               ],
             ), // difficulty.*
             DecoratedBox(
@@ -620,6 +629,65 @@ class ComponentGallery extends StatelessWidget {
               onHome: _noop,
               onPlay: _noop,
               onSettings: _noop,
+            ),
+          ]),
+          section('Sign-in buttons · Apple, Google, email, signing in', [
+            SsoButton(
+              kind: SsoKind.apple,
+              label: _t('Continue with Apple', 'በApple ይቀጥሉ'), // auth.apple
+              onPressed: _noop,
+            ),
+            SsoButton(
+              kind: SsoKind.google,
+              label: _t('Continue with Google', 'በGoogle ይቀጥሉ'), // auth.google
+              onPressed: _noop,
+            ),
+            SsoButton(
+              kind: SsoKind.email,
+              label: _t('Continue with email', 'በኢሜይል ይቀጥሉ'), // auth.email
+              onPressed: _noop,
+            ),
+            SsoButton(
+              kind: SsoKind.google,
+              label: _t('Signing in…', 'በመግባት ላይ…'), // auth.signingIn
+              busy: true,
+              onPressed: null,
+            ),
+          ]),
+          section('Leaderboard avatars · podium, row', [
+            const Wrap(
+              spacing: SpacingTokens.n12,
+              runSpacing: SpacingTokens.n12,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                AvatarTile(
+                  bordered: true,
+                  colorIndex: 3,
+                  size: SizeTokens.podiumFirst,
+                ),
+                AvatarTile(
+                  bordered: true,
+                  colorIndex: 1,
+                  size: SizeTokens.podiumOther,
+                ),
+                AvatarTile(colorIndex: 0, size: SizeTokens.leaderboardAvatar),
+                AvatarTile(colorIndex: 2, size: SizeTokens.leaderboardAvatar),
+              ],
+            ),
+          ]),
+          section('Ad placeholder', [
+            SizedBox(
+              height: 240,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(RadiusTokens.large),
+                child: AdOverlay(
+                  badge: _t('Ad · 3', 'ማስታወቂያ · 3'), // ad.label
+                  caption: _t(
+                    'Ads keep this game free',
+                    'ጨዋታው ነፃ የሆነው በማስታወቂያ ነው',
+                  ), // ad.interstitialCaption
+                ),
+              ),
             ),
           ]),
           section('Dialog and bottom sheet', [

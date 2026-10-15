@@ -37,6 +37,7 @@ class HeroScaffold extends StatelessWidget {
     ),
     this.bodyGap = SpacingTokens.n12,
     this.denseText = false,
+    this.bodyFoot = false,
   });
 
   /// The content of the yellow area. Its height is whatever the content needs.
@@ -52,6 +53,9 @@ class HeroScaffold extends StatelessWidget {
   final double bodyGap;
   final bool denseText;
 
+  /// The faint mint at the bottom of the round screen.
+  final bool bodyFoot;
+
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
@@ -65,6 +69,7 @@ class HeroScaffold extends StatelessWidget {
       gap: bodyGap,
       footer: footer,
       reserveBottomSafeArea: bottomBar == null,
+      foot: bodyFoot,
       children: body,
     );
 
@@ -196,6 +201,7 @@ class _Body extends StatelessWidget {
     required this.gap,
     required this.footer,
     required this.reserveBottomSafeArea,
+    required this.foot,
     required this.children,
   });
 
@@ -203,6 +209,7 @@ class _Body extends StatelessWidget {
   final double gap;
   final Widget? footer;
   final bool reserveBottomSafeArea;
+  final bool foot;
   final List<Widget> children;
 
   @override
@@ -232,6 +239,25 @@ class _Body extends StatelessWidget {
               ),
             ),
           ),
+          if (foot)
+            const Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: SizeTokens.heroFadeHeight,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      ColorTokens.backgroundScreen,
+                      ColorTokens.backgroundScreenFoot,
+                    ],
+                  ),
+                ),
+              ),
+            ),
           CustomScrollView(
             slivers: [
               SliverFillRemaining(

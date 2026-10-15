@@ -32,6 +32,10 @@ enum SegmentedStyle {
   /// On the yellow hero: a translucent track, the selected item dark with a
   /// yellow label.
   onHero,
+
+  /// On a full-yellow screen (the leaderboard): a translucent track like
+  /// [onHero], but the selected item is a white key like [light].
+  onYellow,
 }
 
 /// A row of two or three exclusive choices (Song / Artist, Easy / Medium /
@@ -61,7 +65,7 @@ class SegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onHero = style == SegmentedStyle.onHero;
+    final onHero = style != SegmentedStyle.light;
     return Semantics(
       container: true,
       label: semanticLabel,
@@ -85,6 +89,7 @@ class SegmentedControl<T> extends StatelessWidget {
                       option: options[i],
                       selected: options[i].value == selected,
                       onHero: onHero,
+                      darkSelected: style == SegmentedStyle.onHero,
                       compact: compact,
                       onTap: () => onChanged(options[i].value),
                     ),
@@ -104,6 +109,7 @@ class _Segment<T> extends StatelessWidget {
     required this.option,
     required this.selected,
     required this.onHero,
+    required this.darkSelected,
     required this.compact,
     required this.onTap,
   });
@@ -111,6 +117,9 @@ class _Segment<T> extends StatelessWidget {
   final SegmentOption<T> option;
   final bool selected;
   final bool onHero;
+
+  /// The selected item is dark with a yellow label (Settings), not a white key.
+  final bool darkSelected;
   final bool compact;
   final VoidCallback onTap;
 
@@ -127,7 +136,7 @@ class _Segment<T> extends StatelessWidget {
     if (!selected) {
       textColor = ColorTokens.textSecondary;
     } else {
-      textColor = onHero
+      textColor = darkSelected
           ? ColorTokens.primaryAccentOnDark
           : ColorTokens.textPrimary;
     }
@@ -136,7 +145,7 @@ class _Segment<T> extends StatelessWidget {
     if (!selected) {
       fill = null;
       shadows = const [];
-    } else if (onHero) {
+    } else if (darkSelected) {
       fill = ColorTokens.surfaceDark;
       shadows = edgeShadow(ColorTokens.surfaceDarkEdge, dy: SpacingTokens.n4);
     } else {

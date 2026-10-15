@@ -360,4 +360,207 @@ void main() {
     expect(find.byType(RaisedSurface), findsNWidgets(6));
     handle.dispose();
   });
+
+  group('AvatarTile', () {
+    testWidgets('is the size it is asked to be, with or without its ring', (
+      tester,
+    ) async {
+      await pumpComponent(
+        tester,
+        const Wrap(
+          children: [
+            AvatarTile(colorIndex: 1, size: 68, bordered: true),
+            AvatarTile(colorIndex: 2, size: 30),
+          ],
+        ),
+      );
+      expect(tester.getSize(find.byType(AvatarTile).first), const Size(68, 68));
+      expect(tester.getSize(find.byType(AvatarTile).last), const Size(30, 30));
+    });
+
+    test('the same player always gets the same color', () {
+      expect(AvatarTile.colorFor(3), AvatarTile.colorFor(3));
+      expect(AvatarTile.colorFor(0), AvatarTile.colorFor(6));
+      expect(AvatarTile.colorFor(-1), isNotNull);
+    });
+  });
+
+  group('SsoButton', () {
+    testWidgets('is a button, and a spinner replaces the mark while busy', (
+      tester,
+    ) async {
+      var taps = 0;
+      await pumpComponent(
+        tester,
+        Column(
+          children: [
+            SsoButton(
+              kind: SsoKind.google,
+              label: 'Continue with Google',
+              onPressed: () => taps++,
+            ),
+            const SsoButton(
+              kind: SsoKind.apple,
+              label: 'Signing in…',
+              onPressed: null,
+              busy: true,
+            ),
+          ],
+        ),
+      );
+      await tester.tap(find.text('Continue with Google'));
+      expect(taps, 1);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Continue with Google')),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: true),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('a switched-off button does not tap and is dimmed', (
+      tester,
+    ) async {
+      await pumpComponent(
+        tester,
+        const SsoButton(
+          kind: SsoKind.email,
+          label: 'Continue with email',
+          onPressed: null,
+        ),
+      );
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Continue with email')),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+      );
+      handle.dispose();
+    });
+  });
+
+  group('AnimatedCount', () {
+    testWidgets(
+      'counts up to a new value, and to the first one from 0 on request',
+      (tester) async {
+        Widget count(int v, {bool fromZero = false}) => AnimatedCount(
+          value: v,
+          fromZero: fromZero,
+          builder: (context, n) => Text('n=$n'),
+        );
+        await pumpComponent(tester, count(100, fromZero: true));
+        expect(find.text('n=0'), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('n=100'), findsOneWidget);
+
+        await pumpComponent(tester, count(200));
+        await tester.pump(const Duration(milliseconds: 100));
+        final mid = find.textContaining('n=');
+        expect(mid, findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('n=200'), findsOneWidget);
+      },
+    );
+
+    testWidgets('with reduced motion the value is there at once', (
+      tester,
+    ) async {
+      await pumpComponent(
+        tester,
+        AnimatedCount(
+          value: 100,
+          fromZero: true,
+          builder: (context, n) => Text('n=$n'),
+        ),
+        disableAnimations: true,
+      );
+      await tester.pump();
+      expect(find.text('n=100'), findsOneWidget);
+    });
+  });
+
+  testWidgets('AdOverlay is announced as one message', (tester) async {
+    await pumpComponent(
+      tester,
+      const SizedBox(
+        height: 300,
+        child: AdOverlay(badge: 'Ad · 3', caption: 'Ads keep this game free'),
+      ),
+    );
+    final handle = tester.ensureSemantics();
+    expect(
+      tester.getSemantics(
+        find.bySemanticsLabel('Ad · 3. Ads keep this game free'),
+      ),
+      isSemantics(isLiveRegion: true),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('a small SecondaryButton can still share a row', (tester) async {
+    await pumpComponent(
+      tester,
+      Row(
+        children: [
+          Expanded(
+            child: SecondaryButton(
+              label: 'One',
+              small: true,
+              expand: true,
+              onPressed: () {},
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SecondaryButton(
+              label: 'Two',
+              small: true,
+              expand: true,
+              onPressed: () {},
+            ),
+          ),
+        ],
+      ),
+    );
+    final one = tester.getSize(find.bySemanticsLabel('One')).width;
+    final two = tester.getSize(find.bySemanticsLabel('Two')).width;
+    expect(one, two);
+    expect(one, greaterThan(100));
+  });
+
+  testWidgets('a small SecondaryButton sizes to its label by default', (
+    tester,
+  ) async {
+    await pumpComponent(
+      tester,
+      Align(
+        alignment: Alignment.centerLeft,
+        child: SecondaryButton(label: 'Clear', small: true, onPressed: () {}),
+      ),
+    );
+    expect(tester.getSize(find.byType(SecondaryButton)).width, lessThan(150));
+  });
+
+  testWidgets('the yellow segmented style keeps the selected item white', (
+    tester,
+  ) async {
+    await pumpComponent(
+      tester,
+      SegmentedControl<int>(
+        style: SegmentedStyle.onYellow,
+        selected: 0,
+        onChanged: (_) {},
+        options: const [
+          SegmentOption(value: 0, label: 'This week'),
+          SegmentOption(value: 1, label: 'All time'),
+        ],
+      ),
+    );
+    final selected = tester
+        .widgetList<RaisedSurface>(find.byType(RaisedSurface))
+        .first;
+    // The Settings style is dark with a yellow label; this one is a white key.
+    expect(selected.color, isNot(equals(const Color(0xFF2B2118))));
+    expect(selected.color, const Color(0xFFFFFFFF));
+  });
 }
