@@ -1,7 +1,499 @@
 {
   "@@locale": "en",
   "appTitle": "Guess the Song",
-  "@appTitle": { "description": "App name shown in the task switcher and on the home screen" },
+  "@appTitle": {
+    "description": "App name shown in the task switcher and on the home screen"
+  },
   "homeTagline": "Listen to the clip and pick the song.",
-  "playButton": "Play"
+  "playButton": "Play",
+  "appName": "Yeman Zefen",
+  "appTagline": "Whose song is it?",
+  "onboardLangTitle": "Choose your language",
+  "onboardLangAmharic": "አማርኛ",
+  "onboardLangEnglish": "English",
+  "onboardLangLater": "You can change this anytime in Settings.",
+  "onboardWelcomeTitle": "Name the song from its first notes.",
+  "onboardWelcomeBody": "Hear a short clip, then pick the song or the singer. No sign-up needed.",
+  "onboardWelcomeStart": "Start playing",
+  "commonNext": "Next",
+  "homeHello": "Ready for a song?",
+  "homeQuickPlay": "Play",
+  "homeQuickPlayLabel": "Play button starts",
+  "homeQuickPlaySettings": "{era} · {mode} · {difficulty}",
+  "@homeQuickPlaySettings": {
+    "placeholders": {
+      "era": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      },
+      "difficulty": {
+        "type": "String"
+      }
+    }
+  },
+  "homeChooseMode": "More ways to play",
+  "homeModeIntroShort": "The opening of the song",
+  "homeModeMiddleShort": "Harder · +25% points",
+  "homeModeEraShort": "Name the generation",
+  "homeLeaderboard": "Leaderboard",
+  "homeLeaderboardGuest": "Sign in to get a rank",
+  "homeLeaderboardOffline": "Needs internet",
+  "homeBestLabel": "Your best",
+  "homeBestNone": "Play a game to set your first best score.",
+  "homeBuiltIn": "Built-in songs",
+  "homeQuickPlayModeIntro": "Intro",
+  "homeQuickPlayModeMiddle": "Middle",
+  "homeQuickPlayModeEra": "Which Era?",
+  "difficultyEasyShort": "Easy",
+  "difficultyMediumShort": "Medium",
+  "difficultyHardShort": "Hard",
+  "navHome": "Home",
+  "navPlay": "Play",
+  "navSettings": "Settings",
+  "navBack": "Back",
+  "modeTitle": "How do you want to play?",
+  "modeIntroName": "Guess the Intro",
+  "modeIntroDesc": "The opening of the song. The classic.",
+  "modeMiddleName": "Guess from the Middle",
+  "modeMiddleDesc": "A clip from the middle. Harder, so it's worth more.",
+  "modeMiddleTag": "+25%",
+  "modeEraName": "Which Era?",
+  "modeEraDesc": "Hear a song and name its generation.",
+  "modeBonus": "Bonus",
+  "modeGuessLabel": "Guess the",
+  "modeGuessSong": "Song",
+  "modeGuessArtist": "Artist",
+  "eraTitle": "Pick an era",
+  "eraAll": "All eras",
+  "eraGolden": "Golden Age",
+  "eraGoldenRange": "Before 1980",
+  "era80s": "The '80s",
+  "era90s": "The '90s",
+  "era2000s": "The 2000s",
+  "eraModern": "Modern",
+  "eraModernRange": "2010 and later",
+  "eraOfflineUnavailable": "Needs internet or a downloaded pack",
+  "genreTitle": "Genre (optional)",
+  "genreAny": "Any genre",
+  "genreTizita": "Tizita",
+  "genreEthiojazz": "Ethio-jazz",
+  "genreTraditional": "Traditional",
+  "genrePop": "Pop",
+  "genreHiphop": "Hip-hop",
+  "difficultyTitle": "Clip length",
+  "difficultyEasy": "Easy · 10 s",
+  "difficultyMedium": "Medium · 5 s",
+  "difficultyHard": "Hard · 3 s",
+  "setupStart": "Start · {total} rounds",
+  "@setupStart": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "setupTooFewSongs": "Not enough songs for this choice yet. Try \"All eras\" or another genre.",
+  "roundCounter": "{n} / {total}",
+  "@roundCounter": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "roundScore": "{points} pts",
+  "@roundScore": {
+    "placeholders": {
+      "points": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "roundLoading": "Getting the next song…",
+  "roundLoadingNote": "If it doesn't load in 10 seconds, we'll skip this round. You won't lose points.",
+  "roundListen": "Listen…",
+  "roundQuestionSong": "Which song is this?",
+  "roundQuestionArtist": "Who sings this?",
+  "roundQuestionEra": "Which era is this song from?",
+  "roundSecondsLeft": "{s} s",
+  "@roundSecondsLeft": {
+    "placeholders": {
+      "s": {
+        "type": "int"
+      }
+    }
+  },
+  "roundHint": "Hint: remove 2 answers",
+  "roundHintTerms": "Watch a short ad. This round's points are halved.",
+  "roundHintPaused": "The timer pauses for up to 8 seconds while you decide, and while the ad plays.",
+  "roundHintClosesIn": "{s} s",
+  "@roundHintClosesIn": {
+    "placeholders": {
+      "s": {
+        "type": "int"
+      }
+    }
+  },
+  "roundTimerPaused": "Paused",
+  "roundHintWatch": "Watch ad",
+  "roundHintCancel": "No thanks",
+  "roundHintButton": "Hint",
+  "roundLeave": "Leave game",
+  "roundLeaveTitle": "Leave this game?",
+  "roundLeaveBody": "Your score for this game won't be saved.",
+  "roundLeaveConfirm": "Leave",
+  "roundLeaveCancel": "Keep playing",
+  "a11yAnswer": "Answer {n}: {text}",
+  "@a11yAnswer": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yTimer": "{s} seconds left",
+  "@a11yTimer": {
+    "placeholders": {
+      "s": {
+        "type": "int"
+      }
+    }
+  },
+  "a11yPlaying": "Clip playing",
+  "feedbackCorrect": "Correct",
+  "feedbackPoints": "+{points}",
+  "@feedbackPoints": {
+    "placeholders": {
+      "points": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "feedbackSpeedBonus": "Speed bonus +{bonus}",
+  "@feedbackSpeedBonus": {
+    "placeholders": {
+      "bonus": {
+        "type": "int"
+      }
+    }
+  },
+  "feedbackWrong": "Not this one",
+  "feedbackReveal": "It was {song} · {artist}",
+  "@feedbackReveal": {
+    "placeholders": {
+      "song": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "feedbackTapToContinue": "Tap to continue · {s} s",
+  "@feedbackTapToContinue": {
+    "placeholders": {
+      "s": {
+        "type": "int"
+      }
+    }
+  },
+  "feedbackYourPick": "Your pick",
+  "feedbackRevealEra": "It's from {era}",
+  "@feedbackRevealEra": {
+    "placeholders": {
+      "era": {
+        "type": "String"
+      }
+    }
+  },
+  "feedbackTimeout": "Time's up",
+  "feedbackHintUsed": "Hint used · half points",
+  "feedbackSkipped": "We skipped a song that wouldn't load or play. No points lost.",
+  "resultsTitle": "Game complete",
+  "resultsScore": "{score} points",
+  "@resultsScore": {
+    "placeholders": {
+      "score": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "resultsCorrectCount": "{correct} of {total} right",
+  "@resultsCorrectCount": {
+    "placeholders": {
+      "correct": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsNewBest": "New personal best",
+  "resultsRounds": "Your rounds",
+  "resultsPlayAgain": "Play again",
+  "resultsChange": "Change era or mode",
+  "resultsHome": "Home",
+  "resultsGuestRank": "Sign in to put this score on the leaderboard",
+  "resultsWeeklyRank": "You're #{rank} this week",
+  "@resultsWeeklyRank": {
+    "placeholders": {
+      "rank": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsSavedOffline": "Score saved. It will be sent when you're back online.",
+  "resultsNotRanked": "This game couldn't be checked, so it won't count toward rankings.",
+  "lbTitle": "Leaderboard",
+  "lbWeekly": "This week",
+  "lbAllTime": "All time",
+  "lbEra": "Era: {era}",
+  "@lbEra": {
+    "placeholders": {
+      "era": {
+        "type": "String"
+      }
+    }
+  },
+  "lbYou": "You",
+  "lbYourRank": "Your rank: #{rank}",
+  "@lbYourRank": {
+    "placeholders": {
+      "rank": {
+        "type": "int"
+      }
+    }
+  },
+  "lbPoints": "{points} pts",
+  "@lbPoints": {
+    "placeholders": {
+      "points": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "lbNotRanked": "Finish a game this week to get a rank.",
+  "lbGuestTitle": "Want your name up here?",
+  "lbGuestBody": "Sign in to rank. Your scores come with you.",
+  "lbGuestCta": "Sign in",
+  "lbEmpty": "No scores yet this week. Be the first.",
+  "lbOffline": "You're offline. Showing the board from {time}.",
+  "@lbOffline": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lbOfflineNone": "Connect to the internet to see the leaderboard.",
+  "lbLoading": "Loading the leaderboard…",
+  "packsTitle": "Offline play",
+  "packsIntro": "Online, songs load as you play. Download packs to play without internet.",
+  "packsWifiOnly": "Download packs on Wi-Fi only",
+  "packsMobilePrefetch": "Download upcoming songs on mobile data",
+  "packsMobilePrefetchHelp": "Off saves data: only songs already on your phone play.",
+  "packsCache": "Cache {size} MB",
+  "@packsCache": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "packsClearCache": "Clear cache",
+  "packsBuiltIn": "Built-in songs",
+  "packsBuiltInMeta": "{count} songs · comes with the app",
+  "@packsBuiltInMeta": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "packsAlways": "Always there",
+  "packsOnPhone": "On this phone",
+  "packsAvailable": "Available to download",
+  "packsSongs": "{count} songs",
+  "@packsSongs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "packsSize": "{size} MB",
+  "@packsSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "packsDownload": "Download",
+  "packsProgress": "{percent}%",
+  "@packsProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "packsCancel": "Cancel",
+  "packsVerifying": "Checking files…",
+  "packsDownloaded": "Downloaded",
+  "packsUpdateAvailable": "Update available",
+  "packsUpdate": "Update · {size} MB",
+  "@packsUpdate": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "packsRemove": "Remove",
+  "packsRemoveConfirm": "Remove {name}? You can download it again later.",
+  "@packsRemoveConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "packsMobileDataTitle": "Download on mobile data?",
+  "packsMobileDataBody": "This pack is {size} MB.",
+  "@packsMobileDataBody": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "packsMobileDataConfirm": "Download now",
+  "packsMobileDataWait": "Wait for Wi-Fi",
+  "packsStorageFull": "Not enough space. Free up {size} MB and try again.",
+  "@packsStorageFull": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "packsOffline": "Connect to the internet to download packs.",
+  "authPromptTitle": "Keep your scores",
+  "authPromptBody": "Sign in to keep your progress on any phone and join the global leaderboard.",
+  "authPromptCarryOver": "Your scores so far come with you.",
+  "authGoogle": "Continue with Google",
+  "authApple": "Continue with Apple",
+  "authEmail": "Continue with email",
+  "authNotNow": "Not now",
+  "authEmailLabel": "Email",
+  "authPasswordLabel": "Password",
+  "authEmailSubmit": "Sign in",
+  "authEmailCreate": "New here? Create an account",
+  "authEmailForgot": "Forgot password?",
+  "authSigningIn": "Signing in…",
+  "authSignedIn": "Signed in as {name}",
+  "@authSignedIn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "authLinkFailed": "We couldn't link your account. Your scores are safe on this phone, and we'll try again.",
+  "authErrorEmail": "Check your email address.",
+  "authErrorPassword": "Wrong email or password.",
+  "settingsTitle": "Settings",
+  "settingsLanguage": "Language",
+  "settingsSound": "Sound effects",
+  "settingsHaptics": "Vibration",
+  "settingsAccount": "Account",
+  "settingsGuest": "Playing as a guest",
+  "settingsSignIn": "Sign in",
+  "settingsSignOut": "Sign out",
+  "settingsSignOutConfirm": "Sign out? Your scores stay saved to your account.",
+  "settingsDelete": "Delete account",
+  "settingsDeleteBody": "This permanently deletes your account and your leaderboard scores. It can't be undone.",
+  "settingsDeleteConfirm": "Delete my account",
+  "settingsAdPrivacy": "Ad privacy choices",
+  "settingsOffline": "Offline play · {count, plural, =1{1 pack} other{{count} packs}} · {size} MB",
+  "@settingsOffline": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsPrivacy": "Privacy policy",
+  "settingsAbout": "About and licenses",
+  "settingsVersion": "Version {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMusicCredit": "Music used under license from [ASSOCIATION NAME].",
+  "consentTitle": "Ads keep this game free",
+  "consentBody": "Next, you'll choose how ads may use your data. You can change this anytime in Settings.",
+  "consentContinue": "Continue",
+  "adLabel": "Ad",
+  "adLoading": "Loading ad…",
+  "adUnavailable": "No ad is available right now. Try again later.",
+  "adNotFinished": "Watch the whole ad to get the hint.",
+  "adRewardCaption": "Your hint is on its way…",
+  "adInterstitialCaption": "Ads keep this game free",
+  "updateTitle": "Time to update",
+  "updateBody": "This version can't connect to the game server anymore. Update to use the leaderboard and get new songs.",
+  "updateCtaAndroid": "Update on Google Play",
+  "updateCtaIos": "Update on the App Store",
+  "updatePlayOffline": "Play offline songs",
+  "offlineBanner": "You're offline. You can still play built-in and downloaded songs.",
+  "offlineBannerBuiltInOnly": "You're offline. You can still play the {count} built-in songs.",
+  "@offlineBannerBuiltInOnly": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "offlineBannerShort": "You're offline.",
+  "offlinePending": "{count} games waiting to be sent",
+  "@offlinePending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "offlineSynced": "Back online. Your scores have been sent.",
+  "emptyOutOfSongsTitle": "You've played every song here",
+  "emptyOutOfSongsBody": "You're offline, and you've heard all the songs on this phone recently. Download a pack in Settings › Offline play for more.",
+  "emptyOutOfSongsPacks": "Browse packs",
+  "emptyOutOfSongsReplay": "Play them again",
+  "errorGenericTitle": "Something went wrong",
+  "errorGenericBody": "Please try again. If it keeps happening, restart the app.",
+  "errorRetry": "Try again",
+  "errorDownload": "Download failed. Check your connection and try again.",
+  "errorPackCorrupt": "Part of this pack didn't download correctly. Downloading it again…",
+  "errorSync": "Couldn't send your scores. We'll try again automatically.",
+  "loadingApp": "Tuning up…",
+  "loadingGeneric": "Loading…"
 }

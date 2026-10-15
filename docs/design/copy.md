@@ -61,10 +61,18 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `home.best.label` | Your best | ምርጥ ውጤትዎ |
 | `home.best.none` | Play a game to set your first best score. | የመጀመሪያ ምርጥ ውጤትዎን ለማስመዝገብ አንድ ጨዋታ ይጫወቱ። |
 | `home.builtIn` | Built-in songs | አብረው የመጡ ዘፈኖች |
+| `home.quickPlay.mode.intro` | Intro | መግቢያ |
+| `home.quickPlay.mode.middle` | Middle | ከመሀል |
+| `home.quickPlay.mode.era` | Which Era? | የየትኛው ዘመን? |
+| `difficulty.easy.short` | Easy | ቀላል |
+| `difficulty.medium.short` | Medium | መካከለኛ |
+| `difficulty.hard.short` | Hard | ከባድ |
 | `nav.home` | Home | መነሻ |
 | `nav.play` | Play | ይጫወቱ |
 | `nav.settings` | Settings | ቅንብሮች |
 | `nav.back` | Back | ይመለሱ |
+
+> **Short labels for the Play line** (added in Phase 2 · Sprint 2). The Home boards show "The '80s · Intro · Easy" and "የ80ዎቹ · መግቢያ · ቀላል", but the deck only had the long names ("Guess the Intro", "Easy · 10 s"). The six `home.quickPlay.mode.*` and `difficulty.*.short` rows are those short forms. "መግቢያ" and "ቀላል" are on the approved board; the other Amharic labels are the reviewed long names without their verb or clip length. **Have a native speaker confirm the Amharic ones before release.**
 
 ## Mode select
 

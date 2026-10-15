@@ -66,6 +66,8 @@ abstract final class ColorTokens {
   /// Selected options, Leaderboard row, offline banner. Gradient slate → ink
   static const Color surfaceDark = paletteInk;
   static const Color surfaceDarkEdge = paletteInkDeep;
+  /// Segmented-control track on the yellow hero (Settings language)
+  static const Color surfaceSegmentTrackOnHero = Color(0x73FFFFFF);
   static const Color surfaceSegmentTrack = paletteCream100;
   static const Color surfaceDivider = paletteCream200;
   /// Inline error card, gradient #FFF1EC → #FFE3DA, edge #F4C7B8
@@ -226,9 +228,15 @@ abstract final class SpacingTokens {
   /// Screen side padding in the hero
   static const double n18 = 18.0;
   static const double n20 = 20.0;
+  /// Hero and body bottom padding on Mode select and Settings
+  static const double n22 = 22.0;
   static const double n24 = 24.0;
+  /// Hero bottom padding; side padding of the bottom bar
+  static const double n26 = 26.0;
   /// Body top padding under the hero (hero overlaps by 12)
   static const double n28 = 28.0;
+  /// Hero top padding on Home
+  static const double n30 = 30.0;
   static const double n32 = 32.0;
   /// Body starts 12 px under the hero so the curve sits over the cream fade
   static const double heroOverlap = -12.0;
@@ -247,12 +255,18 @@ abstract final class RadiusTokens {
   /// Answer tiles, primary buttons, option rows
   static const double large = 20.0;
   static const double playButton = 22.0;
+  /// Large option cards on Mode select
+  static const double modeCard = 22.0;
+  /// Icon tile on the large mode cards
+  static const double modeIcon = 16.0;
   /// Message-screen icon badge (120 × 120)
   static const double badge = 36.0;
   static const BorderRadius bottomBar = BorderRadius.only(topLeft: Radius.circular(36.0), topRight: Radius.circular(36.0), bottomRight: Radius.circular(0.0), bottomLeft: Radius.circular(0.0));
   static const BorderRadius sheet = BorderRadius.only(topLeft: Radius.circular(32.0), topRight: Radius.circular(32.0), bottomRight: Radius.circular(0.0), bottomLeft: Radius.circular(0.0));
-  /// Curved bottom of the yellow hero; 40 on denser screens
+  /// Curved bottom of the yellow hero; heroDense on denser screens
   static const BorderRadius hero = BorderRadius.only(topLeft: Radius.circular(0.0), topRight: Radius.circular(0.0), bottomRight: Radius.circular(44.0), bottomLeft: Radius.circular(44.0));
+  /// Curved bottom of the hero on era setup, Settings and Offline play
+  static const BorderRadius heroDense = BorderRadius.only(topLeft: Radius.circular(0.0), topRight: Radius.circular(0.0), bottomRight: Radius.circular(40.0), bottomLeft: Radius.circular(40.0));
 }
 
 abstract final class ElevationTokens {
@@ -325,6 +339,14 @@ abstract final class ElevationTokens {
 abstract final class SizeTokens {
   /// Back button; 52 in the bottom bar
   static const double iconButton = 48.0;
+  /// Wordmark tile on Home (40 on first launch); radius.pill
+  static const double logoTile = 30.0;
+  /// Length of the cream-to-white fade under the hero's curve (color.background.heroFade)
+  static const double heroFadeHeight = 140.0;
+  /// Home and Settings icon buttons in the bottom bar
+  static const double navButton = 52.0;
+  /// Icon tile on the large mode cards (Mode select); radius.modeIcon
+  static const double modeIconTile = 52.0;
   static const double playButtonMinWidth = 140.0;
   static const double playButtonHeight = 62.0;
   /// 2 × 2 grid, 12 gap
@@ -337,6 +359,9 @@ abstract final class SizeTokens {
   static const double chipMinHeight = 34.0;
   static const double toggleWidth = 46.0;
   static const double toggleHeight = 28.0;
+  /// White knob, inset toggleKnobInset from the track
+  static const double toggleKnob = 22.0;
+  static const double toggleKnobInset = 3.0;
   static const double timerBarHeight = 8.0;
   static const double cassetteWidth = 200.0;
   static const double cassetteHeight = 128.0;
