@@ -65,6 +65,8 @@ class EraCard extends StatelessWidget {
     final card = RaisedSurface(
       onTap: enabled ? onTap : null,
       semanticLabel: subtitle == null ? label : '$label, $subtitle',
+      selected: selected,
+      inertButton: true,
       expand: true,
       minHeight: SizeTokens.eraCardMinHeight,
       borderRadius: radius,
@@ -114,11 +116,6 @@ class EraCard extends StatelessWidget {
     );
     return enabled
         ? ringed
-        : Semantics(
-            container: true,
-            button: true,
-            enabled: false,
-            child: Opacity(opacity: game.answerDimOpacity, child: ringed),
-          );
+        : Opacity(opacity: game.answerDimOpacity, child: ringed);
   }
 }

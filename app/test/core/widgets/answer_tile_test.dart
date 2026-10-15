@@ -255,6 +255,36 @@ void main() {
       expect(pop, findsNothing);
     });
 
+    testWidgets(
+      'rebuilding a revealed tile reuses its pop animation instead of making a new one',
+      (tester) async {
+        // A new animation per build would add a listener to the controller on every
+        // rebuild, and the round rebuilds every 100 ms.
+        late StateSetter set;
+        await pumpTile(
+          tester,
+          StatefulBuilder(
+            builder: (context, setState) {
+              set = setState;
+              return const AnswerTile(text: 'A', state: AnswerState.correct);
+            },
+          ),
+        );
+        final pop = find.descendant(
+          of: find.byType(AnswerTile),
+          matching: find.byType(ScaleTransition),
+        );
+        final first = tester.widget<ScaleTransition>(pop).scale;
+        set(() {});
+        await tester.pump();
+        expect(
+          identical(tester.widget<ScaleTransition>(pop).scale, first),
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+      },
+    );
+
     testWidgets('going from idle to correct plays the pop', (tester) async {
       final pop = find.descendant(
         of: find.byType(AnswerTile),

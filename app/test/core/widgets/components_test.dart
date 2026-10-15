@@ -124,6 +124,25 @@ void main() {
           tester.getSemantics(find.text('Off')),
           matchesSemantics(isButton: true, hasEnabledState: true, label: 'Off'),
         );
+
+        // A disabled icon button keeps its name and its disabled state on one node.
+        await pumpComponent(
+          tester,
+          const AppIconButton(
+            icon: Icons.close_rounded,
+            semanticLabel: 'Cancel',
+            onPressed: null,
+          ),
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('Cancel')),
+          isSemantics(
+            label: 'Cancel',
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: false,
+          ),
+        );
         handle.dispose();
       },
     );
@@ -177,6 +196,57 @@ void main() {
       expect(dropOf(tester), ElevationTokens.primary.first.offset.dy);
       await press.up();
     });
+  });
+
+  group('RaisedSurface', () {
+    double dropOf(WidgetTester tester) => tester
+        .widget<Transform>(
+          find
+              .descendant(
+                of: find.byType(RaisedSurface),
+                matching: find.byType(Transform),
+              )
+              .first,
+        )
+        .transform
+        .getTranslation()
+        .y;
+
+    testWidgets(
+      'does not stay pressed when it is switched off mid-press and back on',
+      (tester) async {
+        // The round switches tiles off when time runs out, maybe with a finger still down.
+        var on = true;
+        late StateSetter set;
+        await pumpComponent(
+          tester,
+          StatefulBuilder(
+            builder: (context, setState) {
+              set = setState;
+              return RaisedSurface(
+                onTap: on ? () {} : null,
+                shadows: ElevationTokens.answer,
+                minHeight: SizeTokens.answerTileMinHeight,
+                child: const Text('tile'),
+              );
+            },
+          ),
+          disableAnimations: true,
+        );
+        final press = await tester.startGesture(
+          tester.getCenter(find.text('tile')),
+        );
+        await tester.pump();
+        expect(dropOf(tester), greaterThan(0));
+
+        set(() => on = false);
+        await tester.pump();
+        set(() => on = true);
+        await tester.pump();
+        expect(dropOf(tester), 0);
+        await press.up();
+      },
+    );
   });
 
   group('TimerBar', () {
@@ -390,6 +460,65 @@ void main() {
         ColorTokens.answerDimOpacity,
       );
     });
+
+    testWidgets(
+      'a screen reader hears which era is selected, and which is unavailable',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        await pumpComponent(
+          tester,
+          EraCard(
+            label: "The '80s",
+            generationId: 2,
+            selected: true,
+            onTap: () {},
+          ),
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel("The '80s")),
+          isSemantics(
+            isSelected: true,
+            hasSelectedState: true,
+            isButton: true,
+            isEnabled: true,
+          ),
+        );
+
+        await pumpComponent(
+          tester,
+          EraCard(
+            label: "The '90s",
+            generationId: 3,
+            selected: false,
+            onTap: () {},
+          ),
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel("The '90s")),
+          isSemantics(isSelected: false, hasSelectedState: true),
+        );
+
+        await pumpComponent(
+          tester,
+          const EraCard(
+            label: 'The 2000s',
+            generationId: 4,
+            selected: false,
+            enabled: false,
+            onTap: null,
+          ),
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('The 2000s')),
+          isSemantics(
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: false,
+          ),
+        );
+        handle.dispose();
+      },
+    );
 
     testWidgets('EraCard is read with its years', (tester) async {
       final handle = tester.ensureSemantics();

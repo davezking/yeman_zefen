@@ -39,10 +39,20 @@ void main() {
       '\\b(?:width|height|minWidth|minHeight|dimension):\\s*$num',
     ),
     'a literal offset': RegExp('Offset\\(\\s*$num'),
+    // A weight set with copyWith skips the variable Fidel font's weight axis.
+    'a weight change without AppTextStyles.withWeight': RegExp(
+      r'\bfontWeight:',
+    ),
   };
 
   // Layout values that are not design tokens, by file, with the reason.
   const allowed = <String, Set<String>>{};
+
+  // Rules that do not apply to a file, with the reason.
+  const exemptRules = <String, Set<String>>{
+    // Where the text styles and withWeight itself are built.
+    'app_text.dart': {'a weight change without AppTextStyles.withWeight'},
+  };
 
   test('there are files to scan', () => expect(files, isNotEmpty));
 
@@ -55,6 +65,7 @@ void main() {
         final line = lines[i];
         if (line.trimLeft().startsWith('//')) continue;
         for (final rule in rules.entries) {
+          if ((exemptRules[name] ?? const {}).contains(rule.key)) continue;
           if (rule.value.hasMatch(line) &&
               !(allowed[name] ?? const {}).contains(line.trim())) {
             problems.add('$name:${i + 1}: ${rule.key}: ${line.trim()}');

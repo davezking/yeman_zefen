@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_text.dart';
 import '../theme/theme_context.dart';
 import '../theme/tokens.dart';
 import 'app_button.dart';
@@ -237,10 +238,10 @@ class _Trailing extends StatelessWidget {
       case PackStatus.installed:
       case PackStatus.builtIn:
         final check = card.status == PackStatus.installed;
-        final style = text.caption.copyWith(
-          color: ColorTokens.correctText,
-          fontWeight: FontWeight.w700,
-        );
+        final style = AppTextStyles.withWeight(
+          text.caption,
+          FontWeight.w700,
+        ).copyWith(color: ColorTokens.correctText);
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [

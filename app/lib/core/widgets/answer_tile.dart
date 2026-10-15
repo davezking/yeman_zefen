@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_text.dart';
-import '../theme/game_tokens.dart';
 import '../theme/theme_context.dart';
 import '../theme/tokens.dart';
 import 'raised_surface.dart';
@@ -64,16 +63,30 @@ class _AnswerTileState extends State<AnswerTile>
     with SingleTickerProviderStateMixin {
   AnimationController? _pop;
 
+  /// Built once with the controller. Building it in [build] would add a status
+  /// listener to the controller on every rebuild, and the round rebuilds often.
+  Animation<double>? _popScale;
+  CurvedAnimation? _popCurve;
+
   static bool _reveals(AnswerState s) =>
       s == AnswerState.correct || s == AnswerState.wrong;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _pop ??= AnimationController(
-      vsync: this,
-      duration: context.game.popDuration,
-    );
+    if (_pop == null) {
+      final game = context.game;
+      final controller = AnimationController(
+        vsync: this,
+        duration: game.popDuration,
+      );
+      _pop = controller;
+      _popCurve = CurvedAnimation(
+        parent: controller,
+        curve: game.standardCurve,
+      );
+      _popScale = _buildPop(_popCurve!);
+    }
     if (_reveals(widget.state) &&
         !context.reduceMotion &&
         _pop!.status == AnimationStatus.dismissed) {
@@ -93,6 +106,7 @@ class _AnswerTileState extends State<AnswerTile>
 
   @override
   void dispose() {
+    _popCurve?.dispose();
     _pop?.dispose();
     super.dispose();
   }
@@ -212,19 +226,19 @@ class _AnswerTileState extends State<AnswerTile>
       tile = Opacity(opacity: opacity, child: tile);
     }
 
-    final pop = _pop;
-    if (pop != null && _reveals(state) && !context.reduceMotion) {
-      tile = ScaleTransition(scale: _popScale(pop, game), child: tile);
+    final popScale = _popScale;
+    if (popScale != null && _reveals(state) && !context.reduceMotion) {
+      tile = ScaleTransition(scale: popScale, child: tile);
     }
     return tile;
   }
 
   /// Scale 0.96 -> 1.03 (at 60%) -> 1, as in the design.
-  Animation<double> _popScale(AnimationController c, GameTokens game) =>
+  static Animation<double> _buildPop(CurvedAnimation curve) =>
       TweenSequence<double>([
         TweenSequenceItem(tween: Tween(begin: 0.96, end: 1.03), weight: 60),
         TweenSequenceItem(tween: Tween(begin: 1.03, end: 1.0), weight: 40),
-      ]).animate(CurvedAnimation(parent: c, curve: game.standardCurve));
+      ]).animate(curve);
 
   static LinearGradient _vertical(Color top, Color bottom) => LinearGradient(
     begin: Alignment.topCenter,

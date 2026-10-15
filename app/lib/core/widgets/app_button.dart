@@ -44,6 +44,7 @@ class PrimaryButton extends StatelessWidget {
       enabled: onPressed != null,
       child: RaisedSurface(
         onTap: onPressed,
+        inertButton: true,
         expand: expand && !small,
         minHeight: small
             ? SizeTokens.smallButtonMinHeight
@@ -93,6 +94,7 @@ class SecondaryButton extends StatelessWidget {
       enabled: onPressed != null,
       child: RaisedSurface(
         onTap: onPressed,
+        inertButton: true,
         expand: expand,
         minHeight: SizeTokens.secondaryButtonMinHeight,
         borderRadius: BorderRadius.circular(RadiusTokens.card),
@@ -129,6 +131,7 @@ class AppIconButton extends StatelessWidget {
       enabled: onPressed != null,
       child: RaisedSurface(
         onTap: onPressed,
+        inertButton: true,
         semanticLabel: semanticLabel,
         minWidth: SpacingTokens.touchTargetMin,
         minHeight: SpacingTokens.touchTargetMin,
@@ -174,14 +177,10 @@ class _Dimmed extends StatelessWidget {
   final bool enabled;
   final Widget child;
 
+  // The "disabled button" announcement comes from the surface itself
+  // (RaisedSurface.inertButton), so it stays on the same node as the label.
   @override
-  Widget build(BuildContext context) {
-    if (enabled) return child;
-    return Semantics(
-      container: true,
-      button: true,
-      enabled: false,
-      child: Opacity(opacity: context.game.answerDimOpacity, child: child),
-    );
-  }
+  Widget build(BuildContext context) => enabled
+      ? child
+      : Opacity(opacity: context.game.answerDimOpacity, child: child);
 }

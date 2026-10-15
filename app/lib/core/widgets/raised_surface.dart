@@ -29,6 +29,8 @@ class RaisedSurface extends StatefulWidget {
     this.expand = false,
     this.onTap,
     this.semanticLabel,
+    this.selected,
+    this.inertButton = false,
   });
 
   final Widget child;
@@ -56,12 +58,29 @@ class RaisedSurface extends StatefulWidget {
   /// text is not the whole story ("Answer 2: Aster Aweke").
   final String? semanticLabel;
 
+  /// For a choice among several (an era card): whether this one is chosen.
+  /// Screen readers announce it; null means the surface is not a choice.
+  final bool? selected;
+
+  /// With no [onTap], still announce the surface as a button, a disabled one.
+  /// For buttons and cards that are switched off rather than decorative.
+  final bool inertButton;
+
   @override
   State<RaisedSurface> createState() => _RaisedSurfaceState();
 }
 
 class _RaisedSurfaceState extends State<RaisedSurface> {
   bool _pressed = false;
+
+  @override
+  void didUpdateWidget(RaisedSurface old) {
+    super.didUpdateWidget(old);
+    // InkWell does not report the end of a press when it leaves the tree
+    // (a tile switched off while a finger is still on it), so the press is
+    // dropped here. Otherwise the surface would come back looking pressed.
+    if (widget.onTap == null) _pressed = false;
+  }
 
   /// How far the surface drops when pressed: the height of its press edge.
   double get _edge {
@@ -111,12 +130,18 @@ class _RaisedSurfaceState extends State<RaisedSurface> {
     final onTap = widget.onTap;
     final label = widget.semanticLabel;
     if (onTap == null) {
-      if (label == null) return surface;
-      // Not pressable, but still read out as one piece ("Answer 2: Aster Aweke, Correct").
+      if (label == null && !widget.inertButton && widget.selected == null) {
+        return surface;
+      }
+      // Not pressable, but still read out as one piece: "Answer 2: Aster
+      // Aweke, Correct", or a switched-off button with its label.
       return Semantics(
         container: true,
+        button: widget.inertButton ? true : null,
+        enabled: widget.inertButton ? false : null,
+        selected: widget.selected,
         label: label,
-        child: ExcludeSemantics(child: surface),
+        child: ExcludeSemantics(excluding: label != null, child: surface),
       );
     }
 
@@ -139,6 +164,7 @@ class _RaisedSurfaceState extends State<RaisedSurface> {
       container: true,
       button: true,
       enabled: true,
+      selected: widget.selected,
       label: label,
       onTap: label == null ? null : onTap,
       child: ExcludeSemantics(
