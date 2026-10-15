@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/theme/app_theme.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/debug/sessions_debug_screen.dart';
 import 'features/game/home_screen.dart';
@@ -10,15 +11,9 @@ import 'features/game/presentation/start_screen.dart';
 import 'features/packs/presentation/packs_screen.dart';
 import 'l10n/app_localizations.dart';
 
-/// Bundled in `assets/fonts`. Latin text keeps the default font; Fidel falls back to this.
-const ethiopicFontFamily = 'NotoSansEthiopic';
-
-ThemeData buildAppTheme() {
-  final base = ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal);
-  return base.copyWith(
-    textTheme: base.textTheme.apply(fontFamilyFallback: const [ethiopicFontFamily]),
-  );
-}
+/// One theme per language (only the text differs), built once.
+final _themes = <String, ThemeData>{};
+ThemeData _themeFor(Locale locale) => _themes.putIfAbsent(locale.languageCode, () => buildAppTheme(locale));
 
 /// The app's routes. Tests build their own router, starting anywhere.
 GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
@@ -49,7 +44,9 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: buildAppTheme(),
+      theme: _themeFor(const Locale('en')),
+      // The theme depends on the language, which is only known below MaterialApp.
+      builder: (context, child) => Theme(data: _themeFor(Localizations.localeOf(context)), child: child!),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: _router,

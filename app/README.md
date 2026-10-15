@@ -45,7 +45,39 @@ flutter analyze
 flutter test
 ```
 
+## Design tokens, theme and components
+
+The approved design lives in `docs/design/` (see its README). The app takes its colors, type, spacing, radii,
+shadows, sizes and motion from `docs/design/tokens.json`, never from literals:
+
+```sh
+dart run tool/gen_tokens.dart            # tokens.json -> lib/core/theme/tokens.dart (commit the result)
+dart run tool/gen_tokens.dart --check    # fails if tokens.dart is stale; a test runs the same check
+```
+
+- `lib/core/theme/`: `tokens.dart` (generated, `ColorTokens.correctFill`, `SpacingTokens.n12`, ...), `app_theme.dart`
+  (`buildAppTheme(locale)`), `app_text.dart` (the type scale per language, Fidel line heights), `game_tokens.dart`
+  (a `ThemeExtension`: correct/wrong, timer, era colors, motion). Read them with `context.game` and `context.text`.
+- `lib/core/widgets/`: the designed components, imported through `widgets.dart`. They take plain data and callbacks,
+  never providers. `test/core/theme/no_hardcoded_values_test.dart` fails if a color, size or duration literal
+  sneaks into the theme or the widgets.
+- A grid of answers or eras must use `EqualHeightGrid`, not a fixed-aspect `GridView`: Amharic and text scale 1.3
+  make cells taller, and a fixed ratio clips them.
+- Widget tests load the real fonts with `loadAppFonts()` (`test/core/widgets/widget_kit.dart`). Without it every
+  glyph is a fixed-width square and overflow checks mean nothing.
+
+### Component gallery
+
+Every component in every state, with an English/Amharic switch and a text scale 1.0/1.3 switch:
+
+```sh
+flutter run -t lib/main_gallery.dart
+```
+
+Compare it with the screenshots in `docs/design/screens/`. There is no dark theme: none was designed.
+
 ## Fonts
 
-Noto Sans Ethiopic (SIL Open Font License, see `assets/fonts/OFL.txt`) is the fallback font,
-so Fidel never renders as boxes.
+Poppins (Latin) and Noto Sans Ethiopic (Fidel), both SIL Open Font License (`assets/fonts/OFL-Poppins.txt`,
+`assets/fonts/OFL.txt`). Each is the other's fallback, so neither script renders as boxes. Noto Sans Ethiopic is a
+variable font, so the text styles ask for their weight with `fontVariations` (see `AppTextStyles`).
