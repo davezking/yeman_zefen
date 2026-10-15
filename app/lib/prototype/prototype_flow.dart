@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/widgets/widgets.dart';
 import '../l10n/app_localizations.dart';
+import 'mock_data.dart';
 import 'models.dart';
 import 'prototype_model.dart';
+import 'prototype_paths.dart';
 import 'round_simulation.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/message_screens.dart';
@@ -22,19 +25,11 @@ import 'screens/sign_in_sheet.dart';
 // The round
 
 /// Plays one game of [PrototypeModel.quickPlay]. When it ends it is replaced
-/// by [ResultsRoute]; "Leave" pops it.
+/// by Results (after Ad consent, where that is due); "Leave" goes back.
 class RoundRoute extends StatefulWidget {
-  const RoundRoute({
-    super.key,
-    required this.model,
-    this.simulation,
-    this.onChangeSettings,
-  });
+  const RoundRoute({super.key, required this.model, this.simulation});
 
   final PrototypeModel model;
-
-  /// Results' "Change era or mode": opens the choices again. Null just goes back.
-  final void Function(BuildContext context)? onChangeSettings;
 
   /// Tests pass a seeded game to know the answers.
   final RoundSimulation? simulation;
@@ -84,37 +79,16 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
     }
     if (_sim.left) {
       _done = true;
-      Navigator.of(context).pop();
+      context.popOrHome();
     } else if (_sim.finished) {
       _done = true;
-      final results = widget.model.finishGame(
-        _sim.results,
-        _sim.score,
-        _sim.newBest,
-      );
       final model = widget.model;
-      Widget resultsPage() => ResultsRoute(
-        model: model,
-        results: results,
-        onChangeSettings: widget.onChangeSettings,
-        onPlayAgain: (context) => Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => RoundRoute(
-              model: model,
-              onChangeSettings: widget.onChangeSettings,
-            ),
-          ),
-        ),
-      );
+      model.finishGame(_sim.results, _sim.score, _sim.newBest);
       // After the first finished game, and only where consent is required,
       // ad consent comes before Results (and again until it is answered).
       final askConsent = model.consentRequired && !model.consentDone;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => askConsent
-              ? ConsentRoute(model: model, next: resultsPage)
-              : resultsPage(),
-        ),
+      context.pushReplacement(
+        askConsent ? ProtoPath.consent : ProtoPath.results,
       );
     } else {
       setState(() {});
@@ -146,39 +120,29 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
 // ---------------------------------------------------------------------------
 // Results
 
-/// Results for a finished game. The score starts as the phone's own count and,
-/// online, is "confirmed" by the fake server a moment later. After a guest's
-/// 5th game the sign-in sheet opens over it.
+/// Results for the last finished game (a sample game when none was played).
+/// The score starts as the phone's own count and, online, is "confirmed" by
+/// the fake server a moment later. After a guest's 5th game the sign-in sheet
+/// opens over it.
 class ResultsRoute extends StatefulWidget {
-  const ResultsRoute({
-    super.key,
-    required this.model,
-    required this.results,
-    required this.onPlayAgain,
-    this.onChangeSettings,
-  });
+  const ResultsRoute({super.key, required this.model});
 
   final PrototypeModel model;
-  final ResultsView results;
-
-  /// "Change era or mode". Null just goes back.
-  final void Function(BuildContext context)? onChangeSettings;
-
-  /// Starts another game with the same settings (replacing this route).
-  final void Function(BuildContext context) onPlayAgain;
 
   @override
   State<ResultsRoute> createState() => _ResultsRouteState();
 }
 
 class _ResultsRouteState extends State<ResultsRoute> {
-  late ScoreSync _sync = widget.results.sync;
+  late final ResultsView _results =
+      widget.model.lastResults ?? mockResults(user: widget.model.user);
+  late ScoreSync _sync = _results.sync;
   Timer? _server;
 
   @override
   void initState() {
     super.initState();
-    // A state forced from the dev sheet stays as it is.
+    // A state forced from the dev menu stays as it is.
     if (_sync == ScoreSync.provisional && widget.model.forcedSync == null) {
       _server = Timer(const Duration(milliseconds: 1500), () {
         if (mounted) setState(() => _sync = ScoreSync.synced);
@@ -199,7 +163,7 @@ class _ResultsRouteState extends State<ResultsRoute> {
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.results;
+    final r = _results;
     return ListenableBuilder(
       listenable: widget.model,
       builder: (context, _) => ResultsScreen(
@@ -210,17 +174,13 @@ class _ResultsRouteState extends State<ResultsRoute> {
           newBest: r.newBest,
           sync: _sync,
         ),
-        onPlayAgain: () => widget.onPlayAgain(context),
-        onChange: () => widget.onChangeSettings == null
-            ? Navigator.of(context).pop()
-            : widget.onChangeSettings!(context),
-        onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
+        // The same settings again, in place of this screen.
+        onPlayAgain: () => context.pushReplacement(ProtoPath.round),
+        // The era and mode choices, with Home behind them.
+        onChange: () => context.go(ProtoPath.mode),
+        onHome: () => context.go(ProtoPath.home),
         onSignIn: () => showSignInFlow(context, widget.model),
-        onLeaderboard: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => LeaderboardRoute(model: widget.model),
-          ),
-        ),
+        onLeaderboard: () => context.push(ProtoPath.leaderboard),
       ),
     );
   }
@@ -286,7 +246,7 @@ class _LeaderboardRouteState extends State<LeaderboardRoute> {
     final model = widget.model;
     if (_failed) {
       return ErrorScreen(
-        onBack: () => Navigator.of(context).pop(),
+        onBack: context.popOrHome,
         onRetry: () {
           setState(() => _failed = false);
           _load();
@@ -307,7 +267,7 @@ class _LeaderboardRouteState extends State<LeaderboardRoute> {
                   state: LeaderboardState.loading,
                 )
               : board,
-          onBack: () => Navigator.of(context).pop(),
+          onBack: context.popOrHome,
           onScope: (s) => _change(() => model.leaderboardScope = s),
           onEra: (id) => _change(() => model.leaderboardEra = id),
           onSignIn: () => showSignInFlow(context, model),
@@ -321,12 +281,11 @@ class _LeaderboardRouteState extends State<LeaderboardRoute> {
 // Ad consent
 
 /// Ad consent after the first finished game: the explanation, then Google's
-/// form (a placeholder here), then [next] (Results).
+/// form (a placeholder here), then Results.
 class ConsentRoute extends StatelessWidget {
-  const ConsentRoute({super.key, required this.model, required this.next});
+  const ConsentRoute({super.key, required this.model});
 
   final PrototypeModel model;
-  final Widget Function() next;
 
   @override
   Widget build(BuildContext context) {
@@ -338,8 +297,7 @@ class ConsentRoute extends StatelessWidget {
           await showUmpForm(context, model);
           // Closing the form without answering stays here.
           if (!context.mounted || !model.consentDone) return;
-          Navigator.of(context)
-              .pushReplacement(MaterialPageRoute<void>(builder: (_) => next()));
+          context.pushReplacement(ProtoPath.results);
         },
       ),
     );
