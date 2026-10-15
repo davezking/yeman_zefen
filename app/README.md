@@ -87,15 +87,32 @@ a late next song, a generic error and loading skeletons.
 flutter run -t lib/main_prototype.dart
 ```
 
+It is its own app, for trying on a phone. The `dev` flavor gives it its own application id and the name "Yeman Zefen
+DEV", so it installs next to a real build, and it needs no `--dart-define-from-file`:
+
+```sh
+# Android: an APK to install (signed with the debug key)
+flutter build apk --release --flavor dev -t lib/main_prototype.dart
+# iPhone: from a Mac, with your Apple ID as the signing team (see above)
+flutter run -d <id> --release --flavor dev -t lib/main_prototype.dart
+```
+
+The "prototype" workflow (Actions › prototype › Run workflow) builds the Android APK on GitHub and attaches it to the
+run, so it can be downloaded without a Flutter install. Pull requests that touch the prototype build it too.
+Navigation is `go_router` (`lib/prototype/prototype_router.dart`, paths in `prototype_paths.dart`): the first launch
+and the forced update are redirects, and Back goes to Home when a screen was opened directly.
+
 Settings › Language switches Amharic/English live. Play starts a game on a fake clock with no audio
 (`lib/prototype/round_simulation.dart`): the real scorer counts the points, the answer window is the clip plus 5 s,
 a right answer shows for 1 s, a wrong one for 5 s (a tap skips), the hint sheet closes after 8 s with the timer
 stopped, and an ad follows every 3rd round. Backgrounding the app pauses it. With the system's "reduce motion" on, the
 reveal pop, the score count-up, the sheet slide and the cassette reels become plain fades or stand still.
 
-The flask icon at the top right opens a dev-only sheet for trying the variants: signed in, first run, offline, mobile
-data, a failing download or sign-in, the state of the score on Results, an empty or saved leaderboard. Its "Edge
-states" part sets the rest:
+**The hidden dev menu** opens with three fingers on the screen at once (Ctrl+Shift+D on a keyboard); it has no button,
+so testers do not see it. It switches the player (guest, guest on a first run, registered), the connection (Wi-Fi,
+mobile, offline) and the language, and **jumps to any screen or state** (`lib/prototype/prototype_jumps.dart`; a test
+opens every one in both languages). Below those, switches set up the variants: a failing download or sign-in, the
+state of the score on Results, an empty or saved leaderboard, and the edge states:
 
 - First launch: `main_prototype.dart` starts here (wordmark, then language, welcome, and straight into a game from the
   built-in songs, with no download or sign-up asked). The toggle replays it.
@@ -118,7 +135,25 @@ states" part sets the rest:
   fails when they differ). A key `round.hint.watch` is `roundHintWatch`. After editing an ARB file, `flutter gen-l10n`
   regenerates `lib/l10n/app_localizations*.dart` (they are committed).
 - `test/prototype/screens_layout_test.dart` renders every screen variant in both languages at text scale 1.0 and 1.3
-  on a 360 dp phone and fails on any overflow. `test/prototype/edge_states_test.dart` walks each edge state.
+  on a 360 dp phone and fails on any overflow. `test/prototype/edge_states_test.dart` walks each edge state, and
+  `test/prototype/navigation_test.dart` taps through each flow (first launch to register, settings to a pack download,
+  the leaderboard, account deletion) and the dev menu.
+
+### Screenshots for the design sign-off
+
+`test/design/` draws every screen and state (the list is `screen_catalog.dart`) in `en` and `am` on a 360×780 and a
+430×932 phone, as golden files in `docs/design/flutter/<screen>-<state>-<lang>-<size>.png`. They fail when a screen
+changes, so the prototype and the screenshots cannot drift apart. After a deliberate change:
+
+```sh
+tool/export_screens.sh
+```
+
+It rewrites the screenshots and the gallery in `docs/design/review.md`, which sets each one beside its approved board
+and holds the sign-off checklist. The fonts are loaded for real in the tests (`loadAppFonts` in
+`test/core/widgets/widget_kit.dart`: Poppins, Noto Sans Ethiopic and the SDK's Material icons); without them every
+glyph is a square. The goldens are only exact on the same Flutter version (3.47.7) and Linux text rendering as CI: if
+the check fails on another machine for a screen you did not touch, regenerate them in the CI container or ignore it.
 
 ## Fonts
 

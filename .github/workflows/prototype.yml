@@ -1,0 +1,69 @@
+# Builds the clickable prototype (app/lib/main_prototype.dart) as its own app, on mock data with no
+# services, for the Phase 2 sign-off. The `dev` flavor gives it its own application id
+# (com.yemanzefen.yeman_zefen.dev, "Yeman Zefen DEV"), so it installs next to a real build.
+#
+# - Pull requests that touch the prototype or the Android project build the Android APK, so the entry
+#   point cannot quietly stop building.
+# - Run it by hand (Actions > prototype > Run workflow) to get the APK to install on a phone: it is
+#   attached to the run as the "prototype-android" artifact, signed with the debug key.
+# - Tick "ios" for a compile check on macOS (no code signing, so no installable app: install on an
+#   iPhone from Xcode with `flutter run --flavor dev -t lib/main_prototype.dart`, see app/README.md).
+name: prototype
+
+on:
+  workflow_dispatch:
+    inputs:
+      ios:
+        description: Also compile the iOS app (macOS runner, no code signing)
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - app/lib/main_prototype.dart
+      - app/lib/prototype/**
+      - app/android/**
+      - app/pubspec.yaml
+      - .github/workflows/prototype.yml
+
+concurrency:
+  group: prototype-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: prototype (Android APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release --flavor dev -t lib/main_prototype.dart
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prototype-android
+          path: app/build/app/outputs/flutter-apk/app-dev-release.apk
+          retention-days: 14
+
+  ios:
+    name: prototype (iOS compile)
+    if: github.event_name == 'workflow_dispatch' && inputs.ios
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign --flavor dev -t lib/main_prototype.dart

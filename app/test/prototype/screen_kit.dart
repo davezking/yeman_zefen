@@ -17,8 +17,9 @@ Future<void> pumpScreen(
   Locale locale = const Locale('en'),
   double textScale = 1.0,
   bool disableAnimations = false,
+  Size size = phoneSize,
 }) async {
-  tester.view.physicalSize = phoneSize;
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
