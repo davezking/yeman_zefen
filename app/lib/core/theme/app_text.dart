@@ -102,7 +102,7 @@ class AppTextStyles extends ThemeExtension<AppTextStyles> {
       score: make(
         TypeTokens.scaleScoreFontSize,
         TypeTokens.scaleScoreFontWeight,
-        height: TypeTokens.lineHeightLatin,
+        height: TypeTokens.lineHeightScore,
         latinOnly: true,
       ),
     );

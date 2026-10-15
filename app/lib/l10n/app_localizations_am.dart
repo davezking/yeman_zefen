@@ -637,6 +637,24 @@ class AppLocalizationsAm extends AppLocalizations {
   String get authErrorPassword => 'ኢሜይሉ ወይም የይለፍ ቃሉ ትክክል አይደለም።';
 
   @override
+  String get authNameTitle => 'የሚታይ ስም ይምረጡ';
+
+  @override
+  String get authNameBody => 'ይህ በደረጃ ሰንጠረዡ ላይ ሌሎች ተጫዋቾች የሚያዩት ስም ነው።';
+
+  @override
+  String get authNameLabel => 'የሚታይ ስም';
+
+  @override
+  String get authNameSave => 'ስሙን ያስቀምጡ';
+
+  @override
+  String get authNameErrorShort => 'ቢያንስ 2 ፊደላት ይጠቀሙ።';
+
+  @override
+  String get authNameErrorTaken => 'ይህ ስም ተይዟል። ሌላ ይሞክሩ።';
+
+  @override
   String get settingsTitle => 'ቅንብሮች';
 
   @override

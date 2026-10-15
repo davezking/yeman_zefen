@@ -55,8 +55,9 @@ abstract final class ColorTokens {
   static const Color backgroundScreenFoot = Color(0xFFF3FAF8);
   /// Behind bottom sheets
   static const Color backgroundScrim = Color(0x732B2118);
-  /// Full-screen ad placeholder, gradient to #1C1510
+  /// Full-screen ad placeholder, gradient to adOverlayEnd
   static const Color backgroundAdOverlay = paletteInk;
+  static const Color backgroundAdOverlayEnd = Color(0xFF1C1510);
   /// Gradient white → cream100
   static const Color surfaceCard = paletteWhite;
   static const Color surfaceCardEnd = paletteCream100;
@@ -70,6 +71,10 @@ abstract final class ColorTokens {
   static const Color surfaceSegmentTrackOnHero = Color(0x73FFFFFF);
   static const Color surfaceSegmentTrack = paletteCream100;
   static const Color surfaceDivider = paletteCream200;
+  /// Continue with Apple: black, gradient appleButtonTop to appleButton (Apple's guidelines)
+  static const Color surfaceAppleButton = Color(0xFF111111);
+  static const Color surfaceAppleButtonTop = Color(0xFF2E2620);
+  static const Color surfaceAppleButtonEdge = Color(0xFF000000);
   /// Inline error card, gradient #FFF1EC → #FFE3DA, edge #F4C7B8
   static const Color surfaceErrorCard = Color(0xFFFFF1EC);
   static const Color surfaceErrorCardEnd = Color(0xFFFFE3DA);
@@ -170,6 +175,8 @@ abstract final class TypeTokens {
   static const double lineHeightEthiopic = 1.55;
   /// Era setup, Offline play, Settings: screens with many rows
   static const double lineHeightEthiopicDense = 1.5;
+  /// The big total on Results: Poppins numerals need no extra room
+  static const double lineHeightScore = 1.05;
   /// Headings in both scripts
   static const double lineHeightHeading = 1.35;
   /// Meta lines, stat labels, answer marks
@@ -321,6 +328,10 @@ abstract final class ElevationTokens {
   static const List<BoxShadow> bottomBar = [
     BoxShadow(color: Color(0x47FFA94D), offset: Offset(0.0, -10.0), blurRadius: 26.0),
   ];
+  /// Press edge under the Apple button (color.surface.appleButtonEdge)
+  static const List<BoxShadow> appleButton = [
+    BoxShadow(color: Color(0xFF000000), offset: Offset(0.0, 5.0), blurRadius: 0.0),
+  ];
   /// Press edge under the inline error card (color.surface.errorCardEdge)
   static const List<BoxShadow> errorCard = [
     BoxShadow(color: Color(0xFFF4C7B8), offset: Offset(0.0, 4.0), blurRadius: 0.0),
@@ -341,6 +352,17 @@ abstract final class SizeTokens {
   static const double iconButton = 48.0;
   /// Wordmark tile on Home (40 on first launch); radius.pill
   static const double logoTile = 30.0;
+  /// First place avatar on the leaderboard podium
+  static const double podiumFirst = 68.0;
+  /// Second and third place avatars
+  static const double podiumOther = 52.0;
+  /// Avatar in a leaderboard row
+  static const double leaderboardAvatar = 30.0;
+  static const double leaderboardRowMinHeight = 50.0;
+  /// The crown over first place
+  static const double crownWidth = 26.0;
+  /// The crown over first place
+  static const double crownHeight = 20.0;
   /// Length of the cream-to-white fade under the hero's curve (color.background.heroFade)
   static const double heroFadeHeight = 140.0;
   /// Home and Settings icon buttons in the bottom bar
