@@ -690,6 +690,46 @@ class ComponentGallery extends StatelessWidget {
               ),
             ),
           ]),
+          section('Loading skeletons · on white, on yellow', [
+            const SkeletonBox(height: SizeTokens.skeletonLine),
+            const SkeletonBox(width: 160, height: SizeTokens.skeletonLine),
+            const SkeletonBox(
+              height: SizeTokens.answerTileMinHeight,
+              radius: RadiusTokens.large,
+            ),
+            const ColoredBox(
+              color: ColorTokens.heroMiddle,
+              child: Padding(
+                padding: EdgeInsets.all(SpacingTokens.n12),
+                child: SkeletonBox(
+                  height: SizeTokens.skeletonLine,
+                  onYellow: true,
+                ),
+              ),
+            ),
+          ]),
+          section('Message page · errors, update, consent', [
+            SizedBox(
+              height: 720,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(RadiusTokens.large),
+                child: MessageLayout(
+                  icon: Icons.error_outline_rounded,
+                  badgeColor: ColorTokens.paletteSand,
+                  title: _t(
+                    'Something went wrong',
+                    'የሆነ ችግር ተፈጥሯል',
+                  ), // error.generic.title
+                  body: _t(
+                    'Please try again. If it keeps happening, restart the app.',
+                    'እባክዎ እንደገና ይሞክሩ። ችግሩ ከቀጠለ መተግበሪያውን ዘግተው ይክፈቱ።',
+                  ), // error.generic.body
+                  primaryLabel: _t('Try again', 'እንደገና ይሞክሩ'), // error.retry
+                  onPrimary: _noop,
+                ),
+              ),
+            ),
+          ]),
           section('Dialog and bottom sheet', [
             Builder(
               builder: (context) => SecondaryButton(

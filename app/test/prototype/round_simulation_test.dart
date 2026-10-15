@@ -508,4 +508,77 @@ void main() {
       every: 0,
     );
   });
+
+  group('next song loading', () {
+    testWidgets('a late clip shows the loading state, then the round plays', (
+      tester,
+    ) async {
+      final sim = RoundSimulation(
+        settings: const PlaySettings(),
+        interstitialEvery: 0,
+        random: Random(7),
+        clipLoadTime: (i) => i == 0 ? const Duration(seconds: 3) : null,
+      );
+      expect(sim.view.phase, RoundPhase.loading);
+      expect(sim.view.clipPlaying, isFalse);
+      expect(sim.view.hintAvailable, isFalse);
+      expect(sim.view.timeFraction, 1);
+      // Nothing can be answered while it loads.
+      sim.answer(sim.view.correctIndex);
+      expect(sim.results, isEmpty);
+
+      await tester.pump(const Duration(milliseconds: 2900));
+      expect(sim.view.phase, RoundPhase.loading);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(sim.view.phase, RoundPhase.answering);
+      expect(sim.view.secondsLeft, 15);
+      expect(sim.view.clipPlaying, isTrue);
+      sim.dispose();
+    });
+
+    testWidgets('a clip that never comes is skipped after 10 s, no penalty', (
+      tester,
+    ) async {
+      final sim = RoundSimulation(
+        settings: const PlaySettings(),
+        totalRounds: 3,
+        interstitialEvery: 0,
+        random: Random(7),
+        clipLoadTime: (i) => i == 1 ? const Duration(seconds: 30) : null,
+      );
+      sim.answer(sim.view.correctIndex);
+      await tester.pump(const Duration(seconds: 1));
+      expect(sim.view.roundNumber, 2);
+      expect(sim.view.phase, RoundPhase.loading);
+
+      await tester.pump(const Duration(milliseconds: 9900));
+      expect(sim.view.roundNumber, 2);
+      expect(sim.skipped, 0);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(sim.skipped, 1);
+      expect(sim.view.roundNumber, 3);
+      expect(sim.view.phase, RoundPhase.answering);
+      // The skipped round is not in the results; the rest keep their numbers.
+      expect(sim.results.length, 1);
+      sim.answer(sim.view.correctIndex);
+      expect(sim.results.map((r) => r.number), [1, 3]);
+      sim.dispose();
+    });
+
+    testWidgets('the wait stops while the app is in the background', (
+      tester,
+    ) async {
+      final sim = RoundSimulation(
+        settings: const PlaySettings(),
+        interstitialEvery: 0,
+        random: Random(7),
+        clipLoadTime: (i) => const Duration(seconds: 30),
+      );
+      sim.setBackgrounded(true);
+      await tester.pump(const Duration(seconds: 20));
+      expect(sim.skipped, 0);
+      expect(sim.view.phase, RoundPhase.loading);
+      sim.dispose();
+    });
+  });
 }

@@ -115,8 +115,7 @@ class _LabSheet extends StatelessWidget {
                       ),
                     ],
                     selected: {model.connection},
-                    onSelectionChanged: (s) =>
-                        model.update(() => model.connection = s.first),
+                    onSelectionChanged: (s) => model.setConnection(s.first),
                   ),
                 ),
                 ListTile(
@@ -206,6 +205,68 @@ class _LabSheet extends StatelessWidget {
                   'Offline: a saved board exists',
                   model.boardCached,
                   (v) => model.update(() => model.boardCached = v),
+                ),
+                const ListTile(title: Text('Edge states')),
+                toggle(
+                  'First launch (language, welcome)',
+                  model.firstLaunch,
+                  (v) => model.update(() => model.firstLaunch = v),
+                ),
+                toggle(
+                  'Update required',
+                  model.updateRequired,
+                  (v) => model.update(() => model.updateRequired = v),
+                ),
+                toggle(
+                  'Ad consent required (after the first game)',
+                  model.consentRequired,
+                  (v) => model.update(() {
+                    model.consentRequired = v;
+                    model.consentDone = false;
+                  }),
+                ),
+                toggle(
+                  'Offline: every song played recently',
+                  model.allSongsPlayed,
+                  (v) => model.update(() => model.allSongsPlayed = v),
+                ),
+                ListTile(
+                  title: const Text("Round 2's clip"),
+                  trailing: DropdownButton<ClipArrival>(
+                    value: model.nextClip,
+                    items: const [
+                      DropdownMenuItem(
+                        value: ClipArrival.onTime,
+                        child: Text('on time'),
+                      ),
+                      DropdownMenuItem(
+                        value: ClipArrival.slow,
+                        child: Text('3 s late'),
+                      ),
+                      DropdownMenuItem(
+                        value: ClipArrival.never,
+                        child: Text('never comes'),
+                      ),
+                    ],
+                    onChanged: (v) => model.update(
+                      () => model.nextClip = v ?? ClipArrival.onTime,
+                    ),
+                  ),
+                ),
+                toggle(
+                  'Lists load slowly (skeletons)',
+                  model.slowLists,
+                  (v) => model.update(() => model.slowLists = v),
+                ),
+                toggle(
+                  'Leaderboard fails to load (once)',
+                  model.boardFails,
+                  (v) => model.update(() => model.boardFails = v),
+                ),
+                toggle(
+                  'Sending offline games fails',
+                  model.syncFails,
+                  (v) => model.update(() => model.syncFails = v),
                 ),
               ],
             ),

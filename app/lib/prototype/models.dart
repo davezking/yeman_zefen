@@ -231,6 +231,10 @@ enum QuestionKind { song, artist, era }
 
 /// Where a round is. The reveal states carry an icon and a word as well as color.
 enum RoundPhase {
+  /// Rare: the round's clip is still downloading (a slow connection, an era
+  /// with no songs on the phone). Up to 10 s, then the round is skipped.
+  loading,
+
   /// The clip plays and the timer runs; the player can answer.
   answering,
 
@@ -347,7 +351,8 @@ class RoundView {
   /// The seconds left on the hint sheet or the ad.
   final int overlaySeconds;
 
-  bool get revealed => phase != RoundPhase.answering;
+  bool get revealed =>
+      phase != RoundPhase.answering && phase != RoundPhase.loading;
 }
 
 /// How one round went, for the results list.
@@ -358,8 +363,12 @@ class RoundResult {
     required this.points,
     this.hintUsed = false,
     this.timedOut = false,
+    this.number,
   });
 
+  /// The round's number as played (a skipped round leaves a gap); null
+  /// numbers the rows in order.
+  final int? number;
   final Track track;
   final bool correct;
   final int points;
@@ -411,6 +420,9 @@ enum LeaderboardScope { weekly, allTime }
 /// What the board has to show.
 enum LeaderboardState {
   ready,
+
+  /// Still loading: a skeleton, after a short delay.
+  loading,
 
   /// Nobody has a score yet.
   empty,

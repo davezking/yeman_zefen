@@ -101,7 +101,8 @@ void main() {
     user: user,
     connection: connection,
     resumeDownloads: false,
-  );
+    // Consent before the first Results has tests of its own.
+  )..consentRequired = false;
 
   /// Takes everything down so no timer outlives the test.
   Future<void> finish(WidgetTester tester, [PrototypeModel? model]) async {

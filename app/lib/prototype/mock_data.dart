@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'models.dart';
 
 /// Mock data for the prototype. No service is involved: the screens show
@@ -266,6 +268,11 @@ const mockSignedIn = UserInfo.signedIn(
 );
 
 const mockAppVersion = '1.0.0';
+
+/// The second name on the welcome screen's preview tiles (the boards use
+/// Aster Aweke, a real singer, only as a picture of play).
+String mockWelcomeSecondAnswer(Locale locale) =>
+    locale.languageCode == 'am' ? 'አስቴር አወቀ' : 'Aster Aweke';
 
 /// A leaderboard of invented players. The board differs a little by era and is
 /// larger for all time, so the filters can be seen to do something.

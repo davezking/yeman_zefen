@@ -54,6 +54,8 @@ void main() {
           expect(find.byType(SsoButton), findsNWidgets(4));
           expect(find.byType(AvatarTile), findsNWidgets(4));
           expect(find.byType(AdOverlay), findsOneWidget);
+          expect(find.byType(SkeletonBox), findsNWidgets(4));
+          expect(find.byType(MessageLayout), findsOneWidget);
           await tester.pumpWidget(const SizedBox()); // stop the reels
         },
       );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/theme/app_theme.dart';
 import 'package:yeman_zefen/core/widgets/widgets.dart';
 
 import 'widget_kit.dart';
@@ -495,6 +496,79 @@ void main() {
       isSemantics(isLiveRegion: true),
     );
     handle.dispose();
+  });
+
+  group('SkeletonBox', () {
+    testWidgets('sweeps, is hidden from screen readers, and fills its width', (
+      tester,
+    ) async {
+      await pumpComponent(tester, const SkeletonBox(height: 12));
+      final handle = tester.ensureSemantics();
+      expect(tester.getSize(find.byType(SkeletonBox)), const Size(328, 12));
+      expect(tester.hasRunningAnimations, isTrue);
+      expect(
+        find.descendant(
+          of: find.byType(SkeletonBox),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('holds still when the phone asks for less motion', (
+      tester,
+    ) async {
+      await pumpComponent(
+        tester,
+        const SkeletonBox(height: 12, onYellow: true),
+        disableAnimations: true,
+      );
+      expect(tester.hasRunningAnimations, isFalse);
+    });
+  });
+
+  testWidgets('SkeletonDelay shows its child only after 300 ms', (
+    tester,
+  ) async {
+    await pumpComponent(tester, const SkeletonDelay(child: Text('skeleton')));
+    expect(find.text('skeleton'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(find.text('skeleton'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('skeleton'), findsOneWidget);
+  });
+
+  testWidgets('MessageLayout shows its actions and calls them', (tester) async {
+    final taps = <String>[];
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(const Locale('en')),
+        home: MessageLayout(
+          icon: Icons.error_outline_rounded,
+          badgeColor: Colors.white,
+          title: 'Something went wrong',
+          body: 'Please try again.',
+          primaryLabel: 'Try again',
+          onPrimary: () => taps.add('primary'),
+          secondaryLabel: 'Play offline',
+          onSecondary: () => taps.add('secondary'),
+          linkLabel: 'Settings',
+          onLink: () => taps.add('link'),
+        ),
+      ),
+    );
+    expect(find.text('Something went wrong'), findsOneWidget);
+    expect(find.text('Please try again.'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.tap(find.text('Play offline'));
+    await tester.tap(find.text('Settings'));
+    expect(taps, ['primary', 'secondary', 'link']);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a small SecondaryButton can still share a row', (tester) async {

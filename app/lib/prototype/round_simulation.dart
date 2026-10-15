@@ -33,10 +33,17 @@ class RoundSimulation extends ChangeNotifier {
     this.bestScore,
     Random? random,
     List<Track> catalog = mockTracks,
+    this.clipLoadTime,
   }) : _random = random ?? Random() {
     _rounds = _buildRounds(catalog);
     _timer = Timer.periodic(MotionTokens.durationTimerTick, (_) => _tick());
+    _startRound(0);
   }
+
+  /// How long round [index]'s clip takes to arrive; null when it is already on
+  /// the phone (nearly always). Longer than [TimingTokens.nextSongWaitMax]
+  /// means it never arrives in time and the round is skipped.
+  final Duration? Function(int index)? clipLoadTime;
 
   final PlaySettings settings;
   final int totalRounds;
@@ -82,6 +89,13 @@ class RoundSimulation extends ChangeNotifier {
   bool get left => _left;
 
   bool get backgrounded => _backgrounded;
+
+  /// Rounds skipped because their clip did not arrive in time. Each one is
+  /// worth a short notice; none costs points.
+  int get skipped => _skipped;
+  int _skipped = 0;
+  int _loadMs = 0;
+  int _loadNeededMs = 0;
 
   List<RoundResult> get results => List.unmodifiable(_results);
   int get score => _score;
@@ -177,6 +191,7 @@ class RoundSimulation extends ChangeNotifier {
         correct: correct,
         points: scored.points,
         hintUsed: _hintUsed,
+        number: _round + 1,
       ),
     );
     _changed();
@@ -281,7 +296,17 @@ class RoundSimulation extends ChangeNotifier {
       case RoundOverlay.none:
         break;
     }
-    if (_phase == RoundPhase.answering) {
+    if (_phase == RoundPhase.loading) {
+      _loadMs += _tickMs;
+      if (_loadMs >= _loadNeededMs) {
+        _phase = RoundPhase.answering;
+      } else if (_loadMs >= TimingTokens.nextSongWaitMax.inMilliseconds) {
+        // Waited long enough: skip the round, with no penalty.
+        _skipped++;
+        _advance();
+        return;
+      }
+    } else if (_phase == RoundPhase.answering) {
       _answerMs += _tickMs;
       _clipMs += _tickMs;
       if (_answerMs >= _windowMs) {
@@ -295,6 +320,7 @@ class RoundSimulation extends ChangeNotifier {
             points: 0,
             hintUsed: _hintUsed,
             timedOut: true,
+            number: _round + 1,
           ),
         );
       }
@@ -325,7 +351,10 @@ class RoundSimulation extends ChangeNotifier {
 
   void _startRound(int index) {
     _round = index;
-    _phase = RoundPhase.answering;
+    final load = clipLoadTime?.call(index);
+    _loadMs = 0;
+    _loadNeededMs = load?.inMilliseconds ?? 0;
+    _phase = _loadNeededMs > 0 ? RoundPhase.loading : RoundPhase.answering;
     _answerMs = 0;
     _clipMs = 0;
     _feedbackMs = 0;

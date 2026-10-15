@@ -8,6 +8,7 @@ import 'models.dart';
 import 'prototype_model.dart';
 import 'round_simulation.dart';
 import 'screens/leaderboard_screen.dart';
+import 'screens/message_screens.dart';
 import 'screens/results_screen.dart';
 import 'screens/round_screen.dart';
 import 'screens/sign_in_sheet.dart';
@@ -48,18 +49,22 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
       RoundSimulation(
         settings: widget.model.quickPlay,
         bestScore: widget.model.user.bestScore,
+        clipLoadTime: widget.model.clipLoadTime,
       );
   bool _done = false;
+  int _skipped = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _sim.addListener(_changed);
+    widget.model.roundsOnScreen++;
   }
 
   @override
   void dispose() {
+    widget.model.roundsOnScreen--;
     WidgetsBinding.instance.removeObserver(this);
     _sim.removeListener(_changed);
     _sim.dispose();
@@ -73,6 +78,10 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
 
   void _changed() {
     if (!mounted || _done) return;
+    if (_sim.skipped > _skipped) {
+      _skipped = _sim.skipped;
+      widget.model.toast(const SkippedToast());
+    }
     if (_sim.left) {
       _done = true;
       Navigator.of(context).pop();
@@ -83,21 +92,28 @@ class _RoundRouteState extends State<RoundRoute> with WidgetsBindingObserver {
         _sim.score,
         _sim.newBest,
       );
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => ResultsRoute(
-            model: widget.model,
-            results: results,
-            onChangeSettings: widget.onChangeSettings,
-            onPlayAgain: (context) => Navigator.of(context).pushReplacement(
-              MaterialPageRoute<void>(
-                builder: (_) => RoundRoute(
-                  model: widget.model,
-                  onChangeSettings: widget.onChangeSettings,
-                ),
-              ),
+      final model = widget.model;
+      Widget resultsPage() => ResultsRoute(
+        model: model,
+        results: results,
+        onChangeSettings: widget.onChangeSettings,
+        onPlayAgain: (context) => Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => RoundRoute(
+              model: model,
+              onChangeSettings: widget.onChangeSettings,
             ),
           ),
+        ),
+      );
+      // After the first finished game, and only where consent is required,
+      // ad consent comes before Results (and again until it is answered).
+      final askConsent = model.consentRequired && !model.consentDone;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => askConsent
+              ? ConsentRoute(model: model, next: resultsPage)
+              : resultsPage(),
         ),
       );
     } else {
@@ -213,24 +229,136 @@ class _ResultsRouteState extends State<ResultsRoute> {
 // ---------------------------------------------------------------------------
 // Leaderboard
 
-class LeaderboardRoute extends StatelessWidget {
+/// The leaderboard. It "loads" for a moment (2 s with slow lists on, when a
+/// skeleton shows), and can fail once to show the error screen.
+class LeaderboardRoute extends StatefulWidget {
   const LeaderboardRoute({super.key, required this.model});
 
   final PrototypeModel model;
 
   @override
+  State<LeaderboardRoute> createState() => _LeaderboardRouteState();
+}
+
+class _LeaderboardRouteState extends State<LeaderboardRoute> {
+  bool _loading = false;
+  bool _failed = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _load() {
+    final model = widget.model;
+    if (model.offline) return;
+    if (model.boardFails) {
+      model.boardFails = false;
+      setState(() => _failed = true);
+      return;
+    }
+    if (!model.slowLists) return;
+    setState(() {
+      _failed = false;
+      _loading = true;
+    });
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  void _change(void Function() change) {
+    widget.model.update(change);
+    _load();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final model = widget.model;
+    if (_failed) {
+      return ErrorScreen(
+        onBack: () => Navigator.of(context).pop(),
+        onRetry: () {
+          setState(() => _failed = false);
+          _load();
+        },
+      );
+    }
     return ListenableBuilder(
       listenable: model,
-      builder: (context, _) => LeaderboardScreen(
-        view: model.leaderboard,
-        onBack: () => Navigator.of(context).pop(),
-        onScope: (s) => model.update(() => model.leaderboardScope = s),
-        onEra: (id) => model.update(() => model.leaderboardEra = id),
-        onSignIn: () => showSignInFlow(context, model),
+      builder: (context, _) {
+        final board = model.leaderboard;
+        return LeaderboardScreen(
+          view: _loading
+              ? LeaderboardView(
+                  scope: board.scope,
+                  generationId: board.generationId,
+                  entries: const [],
+                  user: board.user,
+                  state: LeaderboardState.loading,
+                )
+              : board,
+          onBack: () => Navigator.of(context).pop(),
+          onScope: (s) => _change(() => model.leaderboardScope = s),
+          onEra: (id) => _change(() => model.leaderboardEra = id),
+          onSignIn: () => showSignInFlow(context, model),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ad consent
+
+/// Ad consent after the first finished game: the explanation, then Google's
+/// form (a placeholder here), then [next] (Results).
+class ConsentRoute extends StatelessWidget {
+  const ConsentRoute({super.key, required this.model, required this.next});
+
+  final PrototypeModel model;
+  final Widget Function() next;
+
+  @override
+  Widget build(BuildContext context) {
+    // Consent has to be answered: back does not skip it (or Results).
+    return PopScope(
+      canPop: false,
+      child: ConsentScreen(
+        onContinue: () async {
+          await showUmpForm(context, model);
+          // Closing the form without answering stays here.
+          if (!context.mounted || !model.consentDone) return;
+          Navigator.of(context)
+              .pushReplacement(MaterialPageRoute<void>(builder: (_) => next()));
+        },
       ),
     );
   }
+}
+
+/// Google's consent form (UMP), as a placeholder sheet. It is also what
+/// Settings › Ad privacy choices opens.
+Future<void> showUmpForm(BuildContext context, PrototypeModel model) {
+  return showAppBottomSheet<void>(
+    context,
+    semanticLabel: AppLocalizations.of(context).settingsAdPrivacy,
+    builder: (sheetContext) => UmpFormPlaceholder(
+      onDone: () {
+        model.consentDone = true;
+        Navigator.of(sheetContext).pop();
+      },
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

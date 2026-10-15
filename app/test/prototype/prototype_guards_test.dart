@@ -25,7 +25,7 @@ void main() {
         .where((f) => f.path.endsWith('.dart'))
         .toList();
 
-    test('there are screens to scan', () => expect(files.length, 9));
+    test('there are screens to scan', () => expect(files.length, 11));
 
     for (final file in files) {
       final name = file.uri.pathSegments.last;

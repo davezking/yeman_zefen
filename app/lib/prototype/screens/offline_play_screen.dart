@@ -31,8 +31,11 @@ class OfflinePlayScreen extends StatelessWidget {
     required this.onCancel,
     required this.onRetry,
     required this.onRemove,
+    this.loadingPacks = false,
   });
 
+  /// The list of packs to download is still loading: rows of skeletons.
+  final bool loadingPacks;
   final bool wifiOnly;
   final bool mobilePrefetch;
   final CacheUsage cache;
@@ -196,7 +199,26 @@ class OfflinePlayScreen extends StatelessWidget {
                 style: text.caption.copyWith(color: ColorTokens.textSecondary),
               ),
             ),
-          for (final pack in available) _card(context, pack),
+          if (loadingPacks) ...[
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                l10n.loadingGeneric,
+                style: text.caption.copyWith(color: ColorTokens.textSecondary),
+              ),
+            ),
+            SkeletonDelay(
+              child: Column(
+                children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i > 0) const SizedBox(height: SpacingTokens.n10),
+                    const _PackSkeleton(),
+                  ],
+                ],
+              ),
+            ),
+          ] else
+            for (final pack in available) _card(context, pack),
         ],
       ),
     );
@@ -354,6 +376,57 @@ class _RemovablePack extends StatelessWidget {
             ),
           ),
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The shape of a pack row while the list loads.
+class _PackSkeleton extends StatelessWidget {
+  const _PackSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ColorTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(RadiusTokens.card),
+        boxShadow: ElevationTokens.card,
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: SpacingTokens.n12,
+          vertical: SpacingTokens.n10,
+        ),
+        child: Row(
+          children: [
+            SkeletonBox(
+              width: SizeTokens.iconTile,
+              height: SizeTokens.iconTile,
+              radius: RadiusTokens.small,
+            ),
+            SizedBox(width: SpacingTokens.n12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: SizeTokens.skeletonLine),
+                  SizedBox(height: SpacingTokens.n8),
+                  SkeletonBox(
+                    width: SizeTokens.playButtonMinWidth,
+                    height: SizeTokens.skeletonLine,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: SpacingTokens.n32),
+            SkeletonBox(
+              width: SizeTokens.modeIconTile,
+              height: SizeTokens.smallButtonMinHeight,
+              radius: RadiusTokens.small,
+            ),
+          ],
         ),
       ),
     );

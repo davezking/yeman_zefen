@@ -71,6 +71,12 @@ abstract final class ColorTokens {
   static const Color surfaceSegmentTrackOnHero = Color(0x73FFFFFF);
   static const Color surfaceSegmentTrack = paletteCream100;
   static const Color surfaceDivider = paletteCream200;
+  /// Loading skeleton on a yellow screen; the shimmer sweeps to skeletonOnYellowHighlight
+  static const Color surfaceSkeletonOnYellow = Color(0x59FFFFFF);
+  static const Color surfaceSkeletonOnYellowHighlight = Color(0xBFFFFFFF);
+  /// Loading skeleton on a white or cream body; the shimmer sweeps to skeletonOnLightHighlight
+  static const Color surfaceSkeletonOnLight = paletteCream100;
+  static const Color surfaceSkeletonOnLightHighlight = paletteWhite;
   /// Continue with Apple: black, gradient appleButtonTop to appleButton (Apple's guidelines)
   static const Color surfaceAppleButton = Color(0xFF111111);
   static const Color surfaceAppleButtonTop = Color(0xFF2E2620);
@@ -350,6 +356,21 @@ abstract final class ElevationTokens {
 abstract final class SizeTokens {
   /// Back button; 52 in the bottom bar
   static const double iconButton = 48.0;
+  /// Wordmark tile on the first-launch screen
+  static const double logoTileLarge = 40.0;
+  /// Hero height on the message screens (consent, update, out of songs, error)
+  static const double messageHero = 360.0;
+  /// Icon badge on the message screens; radius.badge
+  static const double messageBadge = 120.0;
+  static const double messageBadgeIcon = 56.0;
+  /// Hero height on the welcome screen
+  static const double welcomeHero = 400.0;
+  /// Onboarding page dots
+  static const double pageDotWidth = 8.0;
+  /// Onboarding page dots
+  static const double pageDotActiveWidth = 24.0;
+  /// Height of a text line in a loading skeleton
+  static const double skeletonLine = 12.0;
   /// Wordmark tile on Home (40 on first launch); radius.pill
   static const double logoTile = 30.0;
   /// First place avatar on the leaderboard podium

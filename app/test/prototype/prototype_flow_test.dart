@@ -373,7 +373,8 @@ void main() {
     testWidgets('Change era or mode on Results opens Mode select', (
       tester,
     ) async {
-      final model = PrototypeModel(resumeDownloads: false);
+      final model = PrototypeModel(resumeDownloads: false)
+        ..consentRequired = false;
       await start(tester, model);
       await tester.tap(find.bySemanticsLabel('Play'));
       await tester.pump();

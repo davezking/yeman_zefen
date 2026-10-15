@@ -130,7 +130,9 @@ class LeaderboardScreen extends StatelessWidget {
                 ),
               ),
             Expanded(
-              child: showBoard
+              child: v.state == LeaderboardState.loading
+                  ? const _Loading()
+                  : showBoard
                   ? _Board(podium: podium, rest: rest)
                   : _Message(
                       icon: v.state == LeaderboardState.empty
@@ -141,7 +143,8 @@ class LeaderboardScreen extends StatelessWidget {
                           : l10n.lbOfflineNone,
                     ),
             ),
-            _Footer(view: v, onSignIn: onSignIn),
+            if (v.state != LeaderboardState.loading)
+              _Footer(view: v, onSignIn: onSignIn),
           ],
         ),
       ),
@@ -458,6 +461,120 @@ class _Row extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Loading the leaderboard…" and, if it takes more than a moment, the shape
+/// of the board: a podium and seven rows, shimmering.
+class _Loading extends StatelessWidget {
+  const _Loading();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    Widget row() => Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.n8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: ColorTokens.surfaceSkeletonOnYellow,
+          borderRadius: BorderRadius.circular(RadiusTokens.large),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: SizeTokens.leaderboardRowMinHeight,
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: SpacingTokens.n14),
+            child: Row(
+              children: [
+                SkeletonBox(
+                  onYellow: true,
+                  width: SpacingTokens.n16,
+                  height: SizeTokens.skeletonLine,
+                ),
+                SizedBox(width: SpacingTokens.n12),
+                SkeletonBox(
+                  onYellow: true,
+                  width: SizeTokens.leaderboardAvatar,
+                  height: SizeTokens.leaderboardAvatar,
+                  radius: RadiusTokens.small,
+                ),
+                SizedBox(width: SpacingTokens.n12),
+                Expanded(
+                  child: SkeletonBox(
+                    onYellow: true,
+                    height: SizeTokens.skeletonLine,
+                  ),
+                ),
+                SizedBox(width: SpacingTokens.n32),
+                SkeletonBox(
+                  onYellow: true,
+                  width: SizeTokens.modeIconTile,
+                  height: SizeTokens.skeletonLine,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SpacingTokens.n18,
+            0,
+            SpacingTokens.n18,
+            SpacingTokens.n14,
+          ),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(l10n.lbLoading, style: context.text.label),
+          ),
+        ),
+        Expanded(
+          child: SkeletonDelay(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpacingTokens.n16,
+              ),
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SkeletonBox(
+                      onYellow: true,
+                      width: SizeTokens.podiumOther,
+                      height: SizeTokens.podiumOther,
+                      radius: RadiusTokens.card,
+                    ),
+                    SizedBox(width: SpacingTokens.n16),
+                    SkeletonBox(
+                      onYellow: true,
+                      width: SizeTokens.podiumFirst,
+                      height: SizeTokens.podiumFirst,
+                      radius: RadiusTokens.modeCard,
+                    ),
+                    SizedBox(width: SpacingTokens.n16),
+                    SkeletonBox(
+                      onYellow: true,
+                      width: SizeTokens.podiumOther,
+                      height: SizeTokens.podiumOther,
+                      radius: RadiusTokens.card,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.n18),
+                for (var i = 0; i < 7; i++) row(),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

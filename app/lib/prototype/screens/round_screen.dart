@@ -122,8 +122,11 @@ class RoundScreen extends StatelessWidget {
                   const SizedBox(height: SpacingTokens.n12),
                   TimerBar(
                     fraction: v.timeFraction,
-                    label: pill,
-                    semanticLabel: v.timerPaused
+                    // Waiting for the clip: a full bar and no seconds.
+                    label: v.phase == RoundPhase.loading ? null : pill,
+                    semanticLabel: v.phase == RoundPhase.loading
+                        ? l10n.roundLoading
+                        : v.timerPaused
                         ? l10n.roundTimerPaused
                         : l10n.a11yTimer(v.secondsLeft),
                   ),
@@ -169,6 +172,18 @@ class RoundScreen extends StatelessWidget {
     bool locked,
   ) {
     final v = view;
+    if (v.phase == RoundPhase.loading) {
+      // The box keeps the grid's height while the skeleton waits to appear.
+      return const SizedBox(
+        height: SizeTokens.answerTileMinHeight,
+        child: SkeletonDelay(
+          child: SkeletonBox(
+            height: SizeTokens.answerTileMinHeight,
+            radius: RadiusTokens.large,
+          ),
+        ),
+      );
+    }
     final label = l10n.optionLabel(v.options[i], v.kind, locale);
     final a11y = l10n.a11yAnswer(i + 1, label);
     if (v.phase == RoundPhase.answering) {
@@ -210,6 +225,8 @@ class RoundScreen extends StatelessWidget {
   ) {
     final v = view;
     switch (v.phase) {
+      case RoundPhase.loading:
+        return const SizedBox.shrink();
       case RoundPhase.answering:
         if (v.hintAvailable) {
           return _HintButton(
@@ -309,6 +326,10 @@ class _Status extends StatelessWidget {
     TextStyle style = text.titleSmall;
     String? sub;
     switch (v.phase) {
+      case RoundPhase.loading:
+        head = l10n.roundLoading;
+        color = ColorTokens.textPrimary;
+        sub = l10n.roundLoadingNote;
       case RoundPhase.answering:
         head = l10n.questionText(v.kind);
         color = ColorTokens.textPrimary;
