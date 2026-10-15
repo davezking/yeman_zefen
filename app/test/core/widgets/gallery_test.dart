@@ -42,6 +42,15 @@ void main() {
           expect(find.byType(PackCard), findsNWidgets(7));
           expect(find.byType(ScoreBadge), findsNWidgets(2));
           expect(find.byType(ListRow), findsNWidgets(3));
+          expect(find.byType(AppSwitch), findsNWidgets(3));
+          expect(find.byType(SettingsRow), findsNWidgets(7));
+          expect(find.byType(SegmentedControl<int>), findsNWidgets(3));
+          expect(find.byType(AppChoiceChip), findsNWidgets(3));
+          expect(find.byType(ModeCard), findsNWidgets(2));
+          expect(find.byType(DarkBanner), findsOneWidget);
+          expect(find.byType(StatTile), findsNWidgets(2));
+          expect(find.byType(LogoTiles), findsOneWidget);
+          expect(find.byType(AppBottomBar), findsNWidgets(2));
           await tester.pumpWidget(const SizedBox()); // stop the reels
         },
       );
@@ -73,7 +82,8 @@ void main() {
       expect(find.text('Mahmoud Ahmed'), findsWidgets);
       expect(find.text('ማሕሙድ አሕመድ'), findsNothing);
 
-      await tester.tap(find.text('አማርኛ'));
+      // The app bar's button; the page also has a language segmented control.
+      await tester.tap(find.widgetWithText(TextButton, 'አማርኛ'));
       await tester.pump();
       expect(find.text('ማሕሙድ አሕመድ'), findsWidgets);
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_text.dart';
 import '../theme/theme_context.dart';
 import '../theme/tokens.dart';
+import 'edge_shadow.dart';
 import 'raised_surface.dart';
 
 /// The main call to action: yellow, with a press edge. [small] is the compact
@@ -76,36 +77,54 @@ class PrimaryButton extends StatelessWidget {
 }
 
 /// A white button for the second choice on a screen ("Change era or mode").
+/// [small] is the compact version used inside rows (Clear cache).
 class SecondaryButton extends StatelessWidget {
   const SecondaryButton({
     super.key,
     required this.label,
     required this.onPressed,
     this.expand = true,
+    this.small = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool expand;
 
+  /// The 44 dp row button instead of the 54 dp full-size one.
+  final bool small;
+
   @override
   Widget build(BuildContext context) {
+    final textStyles = context.text;
     return _Dimmed(
       enabled: onPressed != null,
       child: RaisedSurface(
         onTap: onPressed,
         inertButton: true,
-        expand: expand,
-        minHeight: SizeTokens.secondaryButtonMinHeight,
-        borderRadius: BorderRadius.circular(RadiusTokens.card),
+        expand: expand && !small,
+        minHeight: small
+            ? SizeTokens.smallButtonMinHeight
+            : SizeTokens.secondaryButtonMinHeight,
+        borderRadius: BorderRadius.circular(
+          small ? RadiusTokens.small : RadiusTokens.card,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.n16),
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [ColorTokens.surfaceCard, ColorTokens.surfaceCardEnd],
         ),
-        shadows: ElevationTokens.row,
-        child: _ButtonLabel(label: label, style: context.text.bodyLarge),
+        shadows: small ? edgeShadow(ColorTokens.surfaceCardEdge) : ElevationTokens.row,
+        child: _ButtonLabel(
+          label: label,
+          style: small
+              ? AppTextStyles.withWeight(
+                  textStyles.bodySmall,
+                  TypeTokens.scaleButtonFontWeight,
+                )
+              : textStyles.bodyLarge,
+        ),
       ),
     );
   }
@@ -144,6 +163,28 @@ class AppIconButton extends StatelessWidget {
           color: ColorTokens.textPrimary,
         ),
       ),
+    );
+  }
+}
+
+/// The back arrow at the top left of a screen. [semanticLabel] is "Back" (on
+/// the round screen it is "Leave game").
+class AppBackButton extends StatelessWidget {
+  const AppBackButton({
+    super.key,
+    required this.onPressed,
+    required this.semanticLabel,
+  });
+
+  final VoidCallback? onPressed;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppIconButton(
+      icon: Icons.chevron_left_rounded,
+      onPressed: onPressed,
+      semanticLabel: semanticLabel,
     );
   }
 }
