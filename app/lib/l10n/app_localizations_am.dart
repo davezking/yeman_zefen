@@ -359,7 +359,7 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String feedbackRevealEra(String era) {
-    return 'የ$era ዘፈን ነው';
+    return '$era ዘፈን ነው';
   }
 
   @override

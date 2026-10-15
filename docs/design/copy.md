@@ -162,7 +162,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `feedback.reveal` | It was {song} · {artist} | መልሱ፦ {song} · {artist} |
 | `feedback.tapToContinue` | Tap to continue · {s} s | ለመቀጠል ይንኩ · {s} ሰከንድ |
 | `feedback.yourPick` | Your pick | የእርስዎ ምርጫ |
-| `feedback.revealEra` | It's from {era} | የ{era} ዘፈን ነው |
+| `feedback.revealEra` | It's from {era} | {era} ዘፈን ነው |
 | `feedback.timeout` | Time's up | ጊዜው አልቋል |
 | `feedback.hintUsed` | Hint used · half points | ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ |
 | `feedback.skipped` | We skipped a song that wouldn't load or play. No points lost. | ሊጫን ወይም ሊጫወት ያልቻለ ዘፈን ዘለልን። ነጥብ አልተቀነሰም። |

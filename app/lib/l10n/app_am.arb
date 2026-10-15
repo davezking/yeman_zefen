@@ -104,7 +104,7 @@
   "feedbackReveal": "መልሱ፦ {song} · {artist}",
   "feedbackTapToContinue": "ለመቀጠል ይንኩ · {s} ሰከንድ",
   "feedbackYourPick": "የእርስዎ ምርጫ",
-  "feedbackRevealEra": "የ{era} ዘፈን ነው",
+  "feedbackRevealEra": "{era} ዘፈን ነው",
   "feedbackTimeout": "ጊዜው አልቋል",
   "feedbackHintUsed": "ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ",
   "feedbackSkipped": "ሊጫን ወይም ሊጫወት ያልቻለ ዘፈን ዘለልን። ነጥብ አልተቀነሰም።",
