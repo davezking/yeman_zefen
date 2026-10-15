@@ -5,9 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/widgets/widgets.dart';
 import 'package:yeman_zefen/prototype/mock_data.dart';
 import 'package:yeman_zefen/prototype/models.dart';
-import 'package:yeman_zefen/prototype/prototype_flow.dart';
+import 'package:yeman_zefen/prototype/prototype_app.dart';
+import 'package:yeman_zefen/prototype/prototype_router.dart';
 import 'package:yeman_zefen/prototype/prototype_model.dart';
 import 'package:yeman_zefen/prototype/round_simulation.dart';
+import 'package:yeman_zefen/prototype/screens/home_screen.dart';
 import 'package:yeman_zefen/prototype/screens/results_screen.dart';
 
 import 'screen_kit.dart';
@@ -28,40 +30,27 @@ void main() {
     await tester.pump();
   }
 
-  /// Opens [route] over a plain "start" page, so Leave and Home have somewhere
-  /// to go back to.
+  /// Opens the prototype at [path], or (no path) on Home, so Leave and Home
+  /// have somewhere to go back to. [sim] is the first game played.
   Future<void> open(
     WidgetTester tester,
-    PrototypeModel model,
-    Widget Function() route, {
+    PrototypeModel model, {
+    String? path,
+    RoundSimulation? sim,
     Locale locale = const Locale('en'),
     bool disableAnimations = false,
   }) async {
-    await pumpScreen(
-      tester,
-      Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: TextButton(
-              onPressed: () =>
-                  Navigator.of(context)
-                      .push(MaterialPageRoute<void>(builder: (_) => route())),
-              child: const Text('start'),
-            ),
-          ),
-        ),
-      ),
-      locale: locale,
-      disableAnimations: disableAnimations,
+    setUpPhone(tester, disableAnimations: disableAnimations);
+    model.languageCode = locale.languageCode;
+    await tester.pumpWidget(
+      PrototypeApp(model: model, initialLocation: path, simulation: sim),
     );
-    await tester.tap(find.text('start'));
-    // Not pumpAndSettle: the cassette's reels turn for as long as the clip plays.
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
   }
 
   /// Opens the round for [sim] with its clock held, so the page transition does
-  /// not eat into the answer window, then lets it run.
+  /// not eat into the answer window, then lets it run. The way a player gets
+  /// there: Play on Home.
   Future<void> openRound(
     WidgetTester tester,
     PrototypeModel model,
@@ -73,10 +62,16 @@ void main() {
     await open(
       tester,
       model,
-      () => RoundRoute(model: model, simulation: sim),
+      sim: sim,
       locale: locale,
       disableAnimations: disableAnimations,
     );
+    await tester.tap(
+      find.bySemanticsLabel(locale.languageCode == 'am' ? 'ይጫወቱ' : 'Play'),
+    );
+    // Not pumpAndSettle: the cassette's reels turn for as long as the clip plays.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     sim.setBackgrounded(false);
     await tester.pump();
   }
@@ -358,7 +353,7 @@ void main() {
 
       await tester.tap(find.text('Leave'));
       await tester.pumpAndSettle(const Duration(milliseconds: 50));
-      expect(find.text('start'), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
       expect(model.gamesFinished, 0);
       await finish(tester, model);
     });
@@ -578,7 +573,7 @@ void main() {
 
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle(const Duration(milliseconds: 50));
-      expect(find.text('start'), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
       await finish(tester, model);
     });
 
@@ -838,12 +833,7 @@ void main() {
     }) async {
       final model = newModel(user: user, connection: connection);
       setUp?.call(model);
-      await open(
-        tester,
-        model,
-        () => LeaderboardRoute(model: model),
-        locale: locale,
-      );
+      await open(tester, model, path: ProtoPath.leaderboard, locale: locale);
       return model;
     }
 
@@ -882,7 +872,7 @@ void main() {
       (tester) async {
         // A player with a name but no entry: the board has no row for them.
         final model = newModel(user: mockSignedIn);
-        await open(tester, model, () => LeaderboardRoute(model: model));
+        await open(tester, model, path: ProtoPath.leaderboard);
         model.update(() {});
         expect(find.text('Your rank: #7'), findsOneWidget);
         await finish(tester, model);

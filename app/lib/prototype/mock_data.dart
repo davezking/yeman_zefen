@@ -345,3 +345,29 @@ LeaderboardEntry mockMyEntry(
     colorIndex: 5,
   );
 }
+
+/// Ten finished rounds, for Results when no game was played (opened from the
+/// dev menu) and for the design screenshots.
+final mockResultRounds = [
+  for (var i = 0; i < 10; i++)
+    RoundResult(
+      track: mockTracks[(i * 7) % mockTracks.length],
+      correct: i % 4 != 2,
+      points: i % 4 != 2 ? 143 - i : 0,
+      timedOut: i == 6,
+    ),
+];
+
+/// A finished game as Results shows it.
+ResultsView mockResults({
+  UserInfo user = mockGuest,
+  bool newBest = false,
+  ScoreSync sync = ScoreSync.provisional,
+  int score = 1240,
+}) => ResultsView(
+  score: score,
+  rounds: mockResultRounds,
+  user: user,
+  newBest: newBest,
+  sync: sync,
+);

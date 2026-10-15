@@ -6,9 +6,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/theme/app_theme.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
 
+/// The icon font that ships with the Flutter SDK. `flutter test` does not
+/// load it, so every icon would be drawn as a square.
+File _materialIconsFont() {
+  const file = 'material_fonts/MaterialIcons-Regular.otf';
+  final root = Platform.environment['FLUTTER_ROOT'];
+  final candidates = [if (root != null) '$root/bin/cache/artifacts/$file'];
+  // The test runner sits in <sdk>/bin/cache/artifacts/engine/<platform>/.
+  for (
+    var dir = File(Platform.resolvedExecutable).parent;
+    dir.parent.path != dir.path;
+    dir = dir.parent
+  ) {
+    candidates.add('${dir.path}/$file');
+  }
+  return candidates
+      .map(File.new)
+      .firstWhere(
+        (f) => f.existsSync(),
+        orElse: () => throw StateError(
+          'MaterialIcons-Regular.otf not found in the Flutter SDK; icons would '
+          'render as squares. Looked in: ${candidates.join(', ')}',
+        ),
+      );
+}
+
 /// Loads the bundled fonts, because tests otherwise draw every glyph as a
 /// fixed-width square, which makes text wider than it really is and hides (or
-/// invents) overflow. Call from `setUpAll`.
+/// invents) overflow. That includes the icons, whose font comes from the SDK.
+/// Call from `setUpAll`.
 Future<void> loadAppFonts() async {
   Future<void> load(String family, List<String> files) async {
     final loader = FontLoader(family);
@@ -27,6 +53,14 @@ Future<void> loadAppFonts() async {
       'Poppins-$w.ttf',
   ]);
   await load('Noto Sans Ethiopic', ['NotoSansEthiopic.ttf']);
+
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(
+      Future.value(
+        ByteData.view(_materialIconsFont().readAsBytesSync().buffer),
+      ),
+    );
+  await icons.load();
 }
 
 /// Pumps [child] on a 360 dp wide screen (the design's phone width) in the

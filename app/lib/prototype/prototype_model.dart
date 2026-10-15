@@ -83,6 +83,9 @@ class PrototypeModel extends ChangeNotifier {
   /// Games finished this run: after the 5th, a guest is asked to sign in.
   int gamesFinished = 0;
 
+  /// The last finished game, which Results shows (null: a sample game).
+  ResultsView? lastResults;
+
   LeaderboardScope leaderboardScope = LeaderboardScope.weekly;
   int leaderboardEra = EraId.all;
 
@@ -226,7 +229,7 @@ class PrototypeModel extends ChangeNotifier {
             );
       notifyListeners();
     }
-    return ResultsView(
+    return lastResults = ResultsView(
       score: score,
       rounds: rounds,
       user: user,
@@ -235,6 +238,27 @@ class PrototypeModel extends ChangeNotifier {
           forcedSync ??
           (offline ? ScoreSync.savedOffline : ScoreSync.provisional),
     );
+  }
+
+  /// Puts every edge-state switch back to normal (the dev menu does this
+  /// before it jumps, so one jump does not leave another's state behind). The
+  /// player, the connection, the language and the player's own answers (ad
+  /// consent) stay as they are.
+  void resetStates() {
+    firstLaunch = false;
+    updateRequired = false;
+    playingOutdated = false;
+    consentRequired = true;
+    lastResults = null;
+    allSongsPlayed = false;
+    nextClip = ClipArrival.onTime;
+    slowLists = false;
+    boardFails = false;
+    boardEmpty = false;
+    syncFails = false;
+    forcedSync = null;
+    failNextDownload = null;
+    nextSignIn = SignInOutcome.works;
   }
 
   /// The board for the chosen scope and era, in its current state.
