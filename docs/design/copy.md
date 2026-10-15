@@ -61,10 +61,18 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `home.best.label` | Your best | ምርጥ ውጤትዎ |
 | `home.best.none` | Play a game to set your first best score. | የመጀመሪያ ምርጥ ውጤትዎን ለማስመዝገብ አንድ ጨዋታ ይጫወቱ። |
 | `home.builtIn` | Built-in songs | አብረው የመጡ ዘፈኖች |
+| `home.quickPlay.mode.intro` | Intro | መግቢያ |
+| `home.quickPlay.mode.middle` | Middle | ከመሀል |
+| `home.quickPlay.mode.era` | Which Era? | የየትኛው ዘመን? |
+| `difficulty.easy.short` | Easy | ቀላል |
+| `difficulty.medium.short` | Medium | መካከለኛ |
+| `difficulty.hard.short` | Hard | ከባድ |
 | `nav.home` | Home | መነሻ |
 | `nav.play` | Play | ይጫወቱ |
 | `nav.settings` | Settings | ቅንብሮች |
 | `nav.back` | Back | ይመለሱ |
+
+> **Short labels for the Play line** (added in Phase 2 · Sprint 2). The Home boards show "The '80s · Intro · Easy" and "የ80ዎቹ · መግቢያ · ቀላል", but the deck only had the long names ("Guess the Intro", "Easy · 10 s"). The six `home.quickPlay.mode.*` and `difficulty.*.short` rows are those short forms. **Reviewed by a native speaker**, as is the changed `feedback.revealEra` (the era names already start with የ, so it no longer adds one).
 
 ## Mode select
 
@@ -154,7 +162,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `feedback.reveal` | It was {song} · {artist} | መልሱ፦ {song} · {artist} |
 | `feedback.tapToContinue` | Tap to continue · {s} s | ለመቀጠል ይንኩ · {s} ሰከንድ |
 | `feedback.yourPick` | Your pick | የእርስዎ ምርጫ |
-| `feedback.revealEra` | It's from {era} | የ{era} ዘፈን ነው |
+| `feedback.revealEra` | It's from {era} | {era} ዘፈን ነው |
 | `feedback.timeout` | Time's up | ጊዜው አልቋል |
 | `feedback.hintUsed` | Hint used · half points | ፍንጭ ተጠቅመዋል · ግማሽ ነጥብ |
 | `feedback.skipped` | We skipped a song that wouldn't load or play. No points lost. | ሊጫን ወይም ሊጫወት ያልቻለ ዘፈን ዘለልን። ነጥብ አልተቀነሰም። |

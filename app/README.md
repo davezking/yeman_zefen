@@ -76,6 +76,29 @@ flutter run -t lib/main_gallery.dart
 
 Compare it with the screenshots in `docs/design/screens/`. There is no dark theme: none was designed.
 
+### Prototype screens (Phase 2)
+
+The hi-fi screens on mock data, with no services or config. Home, Mode select, Era & genre, Settings and Settings ›
+Offline play are in; the round, results, leaderboard and sign-in screens follow.
+
+```sh
+flutter run -t lib/main_prototype.dart
+```
+
+Settings › Language switches Amharic/English live. The flask icon at the top right opens a dev-only sheet for trying
+the variants (signed in, first run, offline, mobile data, a failing download).
+
+- `lib/prototype/screens/`: one widget per screen. Each takes plain data (`models.dart`) and callbacks, and imports no
+  provider or service (`test/prototype/prototype_guards_test.dart` checks the imports). Phase 4 builds the same data
+  from the real services and reuses these widgets.
+- `lib/prototype/mock_data.dart`: 20 invented tracks across the five eras, four packs in four states, cache use and
+  the guest and signed-in users. `prototype_model.dart` and `prototype_app.dart` only run the prototype.
+- Strings come from the ARB files, which mirror `docs/design/copy.md` key for key (`test/prototype/prototype_guards_test.dart`
+  fails when they differ). A key `round.hint.watch` is `roundHintWatch`. After editing an ARB file, `flutter gen-l10n`
+  regenerates `lib/l10n/app_localizations*.dart` (they are committed).
+- `test/prototype/screens_layout_test.dart` renders every screen variant in both languages at text scale 1.0 and 1.3
+  on a 360 dp phone and fails on any overflow.
+
 ## Fonts
 
 Poppins (Latin) and Noto Sans Ethiopic (Fidel), both SIL Open Font License (`assets/fonts/OFL-Poppins.txt`,

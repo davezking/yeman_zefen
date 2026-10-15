@@ -389,6 +389,239 @@ class ComponentGallery extends StatelessWidget {
               onTap: _noop,
             ),
           ]),
+          section('Switch · on, off, disabled', [
+            SettingsGroup(
+              children: [
+                SettingsRow.toggle(
+                  title: _t('Sound effects', 'የድምፅ ውጤቶች'), // settings.sound
+                  value: true,
+                  onChanged: (_) {},
+                ),
+                SettingsRow.toggle(
+                  title: _t('Vibration', 'ንዝረት'), // settings.haptics
+                  value: false,
+                  onChanged: (_) {},
+                ),
+                SettingsRow.toggle(
+                  title: _t(
+                    'Download upcoming songs on mobile data',
+                    'ቀጣይ ዘፈኖችን በሞባይል ዳታ ያውርዱ',
+                  ), // packs.mobilePrefetch
+                  subtitle: _t(
+                    'Off saves data: only songs already on your phone play.',
+                    'ሲጠፋ ዳታ ይቆጥባል፤ በስልክዎ ላይ ያሉ ዘፈኖች ብቻ ይጫወታሉ።',
+                  ), // packs.mobilePrefetch.help
+                  value: true,
+                  onChanged: null,
+                ),
+              ],
+            ),
+          ]),
+          section('Settings rows · link, badge, button', [
+            SettingsGroup(
+              children: [
+                SettingsRow(
+                  title: _t('Privacy policy', 'የግላዊነት ፖሊሲ'), // settings.privacy
+                  onTap: _noop,
+                ),
+                SettingsRow(
+                  title: _t(
+                    'Offline play · 2 packs · 27 MB',
+                    'ያለ ኢንተርኔት መጫወት · 2 ጥቅሎች · 27 ሜባ',
+                  ), // settings.offline
+                  subtitle: _t('Update available', 'ማሻሻያ አለ'), // packs.updateAvailable
+                  subtitleColor: ColorTokens.correctText,
+                  badge: true,
+                  onTap: _noop,
+                ),
+                SettingsRow(
+                  title: _t('Playing as a guest', 'በእንግድነት እየተጫወቱ ነው'),
+                  onTap: null,
+                  trailing: PrimaryButton(
+                    label: _t('Sign in', 'ይግቡ'),
+                    small: true,
+                    expand: false,
+                    onPressed: _noop,
+                  ),
+                ), // settings.guest, settings.signIn
+                SettingsRow(
+                  title: _t('Delete account', 'መለያ ይሰርዙ'), // settings.delete
+                  titleColor: ColorTokens.textError,
+                  onTap: _noop,
+                ),
+              ],
+            ),
+          ]),
+          section('Segmented controls · light, on the hero', [
+            SegmentedControl<int>(
+              selected: 0,
+              onChanged: (_) {},
+              options: [
+                SegmentOption(value: 0, label: _t('Song', 'ዘፈኑን')),
+                SegmentOption(value: 1, label: _t('Artist', 'ዘፋኙን')),
+              ],
+            ), // mode.guess.*
+            SegmentedControl<int>(
+              compact: true,
+              selected: 1,
+              onChanged: (_) {},
+              options: [
+                SegmentOption(value: 0, label: _t('Easy · 10 s', 'ቀላል · 10 ሰከንድ')),
+                SegmentOption(
+                  value: 1,
+                  label: _t('Medium · 5 s', 'መካከለኛ · 5 ሰከንድ'),
+                ),
+                SegmentOption(value: 2, label: _t('Hard · 3 s', 'ከባድ · 3 ሰከንድ')),
+              ],
+            ), // difficulty.*
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [ColorTokens.heroMiddle, ColorTokens.heroBottom],
+                ),
+                borderRadius: BorderRadius.circular(RadiusTokens.large),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.n12),
+                child: SegmentedControl<int>(
+                  style: SegmentedStyle.onHero,
+                  selected: _am ? 0 : 1,
+                  onChanged: (_) {},
+                  options: const [
+                    SegmentOption(
+                      value: 0,
+                      label: 'አማርኛ',
+                      textLocale: Locale('am'),
+                    ),
+                    SegmentOption(
+                      value: 1,
+                      label: 'English',
+                      textLocale: Locale('en'),
+                    ),
+                  ],
+                ),
+              ),
+            ), // settings.language
+          ]),
+          section('Choice chips · selected, idle', [
+            Wrap(
+              spacing: SpacingTokens.n8,
+              runSpacing: SpacingTokens.n8,
+              children: [
+                AppChoiceChip(
+                  label: _t('Any genre', 'ማንኛውም ዘውግ'), // genre.any
+                  selected: true,
+                  onTap: _noop,
+                ),
+                AppChoiceChip(
+                  label: _t('Tizita', 'ትዝታ'), // genre.tizita
+                  selected: false,
+                  onTap: _noop,
+                ),
+                AppChoiceChip(
+                  label: _t('Ethio-jazz', 'ኢትዮ ጃዝ'), // genre.ethiojazz
+                  selected: false,
+                  onTap: _noop,
+                ),
+              ],
+            ),
+          ]),
+          section('Mode cards · selected, with tag', [
+            ModeCard(
+              title: _t('Guess the Intro', 'መግቢያውን ይገምቱ'),
+              description: _t(
+                'The opening of the song. The classic.',
+                'የዘፈኑ መጀመሪያ። የተለመደው ጨዋታ።',
+              ),
+              icon: Icons.music_note_rounded,
+              iconColor: ColorTokens.paletteSun400,
+              selected: true,
+              onTap: _noop,
+            ),
+            ModeCard(
+              title: _t('Guess from the Middle', 'ከመሀል ይገምቱ'),
+              description: _t(
+                "A clip from the middle. Harder, so it's worth more.",
+                'ከዘፈኑ መሀል የተወሰደ ቅንጭብ። ስለሚከብድ ተጨማሪ ነጥብ ያስገኛል።',
+              ),
+              tag: '+25%', // mode.middle.tag
+              icon: Icons.show_chart_rounded,
+              iconColor: ColorTokens.paletteCoral,
+              selected: false,
+              onTap: _noop,
+            ),
+          ]),
+          section('Hero banner, stat tiles and wordmark', [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [ColorTokens.heroMiddle, ColorTokens.heroBottom],
+                ),
+                borderRadius: BorderRadius.circular(RadiusTokens.large),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.n12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LogoTiles(semanticLabel: _t('Yeman Zefen', 'የማን ዘፈን')),
+                    const SizedBox(height: SpacingTokens.n12),
+                    DarkBanner(
+                      icon: Icons.wifi_off_rounded,
+                      text: _t(
+                        "You're offline. You can still play the 25 built-in songs.",
+                        'ከኢንተርኔት ውጭ ነዎት። አብረው የመጡትን 25 ዘፈኖች መጫወት ይችላሉ።',
+                      ),
+                    ), // offline.banner.builtInOnly
+                    const SizedBox(height: SpacingTokens.n12),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: StatTile.number(
+                              label: _t('Your best', 'ምርጥ ውጤትዎ'),
+                              number: '1,240',
+                            ),
+                          ), // home.best.label
+                          const SizedBox(width: SpacingTokens.n10),
+                          Expanded(
+                            child: StatTile.text(
+                              label: _t('Play button starts', 'ይጫወቱ የሚጀምረው'),
+                              text: _t(
+                                "The '80s · Intro · Easy",
+                                'የ80ዎቹ · መግቢያ · ቀላል',
+                              ),
+                            ),
+                          ), // home.quickPlay.label
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ]),
+          section('Bottom bar · Home, Settings', [
+            AppBottomBar(
+              current: NavTab.home,
+              homeLabel: _t('Home', 'መነሻ'),
+              playLabel: _t('Play', 'ይጫወቱ'),
+              settingsLabel: _t('Settings', 'ቅንብሮች'),
+              onHome: _noop,
+              onPlay: _noop,
+              onSettings: _noop,
+            ), // nav.*
+            AppBottomBar(
+              current: NavTab.settings,
+              homeLabel: _t('Home', 'መነሻ'),
+              playLabel: _t('Play', 'ይጫወቱ'),
+              settingsLabel: _t('Settings', 'ቅንብሮች'),
+              onHome: _noop,
+              onPlay: _noop,
+              onSettings: _noop,
+            ),
+          ]),
           section('Dialog and bottom sheet', [
             Builder(
               builder: (context) => SecondaryButton(
