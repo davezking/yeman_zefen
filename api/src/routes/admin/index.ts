@@ -6,6 +6,7 @@ import { ingestRoutes } from "./ingest";
 import { jobRoutes } from "./jobs";
 import { packRoutes } from "./packs";
 import { reviewRoutes } from "./reviewItems";
+import { rollupRoutes } from "./rollups";
 import { taxonomy } from "./taxonomy";
 
 // Human-authenticated admin routes. The requireAdmin middleware guards every
@@ -20,6 +21,7 @@ human.route("/", jobRoutes);
 human.route("/", packRoutes);
 human.route("/", taxonomy);
 human.route("/", reviewRoutes);
+human.route("/", rollupRoutes);
 
 // Service-token routes for GitHub Actions ingestion. requireService guards these.
 const ingest = new Hono<AppEnv>();
