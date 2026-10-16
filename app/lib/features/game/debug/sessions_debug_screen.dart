@@ -18,6 +18,9 @@ class DebugSession {
     required this.maxResponseMs,
     required this.offline,
     required this.prettyJson,
+    this.attempts = 0,
+    this.parked = false,
+    this.lastError,
   });
 
   final String id;
@@ -30,6 +33,11 @@ class DebugSession {
   final int? maxResponseMs;
   final bool offline;
   final String prettyJson;
+
+  /// Failed uploads so far, whether the API refused it for good, and the last error.
+  final int attempts;
+  final bool parked;
+  final String? lastError;
 
   /// A response faster than a person can react, which the server flags.
   bool get hasTooFastResponse => minResponseMs != null && minResponseMs! < 200;
@@ -48,6 +56,9 @@ class DebugSession {
       maxResponseMs: times.isEmpty ? null : times.last,
       offline: payload['offline'] as bool,
       prettyJson: const JsonEncoder.withIndent('  ').convert(payload),
+      attempts: row.attempts,
+      parked: row.parked,
+      lastError: row.lastError,
     );
   }
 }
@@ -102,7 +113,9 @@ class SessionsDebugScreen extends ConsumerWidget {
                 subtitle: Text(
                   'responses ${s.minResponseMs ?? '-'}–${s.maxResponseMs ?? '-'} ms · '
                   '${s.offline ? 'offline' : 'online'}'
-                  '${s.hasTooFastResponse ? ' · TOO FAST' : ''}',
+                  '${s.hasTooFastResponse ? ' · TOO FAST' : ''}'
+                  '${s.parked ? ' · PARKED' : s.attempts > 0 ? ' · retrying (${s.attempts})' : ''}'
+                  '${s.lastError == null ? '' : '\n${s.lastError}'}',
                 ),
                 children: [
                   Padding(

@@ -109,7 +109,7 @@ class AuthService {
     ],
     RetryTimerFactory? timer,
   }) : assert(retryDelays.isNotEmpty),
-       _onlineChanges = onlineChanges ?? _connectivityOnline(),
+       _onlineChanges = onlineChanges ?? connectivityOnlineChanges(),
        _timer = timer ?? Timer.new;
 
   final AuthBackend backend;
@@ -211,7 +211,8 @@ class AuthService {
   }
 }
 
-Stream<bool> _connectivityOnline() => Connectivity().onConnectivityChanged.map(
+/// True when the device has any connection, false when it has none, on every change.
+Stream<bool> connectivityOnlineChanges() => Connectivity().onConnectivityChanged.map(
   (results) => results.any((r) => r != ConnectivityResult.none),
 );
 

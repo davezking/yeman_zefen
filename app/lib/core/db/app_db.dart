@@ -52,6 +52,18 @@ class PendingSessions extends Table {
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
 
+  /// Not sent before this time (epoch ms, UTC): the backoff after a failed attempt. 0 = send now.
+  IntColumn get nextAttemptAt => integer().withDefault(const Constant(0))();
+
+  /// The API refused the session for good (a 4xx), so it is never sent again. The row stays for
+  /// debugging, with [lastError] saying why.
+  BoolColumn get parked => boolean().withDefault(const Constant(false))();
+
+  /// The HTTP status of the last failed attempt, or null when no response arrived (offline) or
+  /// nothing failed yet. A wait the server asked for (a 5xx, a 429) is kept even when the
+  /// connection comes back; a wait that was only about being offline is not.
+  IntColumn get lastStatus => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -84,6 +96,10 @@ class RecentSessions extends Table {
   IntColumn get playedAt => integer()(); // epoch ms, UTC
   TextColumn get trackIdsJson => text()();
 
+  /// The score the server computed once the session was uploaded; null until then.
+  /// The server decides the real score, so a results list shows this over the local one.
+  IntColumn get serverScore => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {sessionId};
 }
@@ -95,7 +111,7 @@ class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -109,6 +125,13 @@ class AppDb extends _$AppDb {
             await m.createTable(localBests);
             await m.createTable(localCounters);
             await m.createTable(recentSessions);
+          }
+          if (from < 4) {
+            await m.addColumn(pendingSessions, pendingSessions.nextAttemptAt);
+            await m.addColumn(pendingSessions, pendingSessions.parked);
+            await m.addColumn(pendingSessions, pendingSessions.lastStatus);
+            // recent_sessions made by the `from < 3` step above already has this column.
+            if (from >= 3) await m.addColumn(recentSessions, recentSessions.serverScore);
           }
         },
       );

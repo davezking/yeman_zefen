@@ -6,7 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/features/game/debug/sessions_debug_screen.dart';
 
-PendingSession row(String id, {List<int> times = const [2500, 1800, 3100], bool offline = true, String mode = 'intro'}) {
+PendingSession row(
+  String id, {
+  List<int> times = const [2500, 1800, 3100],
+  bool offline = true,
+  String mode = 'intro',
+  int attempts = 0,
+  bool parked = false,
+  String? lastError,
+}) {
   final payload = {
     'id': id,
     'mode': mode,
@@ -21,7 +29,7 @@ PendingSession row(String id, {List<int> times = const [2500, 1800, 3100], bool 
     ],
     'ads': {'interstitialShown': 0, 'rewardedCompleted': 0},
   };
-  return PendingSession(id: id, payloadJson: jsonEncode(payload), createdAt: 100, attempts: 0);
+  return PendingSession(id: id, payloadJson: jsonEncode(payload), createdAt: 100, attempts: attempts, nextAttemptAt: 0, parked: parked, lastError: lastError, lastStatus: null);
 }
 
 void main() {
@@ -72,6 +80,24 @@ void main() {
     expect(find.text('responses 1800–3100 ms · offline'), findsOneWidget);
     expect(find.text('middle · 2 rounds'), findsOneWidget);
     expect(find.text('responses 150–900 ms · online · TOO FAST'), findsOneWidget);
+  });
+
+  testWidgets('shows why a session is waiting or parked', (tester) async {
+    await pump(
+      tester,
+      DebugSessionsData(
+        sessions: [
+          DebugSession.fromRow(row('a', attempts: 2, lastError: '500 internal: boom')),
+          DebugSession.fromRow(row('b', mode: 'middle', attempts: 1, parked: true, lastError: '422 invalid_session: no')),
+        ],
+        clipErrors: 0,
+      ),
+    );
+
+    expect(find.textContaining('retrying (2)'), findsOneWidget);
+    expect(find.textContaining('500 internal: boom'), findsOneWidget);
+    expect(find.textContaining('PARKED'), findsOneWidget);
+    expect(find.textContaining('422 invalid_session: no'), findsOneWidget);
   });
 
   testWidgets('shows the payload when a session is opened', (tester) async {

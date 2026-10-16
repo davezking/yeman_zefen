@@ -20,7 +20,11 @@ import 'session_state.dart';
 
 final sessionEnvironmentProvider = Provider<SessionEnvironment>((ref) => SessionEnvironment.real());
 
-final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore(ref.watch(appDbProvider)));
+final sessionStoreProvider = Provider<SessionStore>((ref) {
+  final store = SessionStore(ref.watch(appDbProvider));
+  ref.onDispose(store.dispose);
+  return store;
+});
 
 final sessionControllerProvider = NotifierProvider<SessionController, SessionState>(SessionController.new);
 
