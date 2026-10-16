@@ -7,6 +7,7 @@ import { cdnUrl } from "../lib/cdn";
 import { remoteConfig } from "../lib/remoteConfig";
 import { requireUser } from "../lib/firebaseAuth";
 import { me } from "./me";
+import { leaderboard } from "./v1/leaderboard";
 import { sessions } from "./v1/sessions";
 
 export const v1 = new Hono<AppEnv>();
@@ -24,6 +25,7 @@ v1.use("*", async (c, next) => {
 
 v1.route("/me", me);
 v1.route("/sessions", sessions);
+v1.route("/leaderboard", leaderboard);
 
 // Tunables for the app (public, see PUBLIC_ROUTES). Cached for 10 minutes at the edge and in the app.
 v1.get("/config", (c) => {
