@@ -34,6 +34,10 @@ bucket_name = "yz-source"
 [env.prod]
 name = "yz-api-prod"
 
+# Nightly roll-ups at 00:30 UTC (src/cron/rollups.ts). Prod only; locally: wrangler dev --test-scheduled.
+[env.prod.triggers]
+crons = ["30 0 * * *"]
+
 [env.prod.vars]
 ENV = "prod"
 FIREBASE_PROJECT_ID = "yeman-zefen"

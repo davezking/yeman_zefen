@@ -421,3 +421,18 @@ build define (`--dart-define-from-file=config/<flavor>.json`).
    clips. Turn the network on and the anonymous user appears without
    restarting.
 4. Repeat for `--flavor prod` against the prod project.
+
+## Nightly roll-ups
+
+A Cron Trigger (`30 0 * * *`, UTC; `api/src/cron/rollups.ts`) rolls the previous UTC day of `game_sessions` up into the tables the admin site reads. A session belongs to the day its `received_at` (server clock) falls in: `[00:00:00.000, next 00:00:00.000)`.
+
+| Table | Rows for a day |
+|---|---|
+| `royalty_daily` | one per track: every entry of `track_ids_json`, right or wrong, flagged sessions included. The day's total equals the sum of `json_array_length(track_ids_json)`. |
+| `ad_events_daily` | per country and format: `interstitial`/`shown` and `rewarded`/`completed`, from `events_json.ads`. Zero counts are not stored. Unplaced sessions use country `XX`. |
+| `analytics_daily` | `sessions`, `rounds`, `rounds_per_session` (**x100**, rounded: 175 = 1.75), `dau` (distinct users; deleted accounts count as one), `new_users` (`users.created_at` that day), and `plays_by_country` (dimension = country, value = tracks played). Always written, so a day with no sessions still has `sessions = 0`. |
+
+- **Reruns are safe.** A run deletes the day's rows and inserts them again in one batch, so the result is the same however often it runs, and a failure leaves the day untouched.
+- **Missed nights fill themselves.** Each run rolls up yesterday and any day of the last 7 with no `sessions` row, at most 6 days per run (Free plan: 50 D1 queries per invocation). A failing day does not stop the others; the run then fails visibly and the next one retries it. Each day logs `rollup <date>: sessions=.. rounds=.. royalty_rows=.. ad_rows=.. analytics_rows=..`.
+- **Backfill or fix a day:** `POST /admin/rollups/run { "date": "2026-10-14" }` (admins only; the day must have ended, UTC). Answers with the same summary.
+- **Prod:** `npm run deploy` registers the trigger (`[env.prod.triggers]`); the dev worker has none (try it with `wrangler dev --test-scheduled`). A play of a track id missing from `tracks` is left out of `royalty_daily` rather than failing the day.

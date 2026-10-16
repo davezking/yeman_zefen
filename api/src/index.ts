@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import type { AppEnv } from "./env";
+import { runScheduled } from "./cron/rollups";
+import type { AppEnv, Bindings } from "./env";
 import { adminCors } from "./lib/cors";
 import { onError, onNotFound } from "./lib/errors";
 import { requestId } from "./lib/requestId";
@@ -21,4 +22,11 @@ app.route("/v1", v1);
 app.use("/admin/*", adminCors());
 app.route("/admin", admin);
 
-export default app;
+// fetch serves the API; scheduled is the Cron Trigger (wrangler.toml `crons`).
+export default {
+  fetch: app.fetch,
+  // Awaited (not waitUntil) so that a failed day makes the invocation fail in Cloudflare.
+  scheduled: async (controller: ScheduledController, env: Bindings) => {
+    await runScheduled(env, controller.scheduledTime);
+  },
+};
