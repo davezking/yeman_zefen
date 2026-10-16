@@ -13,8 +13,8 @@ Future<void> main() async {
   await initializeFirebase();
   await configureGameAudioSession();
   final container = ProviderContainer();
-  // Not awaited: with no network the anonymous sign-in waits, and the game
-  // still starts with its bundled and cached clips.
-  container.read(authServiceProvider).start();
+  // Creating the service starts the anonymous sign-in without waiting for it:
+  // with no network the game still starts with its bundled and cached clips.
+  container.read(authServiceProvider);
   runApp(UncontrolledProviderScope(container: container, child: const App()));
 }

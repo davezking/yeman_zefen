@@ -84,6 +84,21 @@ void main() {
     expect(cdnAuth, isNull);
   });
 
+  test('a /v1/packs body that is not a pack list throws BadResponseException', () async {
+    for (final body in ['', '{"items":[]}', '[]', '{"packs":[{"slug":1}]}']) {
+      final api = PacksApi(api: _apiReturning(200, body));
+      await expectLater(api.listPacks(), throwsA(isA<BadResponseException>()), reason: body);
+    }
+  });
+
+  test('a CDN that cannot be reached throws PacksApiException', () async {
+    final api = PacksApi(
+      api: _apiReturning(200, '{}'),
+      cdnClient: MockClient((_) async => throw http.ClientException('offline')),
+    );
+    await expectLater(api.fetchManifestJson('https://cdn.test/m.json'), throwsA(isA<PacksApiException>()));
+  });
+
   test('a failed /v1/packs call throws a typed ApiException', () async {
     final api = PacksApi(api: _apiReturning(503, '{"error":{"code":"unavailable","message":"down"}}'));
     await expectLater(api.listPacks(), throwsA(isA<ServerException>()));

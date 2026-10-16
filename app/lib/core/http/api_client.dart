@@ -86,14 +86,17 @@ class ApiClient {
   Future<Object?> deleteJson(String path) => _send('DELETE', path);
 
   Future<Object?> _send(String method, String path, {Map<String, String>? query, Object? body}) async {
-    var res = await _attempt(method, path, query, body, forceRefresh: false);
-    if (res.statusCode == 401) {
-      res = await _attempt(method, path, query, body, forceRefresh: true);
+    var (res, sentToken) = await _attempt(method, path, query, body, forceRefresh: false);
+    // A refresh only helps when a token was sent. With no user there is no
+    // token to refresh, and the same request would just fail again.
+    if (res.statusCode == 401 && sentToken) {
+      res = (await _attempt(method, path, query, body, forceRefresh: true)).$1;
     }
     return _decode(res);
   }
 
-  Future<http.Response> _attempt(
+  /// Sends one request. Returns the response and whether a token was attached.
+  Future<(http.Response, bool)> _attempt(
     String method,
     String path,
     Map<String, String>? query,
@@ -115,7 +118,8 @@ class ApiClient {
       request.body = jsonEncode(body);
     }
     try {
-      return await http.Response.fromStream(await _client.send(request).timeout(timeout)).timeout(timeout);
+      final res = await http.Response.fromStream(await _client.send(request).timeout(timeout)).timeout(timeout);
+      return (res, token != null);
     } on TimeoutException {
       throw NetworkException('$method $path timed out');
     } on http.ClientException catch (e) {
@@ -135,7 +139,7 @@ class ApiClient {
       try {
         return jsonDecode(text);
       } on FormatException {
-        throw ApiClientBadResponse(status);
+        throw BadResponseException('The server sent a response that is not JSON', status: status);
       }
     }
     var code = 'http_$status';
@@ -161,7 +165,7 @@ class ApiClient {
   void close() => _client.close();
 }
 
-/// A 2xx response whose body was not JSON.
-class ApiClientBadResponse extends ServerException {
-  ApiClientBadResponse(int status) : super('bad_response', 'The server sent a response that is not JSON', status: status);
+/// A 2xx response the app cannot use: not JSON, or not the expected shape.
+class BadResponseException extends ServerException {
+  const BadResponseException(String message, {required super.status}) : super('bad_response', message);
 }

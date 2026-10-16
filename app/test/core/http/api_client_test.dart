@@ -83,6 +83,18 @@ void main() {
     expect(calls, 2);
   });
 
+  test('a 401 with no token is not retried', () async {
+    final t = tokens(first: null);
+    var calls = 0;
+    final api = clientFor((_) async {
+      calls++;
+      return http.Response('{"error":{"code":"unauthorized","message":"sign in"}}', 401);
+    }, idToken: t.provider);
+    await expectLater(api.getJson('/v1/me'), throwsA(isA<UnauthorizedException>()));
+    expect(calls, 1);
+    expect(t.refreshes, [false]);
+  });
+
   test('maps the { error } shape onto typed exceptions', () async {
     Future<Object> failWith(int status, [String body = '{"error":{"code":"some_code","message":"msg"}}']) async {
       final api = clientFor((_) async => http.Response(body, status));

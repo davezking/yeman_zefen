@@ -58,18 +58,30 @@ class PacksApi {
 
   static const _timeout = Duration(seconds: 15);
 
-  /// Throws [ApiException] when the API call fails.
+  /// Throws [ApiException] when the API call fails, including
+  /// [BadResponseException] when the body is not a pack list.
   Future<List<PackListing>> listPacks() async {
-    final body = await api.getJson('/v1/packs') as Map<String, dynamic>;
-    return [
-      for (final p in body['packs'] as List<dynamic>) PackListing.fromJson(p as Map<String, dynamic>),
-    ];
+    final body = await api.getJson('/v1/packs');
+    try {
+      final packs = (body as Map<String, dynamic>)['packs'] as List<dynamic>;
+      return [for (final p in packs) PackListing.fromJson(p as Map<String, dynamic>)];
+    } on TypeError {
+      // An empty body, or a shape this app version does not know.
+      throw const BadResponseException('/v1/packs did not return a pack list', status: 200);
+    }
   }
 
   /// Returns the raw manifest text, so the exact bytes that were verified are what gets stored.
+  /// Throws [PacksApiException] when the CDN cannot be reached or does not answer 200.
   Future<String> fetchManifestJson(String manifestUrl) async {
     final uri = Uri.parse(manifestUrl);
-    final res = await _cdn.get(uri).timeout(_timeout);
+    final http.Response res;
+    try {
+      res = await _cdn.get(uri).timeout(_timeout);
+    } catch (e) {
+      // Offline, timeout, DNS: one exception type for the packs screen.
+      throw PacksApiException('GET $uri failed: $e');
+    }
     if (res.statusCode != 200) {
       throw PacksApiException('GET $uri returned ${res.statusCode}');
     }

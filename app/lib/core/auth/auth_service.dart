@@ -88,69 +88,126 @@ class FirebaseAuthBackend implements AuthBackend {
       _auth.currentUser?.getIdToken(forceRefresh);
 }
 
+typedef RetryTimerFactory = Timer Function(Duration delay, void Function() callback);
+
 /// Signs every player in, guests included, without showing any UI.
 ///
 /// On start, if nobody is signed in, it signs in anonymously. If that fails
 /// (offline on first launch is the usual reason), the app carries on without a
-/// UID and the sign-in is retried when connectivity comes back.
+/// UID. The sign-in is retried with backoff, and straight away when
+/// connectivity comes back.
 class AuthService {
-  AuthService({required this.backend, Stream<bool>? onlineChanges})
-    : _onlineChanges = onlineChanges ?? _connectivityOnline();
+  AuthService({
+    required this.backend,
+    Stream<bool>? onlineChanges,
+    this.retryDelays = const [
+      Duration(seconds: 5),
+      Duration(seconds: 15),
+      Duration(seconds: 30),
+      Duration(minutes: 1),
+      Duration(minutes: 2),
+    ],
+    RetryTimerFactory? timer,
+  }) : assert(retryDelays.isNotEmpty),
+       _onlineChanges = onlineChanges ?? _connectivityOnline(),
+       _timer = timer ?? Timer.new;
 
   final AuthBackend backend;
-  final Stream<bool> _onlineChanges;
 
-  StreamSubscription<AuthState>? _authSub;
+  /// Waits between failed sign-ins. The last one repeats until a sign-in works.
+  final List<Duration> retryDelays;
+
+  final Stream<bool> _onlineChanges;
+  final RetryTimerFactory _timer;
+
   StreamSubscription<bool>? _onlineSub;
-  bool _signingIn = false;
+  Future<bool>? _inFlight;
+  Timer? _retry;
+  int _failures = 0;
   bool _started = false;
-  final _states = StreamController<AuthState>.broadcast();
+  bool _disposed = false;
 
   AuthState get current => backend.current;
 
   /// The current state first, then every change.
-  Stream<AuthState> get states async* {
-    yield current;
-    yield* _states.stream;
+  ///
+  /// Subscribes to the backend before reading the current state, so a change
+  /// that lands in between is not lost.
+  Stream<AuthState> get states {
+    StreamSubscription<AuthState>? sub;
+    late final StreamController<AuthState> controller;
+    controller = StreamController<AuthState>(
+      onListen: () {
+        sub = backend.changes.listen(controller.add, onError: controller.addError);
+        controller.add(backend.current);
+      },
+      onPause: () => sub?.pause(),
+      onResume: () => sub?.resume(),
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream.distinct();
   }
 
-  /// Starts watching auth and signs in if needed. Does not wait for the
-  /// network: a first launch with no connection still gets to the game.
+  /// Starts the sign-in and its retries. Does not wait for the network: a
+  /// first launch with no connection still gets to the game. Called by
+  /// [authServiceProvider]; calling it again does nothing.
   void start() {
-    if (_started) return;
+    if (_started || _disposed) return;
     _started = true;
-    _authSub = backend.changes.listen(_states.add);
     _onlineSub = _onlineChanges.listen((online) {
-      if (online) unawaited(ensureSignedIn());
+      if (!online) return;
+      // Back online: try now instead of waiting out the backoff.
+      _retry?.cancel();
+      _retry = null;
+      _failures = 0;
+      unawaited(ensureSignedIn());
     });
     unawaited(ensureSignedIn());
   }
 
-  /// Signs in anonymously when there is no user. Safe to call repeatedly.
-  /// Returns whether a user exists afterwards.
-  Future<bool> ensureSignedIn() async {
-    if (backend.current.hasUid) return true;
-    if (_signingIn) return false;
-    _signingIn = true;
+  /// Signs in anonymously when there is no user. Safe to call repeatedly:
+  /// concurrent callers share one attempt. Returns whether a user exists
+  /// afterwards.
+  Future<bool> ensureSignedIn() {
+    if (backend.current.hasUid) return Future.value(true);
+    return _inFlight ??= _signIn().whenComplete(() => _inFlight = null);
+  }
+
+  Future<bool> _signIn() async {
     try {
       await backend.signInAnonymously();
+      _retry?.cancel();
+      _retry = null;
+      _failures = 0;
       return true;
     } catch (_) {
-      // Offline or a transient Firebase error. The connectivity listener tries again.
+      // Offline, a captive portal, or a transient Firebase error.
+      _scheduleRetry();
       return false;
-    } finally {
-      _signingIn = false;
     }
   }
 
-  /// The ID token for API calls, or null when there is no user yet.
-  Future<String?> idToken({bool forceRefresh = false}) =>
-      backend.idToken(forceRefresh: forceRefresh);
+  void _scheduleRetry() {
+    if (!_started || _disposed || (_retry?.isActive ?? false)) return;
+    final delay = retryDelays[_failures < retryDelays.length ? _failures : retryDelays.length - 1];
+    _failures++;
+    _retry = _timer(delay, () {
+      _retry = null;
+      unawaited(ensureSignedIn());
+    });
+  }
+
+  /// The ID token for API calls. With no user yet it tries the anonymous
+  /// sign-in first, and returns null only if that fails.
+  Future<String?> idToken({bool forceRefresh = false}) async {
+    if (!backend.current.hasUid && !await ensureSignedIn()) return null;
+    return backend.idToken(forceRefresh: forceRefresh);
+  }
 
   Future<void> dispose() async {
-    await _authSub?.cancel();
+    _disposed = true;
+    _retry?.cancel();
     await _onlineSub?.cancel();
-    await _states.close();
   }
 }
 
@@ -160,8 +217,9 @@ Stream<bool> _connectivityOnline() => Connectivity().onConnectivityChanged.map(
 
 final authBackendProvider = Provider<AuthBackend>((ref) => FirebaseAuthBackend());
 
+/// Started as soon as it is created, so a rebuilt service signs in too.
 final authServiceProvider = Provider<AuthService>((ref) {
-  final service = AuthService(backend: ref.watch(authBackendProvider));
+  final service = AuthService(backend: ref.watch(authBackendProvider))..start();
   ref.onDispose(service.dispose);
   return service;
 });
