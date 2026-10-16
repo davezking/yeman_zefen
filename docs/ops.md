@@ -339,3 +339,85 @@ flag on the same track is dismissed, since nobody looked at the artists.
 
 **A track others are duplicates of cannot be rejected** (`409 has_duplicates`): that would leave no copy of the song.
 Retiring an approved one is allowed, since that takes the song out on purpose.
+
+## Firebase (player identity)
+
+Every player, guests included, signs in with Firebase Auth. The app signs in
+anonymously on first launch with no UI. Guests link Google, email or Apple later
+(the linking UI is Phase 3 Sprint 2), which keeps the same UID.
+
+### Projects and app ids
+
+One Firebase project per flavor:
+
+| Flavor | Firebase project id | Android package | iOS bundle id |
+|---|---|---|---|
+| `dev` | `yman-zefen-dev` | `com.yemanzefen.yeman_zefen.dev` | `com.yemanzefen.yemanZefen.dev` |
+| `prod` | `yeman-zefen-prod` | `com.yemanzefen.yeman_zefen` | `com.yemanzefen.yemanZefen` |
+
+(The dev project id is spelled `yman`; Firebase project ids can't be renamed.)
+
+The Worker verifies ID tokens against the project id (`iss = https://securetoken.google.com/<project>`,
+`aud = <project>`), so its `dev` environment must use `yman-zefen-dev` and `prod` must use `yeman-zefen-prod`.
+
+### One-time setup
+
+1. Install the tools: Flutter, Node.js, then
+   `npm i -g firebase-tools` and `dart pub global activate flutterfire_cli`.
+   Put the npm global folder and the pub cache (`~/.pub-cache/bin`, or
+   `%LOCALAPPDATA%\Pub\Cache\bin` on Windows) on `PATH`. Run `firebase login`.
+2. In the [Firebase console](https://console.firebase.google.com) create both
+   projects. In each, open Build > Authentication > Sign-in method and enable
+   **Anonymous**, **Google**, **Email/Password** and **Apple** (Apple needs an
+   Apple Developer account: services id, key and team id; it can wait for the
+   linking sprint).
+3. In each project, add the debug **SHA-1 and SHA-256** fingerprints of the
+   Android app (`cd app/android && ./gradlew signingReport`), and later the
+   release keystore's. Google sign-in on Android needs them.
+4. Generate the Dart options, one file per flavor, from `app/`:
+
+   ```
+   flutterfire configure --project=yman-zefen-dev --out=lib/core/config/firebase_options_dev.dart \
+     --android-package-name=com.yemanzefen.yeman_zefen.dev --ios-bundle-id=com.yemanzefen.yemanZefen.dev --platforms=android,ios
+   flutterfire configure --project=yeman-zefen-prod --out=lib/core/config/firebase_options_prod.dart \
+     --android-package-name=com.yemanzefen.yeman_zefen --ios-bundle-id=com.yemanzefen.yemanZefen --platforms=android,ios
+   ```
+
+5. **Move the Android file per flavor.** Each run writes
+   `android/app/google-services.json`, and the second run overwrites the first.
+   After each run, move it to `android/app/src/<flavor>/google-services.json`
+   (`src/dev/` and `src/prod/`). Gradle's Google Services plugin picks the file
+   from the flavor's source set, so a `dev` build never uses the prod project.
+   A build that fails with "No matching client found for package name" means the
+   flavor's file is missing or from the other project.
+6. **iOS config file (needs a Mac).** `flutterfire` can't write the iOS native
+   file from Windows. On a Mac, download `GoogleService-Info.plist` for each iOS
+   app from the Firebase console and keep them at
+   `app/ios/config/dev/` and `app/ios/config/prod/`, then add a Run Script build
+   phase that copies the one for the active configuration into the app bundle.
+   Until then the Dart options carry the iOS ids, which is enough for Auth;
+   the plist is needed for Crashlytics and Google sign-in.
+
+### What is committed
+
+`firebase_options_{dev,prod}.dart`, `firebase.json` and the per-flavor
+`google-services.json` files are committed. They hold public client
+identifiers, not secrets: the Worker trusts only a verified ID token. Still,
+restrict each API key to its app in Google Cloud Console > APIs & Services >
+Credentials (Android package + SHA-1, iOS bundle id). Never commit a
+service-account JSON; nothing in this project needs one.
+
+### Which project the app uses
+
+`lib/core/config/firebase_bootstrap.dart` picks the options from the `APP_FLAVOR`
+build define (`--dart-define-from-file=config/<flavor>.json`).
+
+### Checking it works
+
+1. `flutter run --flavor dev --dart-define-from-file=config/dev.json`. A new
+   anonymous user appears in the dev project under Authentication > Users.
+2. Restart the app: the same UID.
+3. Airplane mode on a fresh install: the game still starts and plays bundled
+   clips. Turn the network on and the anonymous user appears without
+   restarting.
+4. Repeat for `--flavor prod` against the prod project.

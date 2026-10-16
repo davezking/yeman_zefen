@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/http/api_client.dart';
+
 class PackListing {
   const PackListing({
     required this.slug,
@@ -46,35 +48,33 @@ class PacksApiException implements Exception {
   String toString() => 'PacksApiException: $message';
 }
 
-/// Talks to the public pack endpoints of the API Worker and the CDN.
+/// Lists packs through the authenticated [ApiClient] and fetches manifests
+/// from the CDN with a plain client: the ID token goes only to the API.
 class PacksApi {
-  PacksApi({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  PacksApi({required this.api, http.Client? cdnClient}) : _cdn = cdnClient ?? http.Client();
 
-  final String baseUrl;
-  final http.Client _client;
+  final ApiClient api;
+  final http.Client _cdn;
 
   static const _timeout = Duration(seconds: 15);
 
+  /// Throws [ApiException] when the API call fails.
   Future<List<PackListing>> listPacks() async {
-    final body = await _get(Uri.parse('$baseUrl/v1/packs'));
-    final packs = (jsonDecode(body) as Map<String, dynamic>)['packs'] as List<dynamic>;
+    final body = await api.getJson('/v1/packs') as Map<String, dynamic>;
     return [
-      for (final p in packs) PackListing.fromJson(p as Map<String, dynamic>),
+      for (final p in body['packs'] as List<dynamic>) PackListing.fromJson(p as Map<String, dynamic>),
     ];
   }
 
   /// Returns the raw manifest text, so the exact bytes that were verified are what gets stored.
-  Future<String> fetchManifestJson(String manifestUrl) =>
-      _get(Uri.parse(manifestUrl));
-
-  Future<String> _get(Uri uri) async {
-    final res = await _client.get(uri).timeout(_timeout);
+  Future<String> fetchManifestJson(String manifestUrl) async {
+    final uri = Uri.parse(manifestUrl);
+    final res = await _cdn.get(uri).timeout(_timeout);
     if (res.statusCode != 200) {
       throw PacksApiException('GET $uri returned ${res.statusCode}');
     }
     return utf8.decode(res.bodyBytes);
   }
 
-  void close() => _client.close();
+  void closeCdn() => _cdn.close();
 }
