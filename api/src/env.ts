@@ -29,11 +29,14 @@ export type Bindings = {
 };
 
 import type { AdminRole } from "./lib/accessAuth";
+import type { PlayerUser } from "./lib/firebaseAuth";
 
 export type Variables = {
   requestId: string;
   admin?: { email: string; role: AdminRole };
   service?: { clientId: string };
+  /** Set by requireUser() on authenticated /v1 routes. */
+  user?: PlayerUser;
 };
 
 export type AppEnv = { Bindings: Bindings; Variables: Variables };

@@ -1,10 +1,23 @@
-// Public app API (/v1). No auth yet.
-// TODO(phase 3): add the Firebase auth middleware to the player routes. /v1/packs may stay public.
+// Player app API (/v1). Every route needs a Firebase ID token except the
+// public reads in PUBLIC_ROUTES. Routes that also need a registered (non-
+// anonymous) account add `requireUser({ allowAnonymous: false })`.
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { cdnUrl } from "../lib/cdn";
+import { requireUser } from "../lib/firebaseAuth";
 
 export const v1 = new Hono<AppEnv>();
+
+/** Paths (under /v1) that are public for GET (and HEAD). Everything else is authenticated. */
+const PUBLIC_ROUTES = new Set(["/config", "/packs"]);
+
+const authenticate = requireUser();
+v1.use("*", async (c, next) => {
+  const method = c.req.method;
+  const sub = c.req.path.slice("/v1".length);
+  if ((method === "GET" || method === "HEAD") && PUBLIC_ROUTES.has(sub)) return next();
+  return authenticate(c, next);
+});
 
 // Published packs at their current version. The app downloads each manifest from `manifestUrl`.
 v1.get("/packs", async (c) => {
