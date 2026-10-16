@@ -7,8 +7,10 @@ import type { Bindings } from "../env";
 const DAY_MS = 86_400_000;
 /** How far back a run looks for days that were never rolled up. */
 export const BACKFILL_DAYS = 7;
-/** Days one run rolls up at most: 7 statements each, so 6 days + 1 read stays well under the Free plan's 50 queries. */
-export const MAX_DAYS_PER_RUN = 6;
+/** D1 statements in rollUpDay's batch: 3 deletes + royalty + ads + 2 analytics. */
+const STATEMENTS_PER_DAY = 7;
+/** Days one run rolls up at most, derived so that a run (plus its 1 read) stays under the Free plan's 50 queries. */
+export const MAX_DAYS_PER_RUN = Math.floor((45 - 1) / STATEMENTS_PER_DAY);
 /** Country stored for sessions Cloudflare could not place. */
 export const UNKNOWN_COUNTRY = "XX";
 
@@ -40,27 +42,32 @@ const SESSIONS_IN_DAY = "received_at >= ?2 AND received_at < ?3";
 
 const DELETE_SQL = ["royalty_daily", "ad_events_daily", "analytics_daily"].map((t) => `DELETE FROM ${t} WHERE date = ?1`);
 
-// Every track in track_ids_json is one play, right or wrong, flagged or not (FR-22).
+// Every track in track_ids_json is one play, right or wrong, flagged or not (FR-22). A play of an ID
+// that is not in tracks is left out (royalty_daily.track_id is a foreign key, and one bad ID must not
+// fail the whole day); POST /v1/sessions only accepts catalog tracks, so this is a safety net.
 const ROYALTY_SQL = `
   INSERT INTO royalty_daily (date, track_id, plays)
   SELECT ?1, CAST(j.value AS INTEGER), COUNT(*)
   FROM game_sessions s, json_each(s.track_ids_json) j
-  WHERE s.${SESSIONS_IN_DAY}
+  WHERE s.${SESSIONS_IN_DAY} AND CAST(j.value AS INTEGER) IN (SELECT id FROM tracks)
   GROUP BY CAST(j.value AS INTEGER)`;
+
+// events_json is written by POST /v1/sessions, but a malformed row must cost only its own ads, not the day.
+const ad = (field: string) => `COALESCE(CASE WHEN json_valid(events_json) THEN json_extract(events_json, '$.ads.${field}') END, 0)`;
 
 const ADS_SQL = `
   INSERT INTO ad_events_daily (date, country, format, event, count)
   SELECT ?1, COALESCE(country, '${UNKNOWN_COUNTRY}'), 'interstitial', 'shown',
-         SUM(COALESCE(json_extract(events_json, '$.ads.interstitialShown'), 0))
+         SUM(${ad("interstitialShown")})
   FROM game_sessions WHERE ${SESSIONS_IN_DAY}
   GROUP BY COALESCE(country, '${UNKNOWN_COUNTRY}')
-  HAVING SUM(COALESCE(json_extract(events_json, '$.ads.interstitialShown'), 0)) > 0
+  HAVING SUM(${ad("interstitialShown")}) > 0
   UNION ALL
   SELECT ?1, COALESCE(country, '${UNKNOWN_COUNTRY}'), 'rewarded', 'completed',
-         SUM(COALESCE(json_extract(events_json, '$.ads.rewardedCompleted'), 0))
+         SUM(${ad("rewardedCompleted")})
   FROM game_sessions WHERE ${SESSIONS_IN_DAY}
   GROUP BY COALESCE(country, '${UNKNOWN_COUNTRY}')
-  HAVING SUM(COALESCE(json_extract(events_json, '$.ads.rewardedCompleted'), 0)) > 0`;
+  HAVING SUM(${ad("rewardedCompleted")}) > 0`;
 
 // D1 allows only a few terms in a compound SELECT, so the metrics are two statements.
 // rounds_per_session is stored x100 and rounded, because the value column is an integer.

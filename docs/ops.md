@@ -435,4 +435,4 @@ A Cron Trigger (`30 0 * * *`, UTC; `api/src/cron/rollups.ts`) rolls the previous
 - **Reruns are safe.** A run deletes the day's rows and inserts them again in one batch, so the result is the same however often it runs, and a failure leaves the day untouched.
 - **Missed nights fill themselves.** Each run rolls up yesterday and any day of the last 7 with no `sessions` row, at most 6 days per run (Free plan: 50 D1 queries per invocation). A failing day does not stop the others; the run then fails visibly and the next one retries it. Each day logs `rollup <date>: sessions=.. rounds=.. royalty_rows=.. ad_rows=.. analytics_rows=..`.
 - **Backfill or fix a day:** `POST /admin/rollups/run { "date": "2026-10-14" }` (admins only; the day must have ended, UTC). Answers with the same summary.
-- **Prod:** `npm run deploy` registers the trigger (`[env.prod.triggers]`).
+- **Prod:** `npm run deploy` registers the trigger (`[env.prod.triggers]`); the dev worker has none (try it with `wrangler dev --test-scheduled`). A play of a track id missing from `tracks` is left out of `royalty_daily` rather than failing the day.

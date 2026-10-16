@@ -222,15 +222,42 @@ describe("runScheduled", () => {
   });
 
   it("keeps going when one day fails, then throws", async () => {
-    // A play of a track that does not exist breaks royalty_daily's foreign key for that day only.
-    await env.DB.prepare("PRAGMA foreign_keys = ON").run();
-    await session("deleted", Date.parse("2026-10-13T12:00:00Z"), [999_999]);
-    await expect(runScheduled(env, NOW)).rejects.toThrow(/2026-10-13/);
+    // A DB whose batch fails for one date; everything else goes to the real one.
+    const real = env.DB;
+    const flaky = {
+      prepare: (sql: string) => ({
+        bind: (...v: unknown[]) => ({ v, inner: real.prepare(sql).bind(...v), all: () => real.prepare(sql).bind(...v).all() }),
+      }),
+      batch: (stmts: { v: unknown[]; inner: D1PreparedStatement }[]) =>
+        stmts[0]!.v[0] === "2026-10-13" ? Promise.reject(new Error("boom")) : real.batch(stmts.map((x) => x.inner)),
+    } as unknown as D1Database;
+    await expect(runScheduled({ DB: flaky }, NOW)).rejects.toThrow(/2026-10-13/);
     // The 13th is still missing; the 14th was cut by the per-run cap, not by the failure.
     expect(await missingDates(env, NOW)).toEqual(["2026-10-13", "2026-10-14"]);
-    await env.DB.prepare("DELETE FROM game_sessions").run();
     await runScheduled(env, NOW);
     expect(await missingDates(env, NOW)).toEqual([]);
+  });
+
+  it("leaves out a play of an unknown track instead of failing the day", async () => {
+    await session("deleted", DAY_START + 1000, [t[0]!, 999_999], { interstitial: 1 });
+    await rollUpDay(env, DAY);
+    const { royalty, ads } = await dump(DAY);
+    expect(royalty).toEqual([{ date: DAY, track_id: t[0], plays: 1 }]);
+    expect(ads).toHaveLength(1);
+  });
+
+  it("a malformed events_json costs only its own ads", async () => {
+    await session("deleted", DAY_START + 1000, [t[0]!], { interstitial: 2 });
+    await env.DB.prepare(
+      `INSERT INTO game_sessions (id, user_id, mode, received_at, rounds, score, track_ids_json, events_json, country)
+       VALUES ('bad', 'deleted', 'song', ?1, 1, 0, ?2, 'not json', 'ET')`,
+    )
+      .bind(DAY_START + 2000, JSON.stringify([t[1]]))
+      .run();
+    await rollUpDay(env, DAY);
+    const { royalty, ads } = await dump(DAY);
+    expect(royalty).toHaveLength(2);
+    expect(ads).toEqual([{ date: DAY, country: "ET", format: "interstitial", event: "shown", count: 2 }]);
   });
 });
 

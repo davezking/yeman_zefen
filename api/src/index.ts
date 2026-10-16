@@ -25,7 +25,8 @@ app.route("/admin", admin);
 // fetch serves the API; scheduled is the Cron Trigger (wrangler.toml `crons`).
 export default {
   fetch: app.fetch,
-  scheduled: (controller: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
-    ctx.waitUntil(runScheduled(env, controller.scheduledTime));
+  // Awaited (not waitUntil) so that a failed day makes the invocation fail in Cloudflare.
+  scheduled: async (controller: ScheduledController, env: Bindings) => {
+    await runScheduled(env, controller.scheduledTime);
   },
 };

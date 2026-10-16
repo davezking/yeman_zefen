@@ -3,10 +3,6 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Nightly roll-ups at 00:30 UTC (src/cron/rollups.ts).
-[triggers]
-crons = ["30 0 * * *"]
-
 [vars]
 ENV = "dev"
 FIREBASE_PROJECT_ID = "yeman-zefen-dev"
@@ -38,6 +34,7 @@ bucket_name = "yz-source"
 [env.prod]
 name = "yz-api-prod"
 
+# Nightly roll-ups at 00:30 UTC (src/cron/rollups.ts). Prod only; locally: wrangler dev --test-scheduled.
 [env.prod.triggers]
 crons = ["30 0 * * *"]
 
