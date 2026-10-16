@@ -28,6 +28,8 @@ export const FIREBASE_JWKS_URL =
 
 /** Seconds of clock skew allowed on exp, iat and auth_time. */
 const CLOCK_TOLERANCE_S = 60;
+/** The placeholder user that owns sessions of deleted accounts (migration 0006). No real player may have this uid. */
+export const DELETED_USER_ID = "deleted";
 /** Firebase UIDs are at most 128 characters. */
 const MAX_UID_LENGTH = 128;
 /** Firebase ID tokens are ~1 KB; anything far larger is not one, so skip the crypto. */
@@ -147,6 +149,7 @@ export async function verifyFirebaseIdToken(token: string, projectId: string): P
   if (typeof uid !== "string" || uid.length === 0 || uid.length > MAX_UID_LENGTH) {
     throw new InvalidTokenError("sub is empty or too long");
   }
+  if (uid === DELETED_USER_ID) throw new InvalidTokenError("sub is reserved");
   const provider = payload.firebase?.sign_in_provider;
   if (typeof provider !== "string" || provider.length === 0) {
     throw new InvalidTokenError("firebase.sign_in_provider is missing");

@@ -43,6 +43,13 @@
       "when": 1792003473492,
       "tag": "0005_era_display_names",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792157584523,
+      "tag": "0006_deleted_user_sentinel",
+      "breakpoints": true
     }
   ]
 }

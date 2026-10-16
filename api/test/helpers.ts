@@ -3,6 +3,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { db } from "../src/db/client";
 import { adminUsers, artists, clips, ingestJobs, tracks } from "../src/db/schema";
 import { __setTestKeyResolver, ACCESS_HEADER } from "../src/lib/accessAuth";
+import { __setFirebaseJwksFetch } from "../src/lib/firebaseAuth";
 
 export const TEAM = "https://yz.cloudflareaccess.com";
 export const AUD = "test-access-aud";
@@ -204,4 +205,54 @@ export async function adminWithQueryCount(
     { ...env, DB: db },
   );
   return { response, queries: counter.queries };
+}
+
+// ---- Player (Firebase) auth ----
+
+let firebaseKey: CryptoKey;
+
+/** Make the Worker trust a freshly generated key for Firebase ID tokens (test-only JWKS fetch seam). */
+export async function installFirebaseJwks(): Promise<void> {
+  const pair = await generateKeyPair("RS256", { extractable: true });
+  firebaseKey = pair.privateKey;
+  const jwk = { ...(await exportJWK(pair.publicKey)), kid: "fb-test-key", alg: "RS256", use: "sig" };
+  __setFirebaseJwksFetch(async () => Response.json({ keys: [jwk] }));
+}
+
+export function removeFirebaseJwks(): void {
+  __setFirebaseJwksFetch(null);
+}
+
+/** A valid Firebase ID token for `uid` (anonymous unless `provider` says otherwise). */
+export async function signFirebaseToken(uid: string, opts: { provider?: string } = {}): Promise<string> {
+  const projectId = (env as { FIREBASE_PROJECT_ID: string }).FIREBASE_PROJECT_ID;
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ auth_time: now - 10, firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} } })
+    .setProtectedHeader({ alg: "RS256", kid: "fb-test-key", typ: "JWT" })
+    .setIssuer(`https://securetoken.google.com/${projectId}`)
+    .setAudience(projectId)
+    .setSubject(uid)
+    .setIssuedAt(now - 10)
+    .setExpirationTime(now + 3600)
+    .sign(firebaseKey);
+}
+
+/** Call the Worker as a signed-in player. */
+export async function player(
+  uid: string,
+  path: string,
+  opts: { method?: string; body?: unknown; provider?: string; cf?: { country: string } } = {},
+): Promise<Response> {
+  const token = await signFirebaseToken(uid, { provider: opts.provider });
+  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+  if (opts.body !== undefined) headers["content-type"] = "application/json";
+  return exports.default.fetch(
+    new Request(`https://api.test${path}`, {
+      method: opts.method ?? (opts.body === undefined ? "GET" : "PUT"),
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      // Cloudflare sets request.cf at the edge; tests inject it.
+      ...(opts.cf ? { cf: opts.cf } : {}),
+    }),
+  );
 }
