@@ -108,6 +108,7 @@ void main() {
     expect(queued.attempts, 2);
     expect(queued.nextAttemptAt, 0, reason: 'a queued session is due straight away');
     expect(queued.parked, isFalse);
+    expect(queued.lastStatus, isNull);
     expect((await db.select(db.recentSessions).getSingle()).serverScore, isNull);
   });
 }

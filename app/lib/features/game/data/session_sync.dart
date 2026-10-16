@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
 
 import 'package:drift/drift.dart';
@@ -9,7 +10,7 @@ import '../../../core/db/app_db.dart';
 import '../../../core/http/api_client.dart';
 
 /// Sends the finished sessions waiting in `pending_sessions` to
-/// `POST /v1/sessions`, oldest first.
+/// `POST /v1/sessions`, oldest first among those that are due.
 ///
 /// The server is the source of truth: it computes the score and answers the
 /// same way for an `id` it has already stored, so a send that is repeated (a
@@ -19,7 +20,9 @@ import '../../../core/http/api_client.dart';
 /// - One send at a time. A trigger that arrives while a pass runs is not lost:
 ///   the pass looks again before it ends.
 /// - A failed send backs off per session: [baseDelay] doubling each attempt,
-///   up to [maxDelay]. Nothing is sent before then, except on a forced pass.
+///   up to [maxDelay]. Nothing is sent before then, except on a forced pass,
+///   and that only skips a wait caused by being offline: a wait the server
+///   asked for (a 5xx, a 429 and its Retry-After) still holds.
 /// - A 4xx that means the session itself is wrong (400, 409, 413, 422, ...)
 ///   parks it for good. The row stays with `last_error` for debugging.
 /// - Anything that is not the session's fault (offline, a 5xx, 429, a token
@@ -87,15 +90,19 @@ class SessionSync {
   Future<void> _run(bool force, Completer<void> done) async {
     try {
       var forced = force;
+      // Shared by the passes of one run, so a trigger that lands mid-run sends
+      // what is new without sending a session that just failed straight again.
+      final tried = <String>{};
       do {
         _again = false;
         _againForced = false;
-        await _pass(forced);
+        await _pass(forced, tried);
         await _scheduleWake();
         forced = _againForced;
       } while (_again && !_disposed);
-    } catch (_) {
+    } catch (e, st) {
       // A database error: the rows are still there for the next pass.
+      developer.log('session sync failed', name: 'session_sync', error: e, stackTrace: st);
     } finally {
       // Cleared in the same step as the last check of [_again], so a trigger
       // can never land between "nothing left to do" and "not running".
@@ -104,8 +111,7 @@ class SessionSync {
     }
   }
 
-  Future<void> _pass(bool force) async {
-    final tried = <String>{};
+  Future<void> _pass(bool force, Set<String> tried) async {
     while (!_disposed) {
       if (!auth().hasUid) return;
       final row = await _nextDue(tried, force);
@@ -115,18 +121,23 @@ class SessionSync {
     }
   }
 
-  /// The oldest session that is not parked, not tried in this pass and, unless
-  /// [force], not waiting out a backoff.
+  /// The oldest session that is not parked, not tried in this run, and due:
+  /// its backoff is over, or [force] and it only waits because it was offline.
+  ///
+  /// A wait that ends more than [maxDelay] from now cannot be one this class
+  /// set, so the device clock went back: that session counts as due.
   Future<PendingSession?> _nextDue(Set<String> tried, bool force) {
-    final query = db.select(db.pendingSessions)
-      ..where((t) => t.parked.equals(false) & t.id.isNotIn(tried))
-      ..orderBy([(t) => OrderingTerm.asc(t.createdAt), (t) => OrderingTerm.asc(t.id)])
-      ..limit(1);
-    if (!force) {
-      final now = _nowMs();
-      query.where((t) => t.nextAttemptAt.isSmallerOrEqualValue(now));
-    }
-    return query.getSingleOrNull();
+    final now = _nowMs();
+    return (db.select(db.pendingSessions)
+          ..where((t) {
+            var due = t.nextAttemptAt.isSmallerOrEqualValue(now) |
+                t.nextAttemptAt.isBiggerThanValue(now + maxDelay.inMilliseconds);
+            if (force) due = due | t.lastStatus.isNull();
+            return t.parked.equals(false) & t.id.isNotIn(tried) & due;
+          })
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt), (t) => OrderingTerm.asc(t.id)])
+          ..limit(1))
+        .getSingleOrNull();
   }
 
   /// Sends one session. Returns false when the pass should stop.
@@ -143,11 +154,14 @@ class SessionSync {
       await _accepted(row, response);
       return true;
     } on RequestException catch (e) {
-      if (_transient4xx.contains(e.status)) {
+      final status = e.status!;
+      // Only a real 4xx is about the session. The client also reports a
+      // redirect or other odd status this way; those are retried.
+      if (status < 400 || status >= 500 || _transient4xx.contains(status)) {
         await _backOff(row, e);
         return false;
       }
-      await _park(row, '${e.status} ${e.code}: ${e.message}');
+      await _park(row, '$status ${e.code}: ${e.message}');
       return true;
     } on ApiException catch (e) {
       await _backOff(row, e, retryAfter: e is RateLimitedException ? e.retryAfter : null);
@@ -176,6 +190,7 @@ class SessionSync {
         parked: const Value(true),
         attempts: Value(row.attempts + 1),
         lastError: Value(reason),
+        lastStatus: const Value(null),
       ),
     );
   }
@@ -188,6 +203,7 @@ class SessionSync {
       PendingSessionsCompanion(
         attempts: Value(attempts),
         lastError: Value('${error.status ?? 'no response'} ${error.code}: ${error.message}'),
+        lastStatus: Value(error.status),
         nextAttemptAt: Value(_nowMs() + wait.inMilliseconds),
       ),
     );
@@ -205,8 +221,10 @@ class SessionSync {
       ..where(db.pendingSessions.parked.equals(false) & db.pendingSessions.nextAttemptAt.isBiggerThanValue(_nowMs()));
     final next = await query.map((r) => r.read(earliest)).getSingleOrNull();
     if (next == null) return;
-    final delay = Duration(milliseconds: next - _nowMs());
-    _wake = _timer(delay < const Duration(seconds: 1) ? const Duration(seconds: 1) : delay, () {
+    var delay = Duration(milliseconds: next - _nowMs());
+    if (delay > maxDelay) delay = maxDelay; // the clock went back
+    if (delay < const Duration(seconds: 1)) delay = const Duration(seconds: 1);
+    _wake = _timer(delay, () {
       _wake = null;
       unawaited(syncNow());
     });

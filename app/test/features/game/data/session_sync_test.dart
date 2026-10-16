@@ -212,14 +212,81 @@ void main() {
       expect(await queued(), isEmpty);
     });
 
-    test('a forced pass ignores the backoff', () async {
+    test('a forced pass skips a wait caused by being offline', () async {
       await queue('a');
-      server.script.add(error(503, 'unavailable'));
+      server.script.add(null);
       await sync.syncNow();
+      expect((await row('a')).lastStatus, isNull);
       server.received.clear();
       await sync.syncNow(force: true);
       expect(server.received, ['a']);
       expect(await queued(), isEmpty);
+    });
+
+    test('a forced pass keeps a wait the server asked for (5xx, 429), and sends the rest', () async {
+      await queue('busy', createdAt: 1);
+      await queue('limited', createdAt: 2);
+      await queue('fresh', createdAt: 3);
+      server.script.add(error(503, 'unavailable'));
+      await sync.syncNow();
+      server.script.add(error(429, 'rate_limited', headers: {'retry-after': '600'}));
+      await sync.syncNow();
+      expect((await row('busy')).lastStatus, 503);
+      expect((await row('limited')).lastStatus, 429);
+
+      // App start: the sign-in and the first connectivity event both force a pass.
+      server.received.clear();
+      await Future.wait([sync.syncNow(force: true), sync.syncNow(force: true)]);
+      expect(server.received, ['fresh']);
+      expect(await queued(), ['busy', 'limited']);
+    });
+
+    test('a session tried once in a run is not sent again by a trigger landing mid-run', () async {
+      await queue('a', createdAt: 1);
+      await queue('b', createdAt: 2);
+      server.gate = Completer<void>();
+      server.script.add(null); // 'a' fails for want of a connection
+
+      final first = sync.syncNow(force: true);
+      await pumpEventQueue();
+      final second = sync.syncNow(force: true);
+      server.gate!.complete();
+      await Future.wait([first, second]);
+
+      // The re-run sends 'b' but does not retry 'a' straight away.
+      expect(server.received, ['a', 'b']);
+      expect(await queued(), ['a']);
+    });
+
+    test('a redirect or other non-4xx status is retried, not parked', () async {
+      await queue('a');
+      server.script.add(http.Response('', 307));
+      await sync.syncNow();
+      final r = await row('a');
+      expect(r.parked, isFalse);
+      expect(r.lastStatus, 307);
+      expect(r.attempts, 1);
+    });
+
+    test('a wait that ends further away than the longest backoff counts as due (the clock went back)', () async {
+      await queue('a');
+      await (db.update(db.pendingSessions)..where((t) => t.id.equals('a'))).write(
+        PendingSessionsCompanion(nextAttemptAt: Value(nowMs + 86400000), attempts: const Value(3), lastStatus: const Value(500)),
+      );
+      await sync.syncNow();
+      expect(server.received, ['a']);
+    });
+
+    test('the wake-up never waits longer than the longest backoff', () async {
+      await queue('a');
+      await (db.update(db.pendingSessions)..where((t) => t.id.equals('a'))).write(
+        PendingSessionsCompanion(nextAttemptAt: Value(nowMs + 86400000), attempts: const Value(3), lastStatus: const Value(500)),
+      );
+      await queue('b');
+      server.script.add(error(500, 'internal'));
+      // 'a' is due (clock went back) and fails again; its new wait is normal.
+      await sync.syncNow();
+      expect(timers.last.$1 <= const Duration(hours: 1), isTrue);
     });
 
     test('the wait doubles with each failure and stops at an hour', () {

@@ -29,7 +29,7 @@ PendingSession row(
     ],
     'ads': {'interstitialShown': 0, 'rewardedCompleted': 0},
   };
-  return PendingSession(id: id, payloadJson: jsonEncode(payload), createdAt: 100, attempts: attempts, nextAttemptAt: 0, parked: parked, lastError: lastError);
+  return PendingSession(id: id, payloadJson: jsonEncode(payload), createdAt: 100, attempts: attempts, nextAttemptAt: 0, parked: parked, lastError: lastError, lastStatus: null);
 }
 
 void main() {

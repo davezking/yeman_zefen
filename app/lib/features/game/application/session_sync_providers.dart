@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,16 +21,16 @@ final sessionSyncProvider = Provider<SessionSync>((ref) {
 /// first sign-in wait for it), when the connection comes back, after each
 /// session ends, and when the app returns to the foreground.
 ///
-/// The first three skip the backoff of sessions that failed earlier (the wait
-/// was about a network that may be fine now); a resume and a session end
-/// respect it.
+/// The first three skip the backoff of sessions that failed for want of a
+/// connection (the network may be fine now), but never a wait the server asked
+/// for; a resume and a session end respect every backoff.
 final sessionSyncStarterProvider = Provider<void>((ref) {
   final sync = ref.watch(sessionSyncProvider);
   ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
     if (next.value?.hasUid ?? false) unawaited(sync.syncNow(force: true));
   }, fireImmediately: true);
-  final online = Connectivity().onConnectivityChanged.listen((results) {
-    if (results.any((r) => r != ConnectivityResult.none)) unawaited(sync.syncNow(force: true));
+  final online = connectivityOnlineChanges().listen((online) {
+    if (online) unawaited(sync.syncNow(force: true));
   });
   final saved = ref.watch(sessionStoreProvider).saved.listen((_) => unawaited(sync.syncNow()));
   final lifecycle = AppLifecycleListener(onResume: () => unawaited(sync.syncNow()));

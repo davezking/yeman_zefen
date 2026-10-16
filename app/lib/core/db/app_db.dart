@@ -59,6 +59,11 @@ class PendingSessions extends Table {
   /// debugging, with [lastError] saying why.
   BoolColumn get parked => boolean().withDefault(const Constant(false))();
 
+  /// The HTTP status of the last failed attempt, or null when no response arrived (offline) or
+  /// nothing failed yet. A wait the server asked for (a 5xx, a 429) is kept even when the
+  /// connection comes back; a wait that was only about being offline is not.
+  IntColumn get lastStatus => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -124,6 +129,7 @@ class AppDb extends _$AppDb {
           if (from < 4) {
             await m.addColumn(pendingSessions, pendingSessions.nextAttemptAt);
             await m.addColumn(pendingSessions, pendingSessions.parked);
+            await m.addColumn(pendingSessions, pendingSessions.lastStatus);
             // recent_sessions made by the `from < 3` step above already has this column.
             if (from >= 3) await m.addColumn(recentSessions, recentSessions.serverScore);
           }

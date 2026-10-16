@@ -31,6 +31,13 @@ void main() {
     expect(events, hasLength(2));
   });
 
+  test('dispose closes the saved stream', () async {
+    final other = SessionStore(db);
+    final done = expectLater(other.saved, emitsDone);
+    other.dispose();
+    await done;
+  });
+
   test('a new session has no server score and is due for upload', () async {
     await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
     final pending = await db.select(db.pendingSessions).getSingle();

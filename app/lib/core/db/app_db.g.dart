@@ -1154,6 +1154,17 @@ class $PendingSessionsTable extends PendingSessions
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _lastStatusMeta = const VerificationMeta(
+    'lastStatus',
+  );
+  @override
+  late final GeneratedColumn<int> lastStatus = GeneratedColumn<int>(
+    'last_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1163,6 +1174,7 @@ class $PendingSessionsTable extends PendingSessions
     lastError,
     nextAttemptAt,
     parked,
+    lastStatus,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1227,6 +1239,12 @@ class $PendingSessionsTable extends PendingSessions
         parked.isAcceptableOrUnknown(data['parked']!, _parkedMeta),
       );
     }
+    if (data.containsKey('last_status')) {
+      context.handle(
+        _lastStatusMeta,
+        lastStatus.isAcceptableOrUnknown(data['last_status']!, _lastStatusMeta),
+      );
+    }
     return context;
   }
 
@@ -1264,6 +1282,10 @@ class $PendingSessionsTable extends PendingSessions
         DriftSqlType.bool,
         data['${effectivePrefix}parked'],
       )!,
+      lastStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_status'],
+      ),
     );
   }
 
@@ -1286,6 +1308,11 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
   /// The API refused the session for good (a 4xx), so it is never sent again. The row stays for
   /// debugging, with [lastError] saying why.
   final bool parked;
+
+  /// The HTTP status of the last failed attempt, or null when no response arrived (offline) or
+  /// nothing failed yet. A wait the server asked for (a 5xx, a 429) is kept even when the
+  /// connection comes back; a wait that was only about being offline is not.
+  final int? lastStatus;
   const PendingSession({
     required this.id,
     required this.payloadJson,
@@ -1294,6 +1321,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     this.lastError,
     required this.nextAttemptAt,
     required this.parked,
+    this.lastStatus,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1307,6 +1335,9 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     }
     map['next_attempt_at'] = Variable<int>(nextAttemptAt);
     map['parked'] = Variable<bool>(parked);
+    if (!nullToAbsent || lastStatus != null) {
+      map['last_status'] = Variable<int>(lastStatus);
+    }
     return map;
   }
 
@@ -1321,6 +1352,9 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           : Value(lastError),
       nextAttemptAt: Value(nextAttemptAt),
       parked: Value(parked),
+      lastStatus: lastStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastStatus),
     );
   }
 
@@ -1337,6 +1371,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       lastError: serializer.fromJson<String?>(json['lastError']),
       nextAttemptAt: serializer.fromJson<int>(json['nextAttemptAt']),
       parked: serializer.fromJson<bool>(json['parked']),
+      lastStatus: serializer.fromJson<int?>(json['lastStatus']),
     );
   }
   @override
@@ -1350,6 +1385,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       'lastError': serializer.toJson<String?>(lastError),
       'nextAttemptAt': serializer.toJson<int>(nextAttemptAt),
       'parked': serializer.toJson<bool>(parked),
+      'lastStatus': serializer.toJson<int?>(lastStatus),
     };
   }
 
@@ -1361,6 +1397,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     Value<String?> lastError = const Value.absent(),
     int? nextAttemptAt,
     bool? parked,
+    Value<int?> lastStatus = const Value.absent(),
   }) => PendingSession(
     id: id ?? this.id,
     payloadJson: payloadJson ?? this.payloadJson,
@@ -1369,6 +1406,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     lastError: lastError.present ? lastError.value : this.lastError,
     nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
     parked: parked ?? this.parked,
+    lastStatus: lastStatus.present ? lastStatus.value : this.lastStatus,
   );
   PendingSession copyWithCompanion(PendingSessionsCompanion data) {
     return PendingSession(
@@ -1383,6 +1421,9 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           ? data.nextAttemptAt.value
           : this.nextAttemptAt,
       parked: data.parked.present ? data.parked.value : this.parked,
+      lastStatus: data.lastStatus.present
+          ? data.lastStatus.value
+          : this.lastStatus,
     );
   }
 
@@ -1395,7 +1436,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
           ..write('nextAttemptAt: $nextAttemptAt, ')
-          ..write('parked: $parked')
+          ..write('parked: $parked, ')
+          ..write('lastStatus: $lastStatus')
           ..write(')'))
         .toString();
   }
@@ -1409,6 +1451,7 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     lastError,
     nextAttemptAt,
     parked,
+    lastStatus,
   );
   @override
   bool operator ==(Object other) =>
@@ -1420,7 +1463,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           other.attempts == this.attempts &&
           other.lastError == this.lastError &&
           other.nextAttemptAt == this.nextAttemptAt &&
-          other.parked == this.parked);
+          other.parked == this.parked &&
+          other.lastStatus == this.lastStatus);
 }
 
 class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
@@ -1431,6 +1475,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
   final Value<String?> lastError;
   final Value<int> nextAttemptAt;
   final Value<bool> parked;
+  final Value<int?> lastStatus;
   final Value<int> rowid;
   const PendingSessionsCompanion({
     this.id = const Value.absent(),
@@ -1440,6 +1485,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     this.lastError = const Value.absent(),
     this.nextAttemptAt = const Value.absent(),
     this.parked = const Value.absent(),
+    this.lastStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PendingSessionsCompanion.insert({
@@ -1450,6 +1496,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     this.lastError = const Value.absent(),
     this.nextAttemptAt = const Value.absent(),
     this.parked = const Value.absent(),
+    this.lastStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        payloadJson = Value(payloadJson),
@@ -1462,6 +1509,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     Expression<String>? lastError,
     Expression<int>? nextAttemptAt,
     Expression<bool>? parked,
+    Expression<int>? lastStatus,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1472,6 +1520,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
       if (lastError != null) 'last_error': lastError,
       if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
       if (parked != null) 'parked': parked,
+      if (lastStatus != null) 'last_status': lastStatus,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1484,6 +1533,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     Value<String?>? lastError,
     Value<int>? nextAttemptAt,
     Value<bool>? parked,
+    Value<int?>? lastStatus,
     Value<int>? rowid,
   }) {
     return PendingSessionsCompanion(
@@ -1494,6 +1544,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
       lastError: lastError ?? this.lastError,
       nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
       parked: parked ?? this.parked,
+      lastStatus: lastStatus ?? this.lastStatus,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1522,6 +1573,9 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     if (parked.present) {
       map['parked'] = Variable<bool>(parked.value);
     }
+    if (lastStatus.present) {
+      map['last_status'] = Variable<int>(lastStatus.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1538,6 +1592,7 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
           ..write('lastError: $lastError, ')
           ..write('nextAttemptAt: $nextAttemptAt, ')
           ..write('parked: $parked, ')
+          ..write('lastStatus: $lastStatus, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2986,6 +3041,7 @@ typedef $$PendingSessionsTableCreateCompanionBuilder =
       Value<String?> lastError,
       Value<int> nextAttemptAt,
       Value<bool> parked,
+      Value<int?> lastStatus,
       Value<int> rowid,
     });
 typedef $$PendingSessionsTableUpdateCompanionBuilder =
@@ -2997,6 +3053,7 @@ typedef $$PendingSessionsTableUpdateCompanionBuilder =
       Value<String?> lastError,
       Value<int> nextAttemptAt,
       Value<bool> parked,
+      Value<int?> lastStatus,
       Value<int> rowid,
     });
 
@@ -3041,6 +3098,11 @@ class $$PendingSessionsTableFilterComposer
 
   ColumnFilters<bool> get parked => $composableBuilder(
     column: $table.parked,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastStatus => $composableBuilder(
+    column: $table.lastStatus,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3088,6 +3150,11 @@ class $$PendingSessionsTableOrderingComposer
     column: $table.parked,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get lastStatus => $composableBuilder(
+    column: $table.lastStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PendingSessionsTableAnnotationComposer
@@ -3123,6 +3190,11 @@ class $$PendingSessionsTableAnnotationComposer
 
   GeneratedColumn<bool> get parked =>
       $composableBuilder(column: $table.parked, builder: (column) => column);
+
+  GeneratedColumn<int> get lastStatus => $composableBuilder(
+    column: $table.lastStatus,
+    builder: (column) => column,
+  );
 }
 
 class $$PendingSessionsTableTableManager
@@ -3163,6 +3235,7 @@ class $$PendingSessionsTableTableManager
                 Value<String?> lastError = const Value.absent(),
                 Value<int> nextAttemptAt = const Value.absent(),
                 Value<bool> parked = const Value.absent(),
+                Value<int?> lastStatus = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingSessionsCompanion(
                 id: id,
@@ -3172,6 +3245,7 @@ class $$PendingSessionsTableTableManager
                 lastError: lastError,
                 nextAttemptAt: nextAttemptAt,
                 parked: parked,
+                lastStatus: lastStatus,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3183,6 +3257,7 @@ class $$PendingSessionsTableTableManager
                 Value<String?> lastError = const Value.absent(),
                 Value<int> nextAttemptAt = const Value.absent(),
                 Value<bool> parked = const Value.absent(),
+                Value<int?> lastStatus = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingSessionsCompanion.insert(
                 id: id,
@@ -3192,6 +3267,7 @@ class $$PendingSessionsTableTableManager
                 lastError: lastError,
                 nextAttemptAt: nextAttemptAt,
                 parked: parked,
+                lastStatus: lastStatus,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

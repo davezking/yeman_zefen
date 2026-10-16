@@ -29,6 +29,8 @@ class SessionStore {
   /// Fires after each finished session is saved, so the upload can start right away.
   Stream<void> get saved => _saved.stream;
 
+  void dispose() => _saved.close();
+
   static const clipErrorsCounter = 'clip_errors';
 
   /// The track ids of the last sessions, newest first.
