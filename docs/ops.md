@@ -444,3 +444,10 @@ The app's tunables come from the Worker's vars: `CONFIG_INTERSTITIAL_EVERY_ROUND
 - The endpoint is public and answers with `Cache-Control: public, max-age=600`.
 - A var that is missing or not valid is a 500 `config_invalid` that names the var. The app then keeps its cached or built-in values, so check the var before deploying.
 - `CONFIG_MIN_APP_VERSION` (`major.minor.patch`): an app older than it shows an "Update needed" screen instead of playing. Its store link is `STORE_URL` in `app/config/<flavor>.json`.
+
+## Leaderboards (`GET /v1/leaderboard`)
+
+- The top 100 per (period, generation) is cached for 60 s with the Workers Cache API. Responses tell the app to keep a board for 15 s, so a board is at most about 75 s old.
+- **The Cache API works only when the Worker is served on a custom domain.** On `*.workers.dev`, `caches.default` stores nothing, so every request hits D1. Add a custom domain or route to `[env.prod]` in `wrangler.toml` before launch.
+- `GET /v1/leaderboard/me` is not cached. Its rank is a count over the points index minus the hidden (shadow-banned or deleted) users above the caller, read through `users_hidden_idx` (migration 0007). Apply it with `npx wrangler d1 migrations apply yz-db`.
+- Shadow-banning a user hides them from the cached board within about 75 s.

@@ -22,5 +22,5 @@ export function currentIsoWeek(date: Date = new Date()): string {
 
 /** The stored period key for a request's `period` choice at time `now`. */
 export function periodKey(period: "all" | "week", now: number): string {
-  return period === "all" ? ALL_TIME : isoWeek(now);
+  return period === "all" ? ALL_TIME : currentIsoWeek(new Date(now));
 }

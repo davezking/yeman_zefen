@@ -216,7 +216,10 @@ export const users = sqliteTable("users", {
   lastSeenAt: integer("last_seen_at"),
   shadowBanned: integer("shadow_banned", { mode: "boolean" }).notNull().default(false),
   deletedAt: integer("deleted_at"),
-});
+}, (t) => [
+  // Users hidden from leaderboards. Small, so /v1/leaderboard/me can subtract them from a rank cheaply.
+  index("users_hidden_idx").on(t.id).where(sql`${t.shadowBanned} = 1 OR ${t.deletedAt} IS NOT NULL`),
+]);
 
 export const gameSessions = sqliteTable(
   "game_sessions",

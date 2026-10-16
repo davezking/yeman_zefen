@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { leaderboardCacheRequest } from "../src/routes/v1/leaderboard";
+import { leaderboardCacheRequest, OWN_SQL, TOP_SQL } from "../src/routes/v1/leaderboard";
 import { currentIsoWeek } from "../src/lib/period";
 import { installFirebaseJwks, player, removeFirebaseJwks } from "./helpers";
 
@@ -8,6 +8,7 @@ beforeAll(installFirebaseJwks);
 afterAll(removeFirebaseJwks);
 
 const WEEK = currentIsoWeek();
+const ORIGIN = "https://api.test";
 const REG = { provider: "password" };
 
 beforeEach(async () => {
@@ -15,7 +16,7 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM leaderboard_entries"),
     env.DB.prepare("DELETE FROM users WHERE id <> 'deleted'"),
   ]);
-  for (const period of ["all", WEEK]) for (const g of [0, 3]) await caches.default.delete(leaderboardCacheRequest(period, g));
+  for (const period of ["all", WEEK]) for (const g of [0, 3]) await caches.default.delete(leaderboardCacheRequest(ORIGIN, period, g));
 });
 
 type Seed = { id: string; name?: string | null; country?: string | null; points: number; at?: number; banned?: boolean; deleted?: boolean; period?: string; gen?: number };
@@ -30,6 +31,15 @@ async function seed(rows: Seed[]) {
       ).bind(r.period ?? "all", r.gen ?? 0, r.id, r.points, r.at ?? 1000),
     ]),
   );
+}
+
+/** The cache write runs in waitUntil, after the response; wait for it to land. */
+async function waitForCache(period: string, generation: number) {
+  for (let i = 0; i < 50; i++) {
+    if (await caches.default.match(leaderboardCacheRequest(ORIGIN, period, generation))) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error("leaderboard was never cached");
 }
 
 type Board = { period: string; generation: number; entries: { rank: number; displayName: string | null; country: string | null; points: number }[] };
@@ -71,6 +81,13 @@ describe("GET /v1/leaderboard", () => {
     expect(body.entries.map((e) => e.displayName)).toEqual(["ok"]);
   });
 
+  it("never lists a guest, even if an entry exists for one", async () => {
+    await seed([{ id: "ok", points: 10 }, { id: "guest", points: 50 }]);
+    await env.DB.prepare("UPDATE users SET is_anonymous = 1 WHERE id = 'guest'").run();
+    const body = (await (await player("g", "/v1/leaderboard")).json()) as Board;
+    expect(body.entries.map((e) => e.displayName)).toEqual(["ok"]);
+  });
+
   it("separates periods and generations", async () => {
     await seed([
       { id: "all0", points: 1 },
@@ -88,11 +105,15 @@ describe("GET /v1/leaderboard", () => {
   it("serves from the 60 s cache until it is cleared", async () => {
     await seed([{ id: "a", points: 5 }]);
     const first = await player("g", "/v1/leaderboard");
-    expect(first.headers.get("cache-control")).toBe("public, max-age=60");
+    expect(first.headers.get("cache-control")).toBe("public, max-age=15");
+    await first.arrayBuffer();
+    await waitForCache("all", 0);
     await seed([{ id: "b", points: 50 }]);
-    const cached = (await (await player("g", "/v1/leaderboard")).json()) as Board;
+    const hit = await player("g", "/v1/leaderboard");
+    expect(hit.headers.get("cache-control")).toBe("public, max-age=15");
+    const cached = (await hit.json()) as Board;
     expect(cached.entries.map((e) => e.displayName)).toEqual(["a"]);
-    await caches.default.delete(leaderboardCacheRequest("all", 0));
+    await caches.default.delete(leaderboardCacheRequest(ORIGIN, "all", 0));
     const fresh = (await (await player("g", "/v1/leaderboard")).json()) as Board;
     expect(fresh.entries.map((e) => e.displayName)).toEqual(["b", "a"]);
   });
@@ -101,7 +122,7 @@ describe("GET /v1/leaderboard", () => {
     for (const q of ["?period=month", "?generation=-1", "?generation=abc"]) {
       const res = await player("g", `/v1/leaderboard${q}`);
       expect(res.status).toBe(400);
-      expect(((await res.json()) as { error: { code: string } }).error.code).toBe("invalid_request");
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe("validation_error");
     }
     const anon = await exports.default.fetch(new Request("https://api.test/v1/leaderboard"));
     expect(anon.status).toBe(401);
@@ -165,13 +186,17 @@ describe("performance at 50k entries", () => {
        SELECT 'all', 0, id, (CAST(substr(id, 5) AS INTEGER) * 7919) % 100000, 1 FROM users WHERE id LIKE 'bulk%'`,
     ).run();
 
-    const plan = await env.DB.prepare(
-      `EXPLAIN QUERY PLAN SELECT u.display_name, u.country, e.points FROM leaderboard_entries e JOIN users u ON u.id = e.user_id
-        WHERE e.period = 'all' AND e.generation_id = 0 AND u.shadow_banned = 0 AND u.deleted_at IS NULL
-        ORDER BY e.points DESC, e.updated_at ASC, e.user_id ASC LIMIT 100`,
-    ).all<{ detail: string }>();
-    const details = plan.results.map((r) => r.detail).join("\n");
-    expect(details).toContain("leaderboard_period_gen_points_idx");
+    const planOf = async (query: string, ...binds: unknown[]) =>
+      (await env.DB.prepare(`EXPLAIN QUERY PLAN ${query}`).bind(...binds).all<{ detail: string }>()).results
+        .map((r) => r.detail)
+        .join("\n");
+    const topPlan = await planOf(TOP_SQL, "all", 0);
+    expect(topPlan).toContain("leaderboard_period_gen_points_idx");
+    expect(topPlan).not.toMatch(/SCAN e\b/);
+    const ownPlan = await planOf(OWN_SQL, "all", 0, "bulk25");
+    expect(ownPlan).toContain("COVERING INDEX leaderboard_period_gen_points_idx");
+    expect(ownPlan).toContain("users_hidden_idx");
+    expect(ownPlan).not.toMatch(/SCAN (o|e)\b/);
 
     const t0 = Date.now();
     const top = (await (await player("g", "/v1/leaderboard")).json()) as Board;
@@ -183,7 +208,8 @@ describe("performance at 50k entries", () => {
     const meMs = Date.now() - t1;
     expect(mine.me?.rank).toBeGreaterThan(0);
     console.log(`leaderboard 50k: top100 ${topMs} ms, me ${meMs} ms`);
-    expect(topMs).toBeLessThan(300);
-    expect(meMs).toBeLessThan(300);
+    // Loose guards so a slow CI runner does not flake; the plan checks above are the real test.
+    expect(topMs).toBeLessThan(2000);
+    expect(meMs).toBeLessThan(2000);
   }, 60_000);
 });
