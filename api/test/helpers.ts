@@ -136,33 +136,42 @@ export async function resetCatalog(): Promise<void> {
  * queries per Worker invocation (50), and each statement inside a batch() counts.
  */
 export function countingDb(real: D1Database) {
-  const counter = { queries: 0 };
+  // `writes` counts statements that write (INSERT/UPDATE/DELETE/REPLACE), a subset of `queries`.
+  const counter = { queries: 0, writes: 0 };
+  const isWrite = (sql: string) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql);
   class CountedStatement {
-    constructor(readonly inner: D1PreparedStatement) {}
+    constructor(
+      readonly inner: D1PreparedStatement,
+      readonly sql: string,
+    ) {}
     bind(...values: unknown[]) {
-      return new CountedStatement(this.inner.bind(...values));
+      return new CountedStatement(this.inner.bind(...values), this.sql);
     }
     run() {
-      counter.queries++;
+      this.count();
       return this.inner.run();
     }
     all() {
-      counter.queries++;
+      this.count();
       return this.inner.all();
     }
     first(column?: string) {
-      counter.queries++;
+      this.count();
       return column === undefined ? this.inner.first() : this.inner.first(column);
     }
     raw(options?: { columnNames?: boolean }) {
-      counter.queries++;
+      this.count();
       return this.inner.raw(options as { columnNames: true });
+    }
+    count() {
+      counter.queries++;
+      if (isWrite(this.sql)) counter.writes++;
     }
   }
   const wrapped = {
-    prepare: (query: string) => new CountedStatement(real.prepare(query)),
+    prepare: (query: string) => new CountedStatement(real.prepare(query), query),
     batch: (statements: CountedStatement[]) => {
-      counter.queries += statements.length;
+      for (const s of statements) s.count();
       return real.batch(statements.map((s) => s.inner));
     },
   } as unknown as D1Database;

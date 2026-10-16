@@ -25,7 +25,8 @@ export async function readOptionalJson(c: Context): Promise<unknown> {
   return text.trim() === "" ? {} : parseJsonText(text);
 }
 
-function parseJsonText(text: string): unknown {
+/** Parse JSON text; malformed JSON is a 400. */
+export function parseJsonText(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {

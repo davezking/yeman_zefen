@@ -1,0 +1,60 @@
+{
+  "_comment": "Shared scoring cases (docs/scoring.md). Run by app/test/features/game/domain/scorer_test.dart and api/test/scoring.test.ts; both must pass every case. `difficulty: null` means ignored (generation mode). `bonus` is checked only for valid correct rounds.",
+  "rounds": [
+    { "id": "E1", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 2000, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 43, "points": 143, "valid": true },
+    { "id": "E2", "mode": "intro", "difficulty": "medium", "correct": true, "responseMs": 1500, "hintUsed": false, "base": 150, "windowMs": 10000, "bonus": 64, "points": 214, "valid": true },
+    { "id": "E3", "mode": "intro", "difficulty": "hard", "correct": true, "responseMs": 1000, "hintUsed": false, "base": 200, "windowMs": 8000, "bonus": 88, "points": 288, "valid": true },
+    { "id": "E4", "mode": "intro", "difficulty": "easy", "correct": false, "responseMs": 2000, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 0, "valid": true },
+    { "id": "E5", "mode": "middle", "difficulty": "easy", "correct": true, "responseMs": 2000, "hintUsed": false, "base": 125, "windowMs": 15000, "bonus": 54, "points": 179, "valid": true },
+    { "id": "E6", "mode": "middle", "difficulty": "medium", "correct": true, "responseMs": 1500, "hintUsed": false, "base": 188, "windowMs": 10000, "bonus": 80, "points": 268, "valid": true },
+    { "id": "E7", "mode": "middle", "difficulty": "hard", "correct": true, "responseMs": 1000, "hintUsed": false, "base": 250, "windowMs": 8000, "bonus": 109, "points": 359, "valid": true },
+    { "id": "E8", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 2000, "hintUsed": true, "base": 100, "windowMs": 15000, "bonus": 43, "points": 72, "valid": true },
+    { "id": "E9", "mode": "intro", "difficulty": "medium", "correct": true, "responseMs": 1500, "hintUsed": true, "base": 150, "windowMs": 10000, "bonus": 64, "points": 107, "valid": true },
+    { "id": "E10", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 15000, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 100, "valid": true },
+    { "id": "E11", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 20000, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 100, "valid": true },
+    { "id": "E12", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 199, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 0, "valid": false },
+    { "id": "E13", "mode": "intro", "difficulty": "easy", "correct": true, "responseMs": 200, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 49, "points": 149, "valid": true },
+    { "id": "E14", "mode": "intro", "difficulty": "easy", "correct": false, "responseMs": 150, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 0, "valid": false },
+    { "id": "E15", "mode": "generation", "difficulty": null, "correct": true, "responseMs": 3000, "hintUsed": false, "base": 120, "windowMs": 15000, "bonus": 48, "points": 168, "valid": true },
+    { "id": "E16", "mode": "intro", "difficulty": "hard", "correct": true, "responseMs": 7000, "hintUsed": false, "base": 200, "windowMs": 8000, "bonus": 13, "points": 213, "valid": true },
+    { "id": "E17", "mode": "middle", "difficulty": "hard", "correct": true, "responseMs": 1000, "hintUsed": true, "base": 250, "windowMs": 8000, "bonus": 109, "points": 180, "valid": true }
+  ],
+  "sessions": [
+    {
+      "id": "S1",
+      "mode": "intro",
+      "difficulty": "easy",
+      "answers": [
+        { "correct": true, "responseMs": 2000, "hintUsed": false },
+        { "correct": false, "responseMs": 2000, "hintUsed": false },
+        { "correct": true, "responseMs": 2000, "hintUsed": true }
+      ],
+      "points": [143, 0, 72],
+      "score": 215,
+      "flagged": false
+    },
+    {
+      "id": "S2",
+      "mode": "intro",
+      "difficulty": "easy",
+      "answers": [
+        { "correct": true, "responseMs": 2000, "hintUsed": false },
+        { "correct": false, "responseMs": 2000, "hintUsed": false },
+        { "correct": true, "responseMs": 2000, "hintUsed": true },
+        { "correct": true, "responseMs": 199, "hintUsed": false }
+      ],
+      "points": [143, 0, 72, 0],
+      "score": 215,
+      "flagged": true
+    },
+    {
+      "id": "S3",
+      "mode": "intro",
+      "difficulty": "easy",
+      "answers": [],
+      "points": [],
+      "score": 0,
+      "flagged": false
+    }
+  ]
+}

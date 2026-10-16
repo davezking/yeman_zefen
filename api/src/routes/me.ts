@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "../db/client";
 import { gameSessions, leaderboardEntries, users } from "../db/schema";
 import type { AppEnv } from "../env";
+import { requestCountry } from "../lib/country";
 import { displayNameSchema } from "../lib/displayName";
 import { ApiError } from "../lib/errors";
 import { DELETED_USER_ID } from "../lib/firebaseAuth";
@@ -32,11 +33,7 @@ function profile(row: UserRow) {
 me.put("/", async (c) => {
   const user = c.get("user")!;
   const body = parse(putBody, await readOptionalJson(c));
-  const cf = c.req.raw.cf as { country?: string } | undefined;
-  // Cloudflare reports "XX" when it cannot place the IP and "T1" for Tor; neither is a country,
-  // so they must not overwrite a real one.
-  const raw = cf?.country;
-  const country = typeof raw === "string" && /^[A-Z]{2}$/.test(raw) && raw !== "XX" && raw !== "T1" ? raw : null;
+  const country = requestCountry(c.req.raw);
   const now = Date.now();
   // One statement. An omitted name or an unknown country keeps what is stored.
   const [row] = await db(c.env)

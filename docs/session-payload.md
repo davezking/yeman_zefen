@@ -74,13 +74,19 @@ A real session has 10 rounds. Two are shown.
 The payload has no score and does not say which option was correct. The server works both out from `trackId` and
 `question`.
 
-## Open: `chosenId` is null for a timeout
+## `chosenId` is null for a timeout
 
-The shape in the architecture doc gives `chosenId` as a number. It does not say what a round with no answer looks like,
-and the app has to record one, because the clip plays and the window runs out. The app records `chosenId: null` and
-`responseMs` equal to the window. The server should accept `null`, score it 0, and treat it as a round that was played.
-If the server would rather not accept `null`, the alternative is a sentinel such as `0` (no id is 0); this needs a
-decision before the Phase 3 endpoint is written.
+The shape in the architecture doc gives `chosenId` as a number. A round with no answer still plays its clip, so the app
+records `chosenId: null` and `responseMs` equal to the window. The server accepts `null`, scores it 0, and counts the
+round as played.
+
+## What the server answers
+
+`POST /v1/sessions` returns `200 { "score": 286, "rounds": [{ "points": 143, "correct": true }, …], "flagged": false }`,
+one entry per round in order. Sending the same `id` again returns the stored result unchanged and adds nothing, even if
+the payload differs. An `id` another player already used is `409 session_conflict`. A malformed payload is
+`400 validation_error`, and one that cannot come from a real game is `422 invalid_session` (`docs/scoring.md`, "What the
+server adds"). Unknown fields are ignored, so an older server accepts a newer app's payload.
 
 ## Rules the app keeps
 
