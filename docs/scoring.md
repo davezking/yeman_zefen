@@ -97,8 +97,8 @@ A session's score is the sum of its rounds' points. Rounds E1, E4 and E8 played 
 
 `POST /v1/sessions` (`api/src/routes/v1/sessions.ts`) scores each round with the rules above, after checking it against
 the catalog. A payload that cannot come from a real game is rejected with 422 `invalid_session` and nothing is stored:
-an unknown track, artist or era; a correct answer missing from the options; a chosen id that is not an option; an `era`
-question outside generation mode, or another kind inside it.
+an unknown track or session era; a `song` round whose options include an unknown track or leave out the track; a chosen
+id that is not an option; an `era` question outside generation mode, or another kind inside it.
 
 A session that breaks a sanity bound is stored (its plays still count for royalties) and **flagged**, which keeps it off
 every leaderboard. `flag_reason` lists why, comma-separated:
@@ -110,6 +110,7 @@ every leaderboard. `flag_reason` lists why, comma-separated:
 | `duration_mismatch` | The response times add up to more than `clientEndedAt − clientStartedAt` + 10 s, or the session ends before it starts. |
 | `clock_out_of_range` | `clientStartedAt` is more than 14 days old, or `clientEndedAt` is more than 5 minutes in the future. |
 | `era_mismatch` | An era session (`generationId` ≠ 0) played a track from another era. |
+| `catalog_mismatch` | An `artist` or `era` round no longer matches the catalog: an option is not an artist (or era), or the track's artist (or era) is not among the options. The round scores 0. Artists can be merged and eras changed after a pack was downloaded, so this is not rejected. |
 
 The leaderboard week comes from the server's clock when the session arrives, never from the device.
 

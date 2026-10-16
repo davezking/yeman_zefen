@@ -295,6 +295,23 @@ describe("idempotency", () => {
     expect((await board("u-slip")).map((r) => r.points)).toEqual([HONEST_SCORE, HONEST_SCORE]);
   });
 
+  it("returns the stored result to a deleted account retrying its own session", async () => {
+    const body = honest();
+    const first = await (await post("u-gone-retry", body, { provider: REGISTERED })).json();
+    const del = await exports.default.fetch(
+      new Request("https://api.test/v1/me", {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${await signFirebaseToken("u-gone-retry", { provider: REGISTERED })}` },
+      }),
+    );
+    expect(del.status).toBe(204);
+    const again = await post("u-gone-retry", body, { provider: REGISTERED });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(first);
+    expect(await board("u-gone-retry")).toEqual([]);
+    expect((await storedSession(body.id))!.user_id).toBe("deleted");
+  });
+
   it("returns 409 for an id another player already used", async () => {
     const body = honest();
     await post("u-owner", body, { provider: REGISTERED });
@@ -312,8 +329,6 @@ describe("forged rounds (422 invalid_session, nothing stored)", () => {
     ["an unknown track", () => songRound(0, { trackId: 999_999 })],
     ["an unknown track among the options", () => songRound(0, { optionIds: [t(0), t(1), t(2), 999_999] })],
     ["a chosen id that is not an option", () => songRound(0, { chosenId: t(4) })],
-    ["artist options that leave out the track's artist", () => artistRound(0, { optionIds: [a(1), a(2), a(3), a(4)], chosenId: a(1) })],
-    ["artist options that are not artists", () => artistRound(0, { optionIds: [a(0), 999_999, a(2), a(3)] })],
     ["an era question outside generation mode", () => ({ trackId: t(0), question: "era", optionIds: [1, 2, ERA, 5], chosenId: ERA, responseMs: 2000, hintUsed: false })],
   ];
   for (const [label, round] of forged) {
@@ -329,18 +344,6 @@ describe("forged rounds (422 invalid_session, nothing stored)", () => {
 
   it("rejects song questions in generation mode", async () => {
     const res = await post("u-forge", honest({ mode: "generation", rounds: [songRound(0)] }), { provider: REGISTERED });
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects an era question about a track with no era", async () => {
-    const round = { trackId: noEraTrack, question: "era", optionIds: [1, 2, ERA, 5], chosenId: ERA, responseMs: 2000, hintUsed: false };
-    const res = await post("u-forge", honest({ mode: "generation", rounds: [round] }), { provider: REGISTERED });
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects era options that are not eras", async () => {
-    const round = { trackId: t(0), question: "era", optionIds: [1, 2, ERA, 999], chosenId: ERA, responseMs: 2000, hintUsed: false };
-    const res = await post("u-forge", honest({ mode: "generation", rounds: [round] }), { provider: REGISTERED });
     expect(res.status).toBe(422);
   });
 
@@ -391,6 +394,16 @@ describe("payload validation (400 validation_error)", () => {
     expect((await post("u-val", "{nope", { provider: REGISTERED })).status).toBe(400);
     const huge = JSON.stringify({ ...honest(), padding: "x".repeat(40_000) });
     expect((await post("u-val", huge, { provider: REGISTERED })).status).toBe(413);
+    // A declared length over the cap is refused before the body is read.
+    const token = await signFirebaseToken("u-val", { provider: REGISTERED });
+    const declared = await exports.default.fetch(
+      new Request("https://api.test/v1/sessions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "content-length": "50000000" },
+        body: JSON.stringify(honest()),
+      }),
+    );
+    expect(declared.status).toBe(413);
   });
 });
 
@@ -453,6 +466,28 @@ describe("sanity bounds (stored, flagged, kept off the leaderboard)", () => {
   it("flags a correct answer that came after the window closed", async () => {
     // Easy: the window is 15 s; the app ends the round as a timeout, so a tap at 20 s is not from the app.
     await expectFlagged("u-late", honest({ rounds: [songRound(0, { responseMs: 20_000 })] }), "late_answer");
+  });
+
+  // Artists can be merged (deleted) and eras changed after a pack shipped, so these are flagged, not rejected.
+  it("flags artist options that leave out the track's artist, and scores the round 0", async () => {
+    const round = artistRound(0, { optionIds: [a(1), a(2), a(3), a(4)], chosenId: a(1) });
+    const result = await expectFlagged("u-merged", honest({ rounds: [songRound(1), round] }), "catalog_mismatch");
+    expect(result).toEqual({ score: 143, rounds: [{ points: 143, correct: true }, { points: 0, correct: false }], flagged: true });
+  });
+
+  it("flags artist options that are no longer artists", async () => {
+    const round = artistRound(0, { optionIds: [a(0), 999_999, a(2), a(3)] });
+    await expectFlagged("u-gone", honest({ rounds: [round] }), "catalog_mismatch");
+  });
+
+  it("flags an era question about a track that has lost its era", async () => {
+    const round = { trackId: noEraTrack, question: "era", optionIds: [1, 2, ERA, 5], chosenId: ERA, responseMs: 2000, hintUsed: false };
+    await expectFlagged("u-noera", honest({ mode: "generation", rounds: [round] }), "catalog_mismatch");
+  });
+
+  it("flags era options that are not eras", async () => {
+    const round = { trackId: t(0), question: "era", optionIds: [1, 2, ERA, 999], chosenId: ERA, responseMs: 2000, hintUsed: false };
+    await expectFlagged("u-badera", honest({ mode: "generation", rounds: [round] }), "catalog_mismatch");
   });
 
   it("flags an era session that plays a track from another era", async () => {

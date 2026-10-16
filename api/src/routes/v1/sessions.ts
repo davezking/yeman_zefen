@@ -12,9 +12,9 @@ import { z } from "zod";
 import type { AppEnv } from "../../env";
 import { requestCountry } from "../../lib/country";
 import { ApiError } from "../../lib/errors";
-import type { PlayerUser } from "../../lib/firebaseAuth";
+import { DELETED_USER_ID, type PlayerUser } from "../../lib/firebaseAuth";
 import { ALL_TIME, isoWeek } from "../../lib/period";
-import { DIFFICULTIES, GAME_MODES, scoreRound, windowMs, type Difficulty, type GameMode } from "../../lib/scoring";
+import { DIFFICULTIES, GAME_MODES, scoreSession, windowMs, type Difficulty, type GameMode } from "../../lib/scoring";
 import { parse, parseJsonText } from "../../lib/validate";
 
 export const sessions = new Hono<AppEnv>();
@@ -37,8 +37,19 @@ const MAX_BODY_CHARS = 32 * 1024;
 export const QUESTION_KINDS = ["song", "artist", "era"] as const;
 type QuestionKind = (typeof QUESTION_KINDS)[number];
 
+type CatalogKind = "t" | "a" | "g";
+/** Which catalog table a question's options are ids of. */
+const OPTION_KIND: Record<QuestionKind, CatalogKind> = { song: "t", artist: "a", era: "g" };
+const KIND_LABEL: Record<CatalogKind, string> = { t: "track", a: "artist", g: "era" };
+
 /** Why a session is flagged. A flagged session is stored (royalty counts) but never reaches a leaderboard. */
-export type FlagReason = "fast_response" | "late_answer" | "duration_mismatch" | "clock_out_of_range" | "era_mismatch";
+export type FlagReason =
+  | "fast_response"
+  | "late_answer"
+  | "duration_mismatch"
+  | "clock_out_of_range"
+  | "era_mismatch"
+  | "catalog_mismatch";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const catalogId = z.number().int().positive();
@@ -83,7 +94,7 @@ type StoredEvents = {
   ads: Payload["ads"];
 };
 
-type CatalogRow = { kind: "t" | "a" | "g"; id: number; artist_id: number | null; generation_id: number | null };
+type CatalogRow = { kind: CatalogKind; id: number; artist_id: number | null; generation_id: number | null };
 type StoredRow = { user_id: string; score: number; flagged: number; events_json: string };
 
 const CATALOG_SQL = `
@@ -126,7 +137,11 @@ function invalid(message: string): never {
 
 /** The stored result for `id`, or a 409 when another player owns it. */
 function storedResult(row: StoredRow, user: PlayerUser): SessionResult {
-  if (row.user_id !== user.uid) throw new ApiError(409, "session_conflict", "This session id belongs to another player");
+  // After DELETE /v1/me the row belongs to the placeholder user. A retry from the deleted account
+  // must still read as stored (or its queue would keep it forever); the result is not personal.
+  if (row.user_id !== user.uid && row.user_id !== DELETED_USER_ID) {
+    throw new ApiError(409, "session_conflict", "This session id belongs to another player");
+  }
   const events = JSON.parse(row.events_json) as StoredEvents;
   return {
     score: row.score,
@@ -135,38 +150,38 @@ function storedResult(row: StoredRow, user: PlayerUser): SessionResult {
   };
 }
 
-/** The catalog ids each kind of round refers to, for one lookup query. */
-function referencedIds(p: Payload) {
-  const tracks = new Set<number>();
-  const artists = new Set<number>();
-  const generations = new Set<number>();
-  if (p.generationId !== 0) generations.add(p.generationId);
+/** The catalog ids the session refers to, by table, for one lookup query. */
+function referencedIds(p: Payload): Record<CatalogKind, number[]> {
+  const ids: Record<CatalogKind, Set<number>> = { t: new Set(), a: new Set(), g: new Set() };
+  if (p.generationId !== 0) ids.g.add(p.generationId);
   for (const r of p.rounds) {
-    tracks.add(r.trackId);
-    const into = r.question === "song" ? tracks : r.question === "artist" ? artists : generations;
-    for (const id of r.optionIds) into.add(id);
+    ids.t.add(r.trackId);
+    for (const id of r.optionIds) ids[OPTION_KIND[r.question]].add(id);
   }
-  return { tracks: [...tracks], artists: [...artists], generations: [...generations] };
+  return { t: [...ids.t], a: [...ids.a], g: [...ids.g] };
 }
 
-/** Score every round against the catalog. Throws 422 for a payload that cannot have come from a real game. */
+/**
+ * Score every round against the catalog. Throws 422 for a payload that cannot have come from a real
+ * game. Artist and era rounds that no longer match the catalog are flagged instead: an admin can
+ * merge an artist or change a track's era after a pack was downloaded, and an honest session
+ * queued offline must not be lost for it (the queue parks a 4xx for good).
+ */
 function scoreAgainstCatalog(p: Payload, catalog: CatalogRow[], now: number) {
   const tracks = new Map<number, CatalogRow>();
-  const artists = new Set<number>();
-  const generations = new Set<number>();
+  const known: Record<CatalogKind, Set<number>> = { t: new Set(), a: new Set(), g: new Set() };
   for (const row of catalog) {
+    known[row.kind].add(row.id);
     if (row.kind === "t") tracks.set(row.id, row);
-    else if (row.kind === "a") artists.add(row.id);
-    else generations.add(row.id);
   }
-  if (p.generationId !== 0 && !generations.has(p.generationId)) invalid(`generationId: unknown era ${p.generationId}`);
+  if (p.generationId !== 0 && !known.g.has(p.generationId)) invalid(`generationId: unknown era ${p.generationId}`);
 
   const flags = new Set<FlagReason>();
   const mode: GameMode = p.mode;
   const difficulty: Difficulty = p.difficulty;
   const window = windowMs(mode, difficulty);
 
-  const rounds = p.rounds.map((r, i) => {
+  const answers = p.rounds.map((r, i) => {
     const at = `rounds.${i}`;
     const track = tracks.get(r.trackId);
     if (!track) invalid(`${at}.trackId: unknown track ${r.trackId}`);
@@ -175,24 +190,31 @@ function scoreAgainstCatalog(p: Payload, catalog: CatalogRow[], now: number) {
     }
     if (r.chosenId !== null && !r.optionIds.includes(r.chosenId)) invalid(`${at}.chosenId: not one of the options`);
 
-    const answer = correctAnswer(r.question, track, at);
-    const known = r.question === "song" ? tracks : r.question === "artist" ? artists : generations;
-    const kind: Record<QuestionKind, string> = { song: "track", artist: "artist", era: "era" };
-    for (const id of r.optionIds) {
-      if (!known.has(id)) invalid(`${at}.optionIds: unknown ${kind[r.question]} ${id}`);
+    // The id the player has to pick: the track itself, its artist, or its era.
+    const answer = r.question === "song" ? track.id : r.question === "artist" ? track.artist_id : track.generation_id;
+    const kind = OPTION_KIND[r.question];
+    const unknown = r.optionIds.find((id) => !known[kind].has(id));
+    const answerShown = answer !== null && r.optionIds.includes(answer);
+    let correct = r.chosenId === answer;
+    if (r.question === "song") {
+      // Tracks are never deleted, so a song round that does not match is forged.
+      if (unknown !== undefined) invalid(`${at}.optionIds: unknown ${KIND_LABEL[kind]} ${unknown}`);
+      if (!answerShown) invalid(`${at}.optionIds: the correct answer is not among the options`);
+    } else if (unknown !== undefined || !answerShown) {
+      flags.add("catalog_mismatch");
+      correct = false;
     }
-    if (!r.optionIds.includes(answer)) invalid(`${at}.optionIds: the correct answer is not among the options`);
 
     if (p.generationId !== 0 && track.generation_id !== p.generationId) flags.add("era_mismatch");
     if (r.chosenId !== null && r.responseMs > window + LATE_ANSWER_TOLERANCE_MS) flags.add("late_answer");
+    return { correct, responseMs: r.responseMs, hintUsed: r.hintUsed };
+  });
 
-    const score = scoreRound(mode, difficulty, {
-      correct: r.chosenId === answer,
-      responseMs: r.responseMs,
-      hintUsed: r.hintUsed,
-    });
-    if (!score.valid) flags.add("fast_response");
-    return { ...r, points: score.points, correct: score.correct, valid: score.valid };
+  const session = scoreSession(mode, difficulty, answers);
+  if (session.flagged) flags.add("fast_response");
+  const rounds = p.rounds.map((r, i) => {
+    const s = session.rounds[i]!;
+    return { ...r, points: s.points, correct: s.correct, valid: s.valid };
   });
 
   const duration = p.clientEndedAt - p.clientStartedAt;
@@ -202,21 +224,16 @@ function scoreAgainstCatalog(p: Payload, catalog: CatalogRow[], now: number) {
     flags.add("clock_out_of_range");
   }
 
-  return { rounds, score: rounds.reduce((sum, r) => sum + r.points, 0), flags };
-}
-
-/** The id the player has to pick: the track itself, its artist, or its era. */
-function correctAnswer(question: QuestionKind, track: CatalogRow, at: string): number {
-  if (question === "song") return track.id;
-  if (question === "artist") return track.artist_id!;
-  if (track.generation_id === null) invalid(`${at}.trackId: track ${track.id} has no era`);
-  return track.generation_id;
+  return { rounds, score: session.total, flags };
 }
 
 sessions.post("/", async (c) => {
   const user = c.get("user")!;
+  // Refuse a declared oversize body before reading it; the length check after catches chunked ones.
+  const tooLarge = () => new ApiError(413, "payload_too_large", "Session payload is too large");
+  if (Number(c.req.header("content-length") ?? 0) > MAX_BODY_CHARS) throw tooLarge();
   const text = await c.req.text();
-  if (text.length > MAX_BODY_CHARS) throw new ApiError(413, "payload_too_large", "Session payload is too large");
+  if (text.length > MAX_BODY_CHARS) throw tooLarge();
   const p = parse(sessionPayloadSchema, parseJsonText(text));
   const DB = c.env.DB;
   const now = Date.now();
@@ -225,9 +242,9 @@ sessions.post("/", async (c) => {
   const [stored, catalog] = await DB.batch([
     DB.prepare(STORED_SQL).bind(p.id),
     DB.prepare(CATALOG_SQL).bind(
-      JSON.stringify(ids.tracks),
-      JSON.stringify(ids.artists),
-      JSON.stringify(ids.generations),
+      JSON.stringify(ids.t),
+      JSON.stringify(ids.a),
+      JSON.stringify(ids.g),
     ),
   ]);
   // Idempotency comes first: a stored session is returned as it was scored, even if the catalog

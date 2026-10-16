@@ -12,10 +12,7 @@ class _RoundCase {
   _RoundCase(Map<String, Object?> j)
       : id = j['id']! as String,
         mode = GameMode.values.byName(j['mode']! as String),
-        // Generation mode ignores difficulty; the fixture says so with null.
-        difficulty = j['difficulty'] == null
-            ? Difficulty.easy
-            : Difficulty.values.byName(j['difficulty']! as String),
+        difficulty = _difficulty(j['difficulty']),
         correct = j['correct']! as bool,
         responseMs = j['responseMs']! as int,
         hint = j['hintUsed']! as bool,
@@ -37,6 +34,10 @@ class _RoundCase {
   final int points;
   final bool valid;
 }
+
+/// Generation mode ignores difficulty; the fixture says so with null.
+Difficulty _difficulty(Object? name) =>
+    name == null ? Difficulty.easy : Difficulty.values.byName(name as String);
 
 Map<String, Object?> _fixture() =>
     jsonDecode(readDoc('fixtures/scoring.json')) as Map<String, Object?>;
@@ -85,7 +86,7 @@ void main() {
       test('session ${s['id']}', () {
         final session = scorer.scoreSession(
           mode: GameMode.values.byName(s['mode']! as String),
-          difficulty: Difficulty.values.byName(s['difficulty']! as String),
+          difficulty: _difficulty(s['difficulty']),
           answers: [
             for (final a in (s['answers']! as List<Object?>).cast<Map<String, Object?>>())
               RoundAnswer(
