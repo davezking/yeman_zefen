@@ -33,7 +33,10 @@ me.put("/", async (c) => {
   const user = c.get("user")!;
   const body = parse(putBody, await readOptionalJson(c));
   const cf = c.req.raw.cf as { country?: string } | undefined;
-  const country = typeof cf?.country === "string" && /^[A-Z]{2}$/.test(cf.country) ? cf.country : null;
+  // Cloudflare reports "XX" when it cannot place the IP and "T1" for Tor; neither is a country,
+  // so they must not overwrite a real one.
+  const raw = cf?.country;
+  const country = typeof raw === "string" && /^[A-Z]{2}$/.test(raw) && raw !== "XX" && raw !== "T1" ? raw : null;
   const now = Date.now();
   // One statement. An omitted name or an unknown country keeps what is stored.
   const [row] = await db(c.env)

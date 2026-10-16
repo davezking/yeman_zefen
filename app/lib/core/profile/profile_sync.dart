@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
@@ -96,14 +97,19 @@ final profileSyncProvider = Provider<ProfileSync>(
   (ref) => ProfileSync(api: ref.watch(apiClientProvider), store: DbProfileSyncStore(ref.watch(appDbProvider))),
 );
 
-/// Runs [ProfileSync] for as long as it is watched. The auth stream starts
-/// with the current user, so the first run is the app open, and it fires again
-/// whenever the user changes (sign-in, linking, signing in again after a
-/// deletion).
+/// Runs [ProfileSync] for as long as it is read. The auth stream starts with
+/// the current user, so the first run is the app open. It runs again whenever
+/// the user changes (sign-in, linking, signing in again after a deletion) and
+/// when the app comes back to the foreground; the 6-hour window keeps those
+/// cheap.
 final profileSyncStarterProvider = Provider<void>((ref) {
   final sync = ref.watch(profileSyncProvider);
   ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
     final auth = next.value;
     if (auth != null) unawaited(sync.syncIfDue(auth));
   }, fireImmediately: true);
+  final lifecycle = AppLifecycleListener(
+    onResume: () => unawaited(sync.syncIfDue(ref.read(authServiceProvider).current)),
+  );
+  ref.onDispose(lifecycle.dispose);
 });

@@ -1,6 +1,7 @@
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "../src/db/client";
+import { eq } from "drizzle-orm";
 import { gameSessions, leaderboardEntries, users } from "../src/db/schema";
 import { countingDb, installFirebaseJwks, player, removeFirebaseJwks, signFirebaseToken } from "./helpers";
 
@@ -53,6 +54,12 @@ describe("PUT /v1/me", () => {
     expect(((await ok.json()) as { country: string }).country).toBe("ET");
   });
 
+  it("ignores Cloudflare's unknown (XX) and Tor (T1) codes", async () => {
+    await putMe("u-xx", undefined, { cf: { country: "ET" } });
+    expect(await (await putMe("u-xx", undefined, { cf: { country: "XX" } })).json()).toMatchObject({ country: "ET" });
+    expect(await (await putMe("u-xx", undefined, { cf: { country: "T1" } })).json()).toMatchObject({ country: "ET" });
+  });
+
   it("keeps the stored name and country when a later call omits them", async () => {
     await putMe("u-keep", { displayName: "Meron" }, { cf: { country: "ET" } });
     const again = await putMe("u-keep");
@@ -82,7 +89,7 @@ describe("PUT /v1/me", () => {
   });
 
   it("requires a token", async () => {
-    const res = await (await import("cloudflare:workers")).exports.default.fetch(
+    const res = await exports.default.fetch(
       new Request("https://api.test/v1/me", { method: "PUT", body: "{}" }),
     );
     expect(res.status).toBe(401);
@@ -105,7 +112,8 @@ describe("display name validation (400 validation_error)", () => {
     ["not a string", 42],
     ["a blocked word", "Admin"],
     ["a blocked word with spaces and case", "xx A d M i n"],
-    ["a blocked word inside a longer name", "megafuckfan"],
+    ["a blocked word with trailing digits", "Admin2"],
+    ["a blocked word among others", "the official one"],
     ["a blocked Fidel word", "የማን ዘፈን"],
   ];
   for (const [label, displayName] of bad) {
@@ -121,7 +129,7 @@ describe("display name validation (400 validation_error)", () => {
   });
 
   it("rejects invalid JSON", async () => {
-    const res = await (await import("cloudflare:workers")).exports.default.fetch(
+    const res = await exports.default.fetch(
       new Request("https://api.test/v1/me", {
         method: "PUT",
         headers: { authorization: `Bearer ${await signFirebaseToken("u-bad")}`, "content-type": "application/json" },
@@ -135,6 +143,12 @@ describe("display name validation (400 validation_error)", () => {
     expect((await putMe("u-len", { displayName: "ዘፈ" })).status).toBe(200);
     expect((await putMe("u-len", { displayName: "ዘ".repeat(24) })).status).toBe(200);
     expect((await putMe("u-len", { displayName: "ዘ".repeat(25) })).status).toBe(400);
+  });
+
+  it("does not block real names that merely contain a blocked word", async () => {
+    for (const displayName of ["Shitaye Bekele", "ሽታዬ", "Badminton Fan", "Ahmad Mintesinot", "Supporter"]) {
+      expect((await putMe("u-ok", { displayName })).status, displayName).toBe(200);
+    }
   });
 
   it("accepts digits and mixed scripts", async () => {
@@ -163,8 +177,10 @@ async function addSession(userId: string, score = 100) {
     rounds: 5, score, trackIdsJson: "[1,2,3]", eventsJson: "[]",
   });
 }
-const sessionsOf = (userId: string) => db(env).select().from(gameSessions).all().then((r) => r.filter((s) => s.userId === userId));
-const leaderboardOf = (userId: string) => db(env).select().from(leaderboardEntries).all().then((r) => r.filter((e) => e.userId === userId));
+const sessionsOf = (userId: string) => db(env).select().from(gameSessions).where(eq(gameSessions.userId, userId)).all();
+const leaderboardOf = (userId: string) =>
+  db(env).select().from(leaderboardEntries).where(eq(leaderboardEntries.userId, userId)).all();
+const userRow = (id: string) => db(env).select().from(users).where(eq(users.id, id)).get();
 
 describe("DELETE /v1/me", () => {
   async function seedPlayer(uid: string) {
@@ -186,7 +202,7 @@ describe("DELETE /v1/me", () => {
     expect(res.status).toBe(204);
 
     expect(await leaderboardOf("u-del")).toEqual([]);
-    expect(await db(env).select().from(users).all().then((r) => r.some((u) => u.id === "u-del"))).toBe(false);
+    expect(await userRow("u-del")).toBeUndefined();
     expect((await sessionsOf("u-del")).length).toBe(0);
     expect((await sessionsOf("deleted")).length).toBe(2);
 
@@ -213,8 +229,7 @@ describe("DELETE /v1/me", () => {
   });
 
   it("never lists the placeholder as a player", async () => {
-    const row = await db(env).select().from(users).all().then((r) => r.find((u) => u.id === "deleted"));
-    expect(row).toMatchObject({ shadowBanned: true });
+    expect(await userRow("deleted")).toMatchObject({ shadowBanned: true });
   });
 
   it("uses a fixed number of D1 queries however many sessions the player has", async () => {
