@@ -30,19 +30,19 @@ class NetworkException extends ApiException {
 
 /// 401, still rejected after one token refresh.
 class UnauthorizedException extends ApiException {
-  const UnauthorizedException(String code, String message) : super(code, message, status: 401);
+  const UnauthorizedException(super.code, super.message) : super(status: 401);
 }
 
 class ForbiddenException extends ApiException {
-  const ForbiddenException(String code, String message) : super(code, message, status: 403);
+  const ForbiddenException(super.code, super.message) : super(status: 403);
 }
 
 class NotFoundException extends ApiException {
-  const NotFoundException(String code, String message) : super(code, message, status: 404);
+  const NotFoundException(super.code, super.message) : super(status: 404);
 }
 
 class RateLimitedException extends ApiException {
-  const RateLimitedException(String code, String message, {this.retryAfter}) : super(code, message, status: 429);
+  const RateLimitedException(super.code, super.message, {this.retryAfter}) : super(status: 429);
 
   /// From the `Retry-After` header, when the server sent one.
   final Duration? retryAfter;
@@ -50,11 +50,11 @@ class RateLimitedException extends ApiException {
 
 /// Any other 4xx (validation errors, conflicts).
 class RequestException extends ApiException {
-  const RequestException(String code, String message, {required int status}) : super(code, message, status: status);
+  const RequestException(super.code, super.message, {required int status}) : super(status: status);
 }
 
 class ServerException extends ApiException {
-  const ServerException(String code, String message, {required int status}) : super(code, message, status: status);
+  const ServerException(super.code, super.message, {required int status}) : super(status: status);
 }
 
 /// The API client for the Worker. Attaches `Authorization: Bearer <ID token>`,

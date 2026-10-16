@@ -94,11 +94,10 @@ class FirebaseAuthBackend implements AuthBackend {
 /// (offline on first launch is the usual reason), the app carries on without a
 /// UID and the sign-in is retried when connectivity comes back.
 class AuthService {
-  AuthService({required AuthBackend backend, Stream<bool>? onlineChanges})
-    : _backend = backend,
-      _onlineChanges = onlineChanges ?? _connectivityOnline();
+  AuthService({required this.backend, Stream<bool>? onlineChanges})
+    : _onlineChanges = onlineChanges ?? _connectivityOnline();
 
-  final AuthBackend _backend;
+  final AuthBackend backend;
   final Stream<bool> _onlineChanges;
 
   StreamSubscription<AuthState>? _authSub;
@@ -107,7 +106,7 @@ class AuthService {
   bool _started = false;
   final _states = StreamController<AuthState>.broadcast();
 
-  AuthState get current => _backend.current;
+  AuthState get current => backend.current;
 
   /// The current state first, then every change.
   Stream<AuthState> get states async* {
@@ -120,7 +119,7 @@ class AuthService {
   void start() {
     if (_started) return;
     _started = true;
-    _authSub = _backend.changes.listen(_states.add);
+    _authSub = backend.changes.listen(_states.add);
     _onlineSub = _onlineChanges.listen((online) {
       if (online) unawaited(ensureSignedIn());
     });
@@ -130,11 +129,11 @@ class AuthService {
   /// Signs in anonymously when there is no user. Safe to call repeatedly.
   /// Returns whether a user exists afterwards.
   Future<bool> ensureSignedIn() async {
-    if (_backend.current.hasUid) return true;
+    if (backend.current.hasUid) return true;
     if (_signingIn) return false;
     _signingIn = true;
     try {
-      await _backend.signInAnonymously();
+      await backend.signInAnonymously();
       return true;
     } catch (_) {
       // Offline or a transient Firebase error. The connectivity listener tries again.
@@ -146,7 +145,7 @@ class AuthService {
 
   /// The ID token for API calls, or null when there is no user yet.
   Future<String?> idToken({bool forceRefresh = false}) =>
-      _backend.idToken(forceRefresh: forceRefresh);
+      backend.idToken(forceRefresh: forceRefresh);
 
   Future<void> dispose() async {
     await _authSub?.cancel();
