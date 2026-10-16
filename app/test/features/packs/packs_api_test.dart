@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:yeman_zefen/core/http/api_client.dart';
 import 'package:yeman_zefen/features/packs/data/packs_api.dart';
 
 void main() {
@@ -21,15 +22,18 @@ void main() {
   test('lists packs from /v1/packs', () async {
     late Uri requested;
     final api = PacksApi(
-      baseUrl: 'https://api.test',
-      client: MockClient((request) async {
-        requested = request.url;
-        return http.Response(
-          jsonEncode({'packs': [listing]}),
-          200,
-          headers: {'content-type': 'application/json; charset=utf-8'},
-        );
-      }),
+      api: ApiClient(
+        baseUrl: 'https://api.test',
+        idToken: ({bool forceRefresh = false}) async => 'tok',
+        client: MockClient((request) async {
+          requested = request.url;
+          return http.Response(
+            jsonEncode({'packs': [listing]}),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+      ),
     );
 
     final packs = await api.listPacks();
@@ -43,17 +47,66 @@ void main() {
 
   test('fetches a manifest as raw text', () async {
     final api = PacksApi(
-      baseUrl: 'https://api.test',
-      client: MockClient((_) async => http.Response('{"schema":1}', 200)),
+      api: _apiReturning(200, '{}'),
+      cdnClient: MockClient((_) async => http.Response('{"schema":1}', 200)),
     );
     expect(await api.fetchManifestJson('https://cdn.test/m.json'), '{"schema":1}');
   });
 
-  test('a non-200 response throws', () async {
+  test('a manifest fetch that is not 200 throws', () async {
     final api = PacksApi(
-      baseUrl: 'https://api.test',
-      client: MockClient((_) async => http.Response('nope', 503)),
+      api: _apiReturning(200, '{}'),
+      cdnClient: MockClient((_) async => http.Response('nope', 503)),
     );
-    await expectLater(api.listPacks(), throwsA(isA<PacksApiException>()));
+    await expectLater(api.fetchManifestJson('https://cdn.test/m.json'), throwsA(isA<PacksApiException>()));
+  });
+
+  test('the ID token goes to the API but never to the CDN', () async {
+    String? apiAuth;
+    String? cdnAuth;
+    final api = PacksApi(
+      api: ApiClient(
+        baseUrl: 'https://api.test',
+        idToken: ({bool forceRefresh = false}) async => 'tok',
+        client: MockClient((request) async {
+          apiAuth = request.headers['Authorization'];
+          return http.Response('{"packs":[]}', 200);
+        }),
+      ),
+      cdnClient: MockClient((request) async {
+        cdnAuth = request.headers['Authorization'];
+        return http.Response('{}', 200);
+      }),
+    );
+    await api.listPacks();
+    await api.fetchManifestJson('https://cdn.test/m.json');
+    expect(apiAuth, 'Bearer tok');
+    expect(cdnAuth, isNull);
+  });
+
+  test('a /v1/packs body that is not a pack list throws BadResponseException', () async {
+    for (final body in ['', '{"items":[]}', '[]', '{"packs":[{"slug":1}]}']) {
+      final api = PacksApi(api: _apiReturning(200, body));
+      await expectLater(api.listPacks(), throwsA(isA<BadResponseException>()), reason: body);
+    }
+  });
+
+  test('a CDN that cannot be reached throws PacksApiException', () async {
+    final api = PacksApi(
+      api: _apiReturning(200, '{}'),
+      cdnClient: MockClient((_) async => throw http.ClientException('offline')),
+    );
+    await expectLater(api.fetchManifestJson('https://cdn.test/m.json'), throwsA(isA<PacksApiException>()));
+  });
+
+  test('a failed /v1/packs call throws a typed ApiException', () async {
+    final api = PacksApi(api: _apiReturning(503, '{"error":{"code":"unavailable","message":"down"}}'));
+    await expectLater(api.listPacks(), throwsA(isA<ServerException>()));
   });
 }
+
+ApiClient _apiReturning(int status, String body) => ApiClient(
+  baseUrl: 'https://api.test',
+  idToken: ({bool forceRefresh = false}) async => 'tok',
+  client: MockClient((_) async => http.Response(body, status)),
+);

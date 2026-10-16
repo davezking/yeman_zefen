@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/db/app_db.dart';
+import '../../../core/http/api_providers.dart';
 import '../domain/pack_install_progress.dart';
 import 'clip_downloader.dart';
 import 'pack_installer.dart';
@@ -12,8 +12,9 @@ import 'pack_service.dart';
 import 'packs_api.dart';
 
 final packsApiProvider = Provider<PacksApi>((ref) {
-  final api = PacksApi(baseUrl: AppConfig.apiBase);
-  ref.onDispose(api.close);
+  final api = PacksApi(api: ref.watch(apiClientProvider));
+  // The shared ApiClient is closed by its own provider; only the CDN client is ours.
+  ref.onDispose(api.closeCdn);
   return api;
 });
 

@@ -12,6 +12,8 @@ dependencies:
   connectivity_plus: ^7.3.2
   crypto: ^3.0.7
   drift: ^2.35.2
+  firebase_auth: ^6.1.0
+  firebase_core: ^4.2.0
   flutter:
     sdk: flutter
   flutter_localizations:

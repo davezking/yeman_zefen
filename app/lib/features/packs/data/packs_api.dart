@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/http/api_client.dart';
+
 class PackListing {
   const PackListing({
     required this.slug,
@@ -46,35 +48,45 @@ class PacksApiException implements Exception {
   String toString() => 'PacksApiException: $message';
 }
 
-/// Talks to the public pack endpoints of the API Worker and the CDN.
+/// Lists packs through the authenticated [ApiClient] and fetches manifests
+/// from the CDN with a plain client: the ID token goes only to the API.
 class PacksApi {
-  PacksApi({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  PacksApi({required this.api, http.Client? cdnClient}) : _cdn = cdnClient ?? http.Client();
 
-  final String baseUrl;
-  final http.Client _client;
+  final ApiClient api;
+  final http.Client _cdn;
 
   static const _timeout = Duration(seconds: 15);
 
+  /// Throws [ApiException] when the API call fails, including
+  /// [BadResponseException] when the body is not a pack list.
   Future<List<PackListing>> listPacks() async {
-    final body = await _get(Uri.parse('$baseUrl/v1/packs'));
-    final packs = (jsonDecode(body) as Map<String, dynamic>)['packs'] as List<dynamic>;
-    return [
-      for (final p in packs) PackListing.fromJson(p as Map<String, dynamic>),
-    ];
+    final body = await api.getJson('/v1/packs');
+    try {
+      final packs = (body as Map<String, dynamic>)['packs'] as List<dynamic>;
+      return [for (final p in packs) PackListing.fromJson(p as Map<String, dynamic>)];
+    } on TypeError {
+      // An empty body, or a shape this app version does not know.
+      throw const BadResponseException('/v1/packs did not return a pack list', status: 200);
+    }
   }
 
   /// Returns the raw manifest text, so the exact bytes that were verified are what gets stored.
-  Future<String> fetchManifestJson(String manifestUrl) =>
-      _get(Uri.parse(manifestUrl));
-
-  Future<String> _get(Uri uri) async {
-    final res = await _client.get(uri).timeout(_timeout);
+  /// Throws [PacksApiException] when the CDN cannot be reached or does not answer 200.
+  Future<String> fetchManifestJson(String manifestUrl) async {
+    final uri = Uri.parse(manifestUrl);
+    final http.Response res;
+    try {
+      res = await _cdn.get(uri).timeout(_timeout);
+    } catch (e) {
+      // Offline, timeout, DNS: one exception type for the packs screen.
+      throw PacksApiException('GET $uri failed: $e');
+    }
     if (res.statusCode != 200) {
       throw PacksApiException('GET $uri returned ${res.statusCode}');
     }
     return utf8.decode(res.bodyBytes);
   }
 
-  void close() => _client.close();
+  void closeCdn() => _cdn.close();
 }

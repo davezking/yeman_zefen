@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "613078882624",
+    "project_id": "yeman-zefen-prod",
+    "storage_bucket": "yeman-zefen-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613078882624:android:00305980084bd8a74882a5",
+        "android_client_info": {
+          "package_name": "com.yemanzefen.yeman_zefen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "613078882624-4ikvisd5f95i78tntvlh5f90evjgq1k0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDggq4gsEK-614XsjZmGxHIat3UtT3fNdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "613078882624-4ikvisd5f95i78tntvlh5f90evjgq1k0.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "613078882624-fn8tk5klgvu2bdmqbsthvutv3sc9s25p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.yemanzefen.yemanZefen"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
