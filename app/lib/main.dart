@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/audio/game_audio_session.dart';
+import 'core/auth/account_linker.dart';
 import 'core/auth/auth_service.dart';
 import 'core/config/app_config.dart';
 import 'core/config/firebase_bootstrap.dart';
@@ -21,6 +22,8 @@ Future<void> main() async {
   container.read(authServiceProvider);
   // Tells the server who the player is once signed in, and again on each app open (at most every 6 hours).
   container.read(profileSyncStarterProvider);
+  // Finishes the server side of an account link that was cut off (offline, or the app closed).
+  container.read(accountSyncStarterProvider);
   // The server's tunables: the cached ones before the first frame, the server's on every start.
   await primeRemoteConfig(container);
   container.read(remoteConfigStarterProvider);

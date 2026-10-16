@@ -108,17 +108,18 @@ const USER_TOUCH_SQL = `
   INSERT INTO users (id, display_name, is_anonymous, country, created_at, last_seen_at)
   VALUES (?1, NULL, ?2, ?3, ?4, ?4)
   ON CONFLICT (id) DO UPDATE SET
-    is_anonymous = excluded.is_anonymous,
+    is_anonymous = MIN(users.is_anonymous, excluded.is_anonymous),
     last_seen_at = excluded.last_seen_at,
     country = COALESCE(excluded.country, users.country)`;
 
 // Runs before the session insert in the same batch (a D1 batch is one transaction), so the
 // NOT EXISTS sees whether this id was already stored: a replay, even a concurrent one, adds
-// nothing. The shadow-ban check reads the row as it is at write time.
+// nothing. The registered and shadow-ban checks read the row as it is at write time (after the
+// user touch), so a guest token still cached right after linking counts for the account.
 const LEADERBOARD_SQL = `
   INSERT INTO leaderboard_entries (period, generation_id, user_id, points, updated_at)
   SELECT ?1, ?2, u.id, ?3, ?4 FROM users u
-   WHERE u.id = ?5 AND u.shadow_banned = 0
+   WHERE u.id = ?5 AND u.is_anonymous = 0 AND u.shadow_banned = 0
      AND NOT EXISTS (SELECT 1 FROM game_sessions WHERE id = ?6)
   ON CONFLICT (period, generation_id, user_id) DO UPDATE SET
     points = points + excluded.points,
@@ -258,7 +259,7 @@ sessions.post("/", async (c) => {
   const events: StoredEvents = { clientEndedAt: p.clientEndedAt, rounds, ads: p.ads };
 
   const statements = [DB.prepare(USER_TOUCH_SQL).bind(user.uid, user.isAnonymous ? 1 : 0, country, now)];
-  if (!user.isAnonymous && !flagged && score > 0) {
+  if (!flagged && score > 0) {
     // The server's clock decides the week, so a device clock cannot move points between weeks.
     const periods = [ALL_TIME, isoWeek(now)];
     const generations = p.generationId === 0 ? [0] : [0, p.generationId];

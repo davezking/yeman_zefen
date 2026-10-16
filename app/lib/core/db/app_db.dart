@@ -114,14 +114,36 @@ class RemoteConfigCache extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// The server step of an account link that has not gone through yet (offline, or a server error),
+/// so it is retried on the next start. At most one row. `kind` is `registered` or `merge`; a merge
+/// keeps the guest's ID token, which the server accepts for up to 30 days.
+class PendingAccountSync extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  TextColumn get kind => text()();
+  TextColumn get anonymousIdToken => text().nullable()();
+  IntColumn get createdAt => integer()(); // epoch ms, UTC
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
-  tables: [InstalledPacks, LocalTracks, PendingSessions, LocalBests, LocalCounters, RecentSessions, RemoteConfigCache],
+  tables: [
+    InstalledPacks,
+    LocalTracks,
+    PendingSessions,
+    LocalBests,
+    LocalCounters,
+    RecentSessions,
+    RemoteConfigCache,
+    PendingAccountSync,
+  ],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -144,6 +166,7 @@ class AppDb extends _$AppDb {
             if (from >= 3) await m.addColumn(recentSessions, recentSessions.serverScore);
           }
           if (from < 5) await m.createTable(remoteConfigCache);
+          if (from < 6) await m.createTable(pendingAccountSync);
         },
       );
 }

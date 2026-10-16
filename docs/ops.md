@@ -451,3 +451,14 @@ The app's tunables come from the Worker's vars: `CONFIG_INTERSTITIAL_EVERY_ROUND
 - **The Cache API works only when the Worker is served on a custom domain.** On `*.workers.dev`, `caches.default` stores nothing, so every request hits D1. Add a custom domain or route to `[env.prod]` in `wrangler.toml` before launch.
 - `GET /v1/leaderboard/me` is not cached. Its rank is a count over the points index minus the hidden (shadow-banned or deleted) users above the caller, read through `users_hidden_idx` (migration 0007). Apply it with `npx wrangler d1 migrations apply yz-db`.
 - Shadow-banning a user hides them from the cached board within about 75 s.
+
+## Account linking (Google, email, Apple)
+
+The app links a provider to the guest's Firebase user (`AccountLinker` in `app/lib/core/auth/account_linker.dart`). Linking keeps the uid, and the app then calls `POST /v1/me/registered`, which marks the user registered and rebuilds their leaderboard rows from their unflagged sessions. If the credential already belongs to another account, the app saves the guest's ID token, signs in to that account and calls `POST /v1/me/merge`. The server moves the guest's sessions to the account, deletes the guest row and rebuilds the account's rows. Both calls are safe to repeat. A server step that fails (offline) is kept in the `pending_account_sync` table and retried on the next start. The server accepts a guest token up to 30 days old for this.
+
+Setup before these work on a device:
+- **Firebase console → Authentication → Sign-in method:** enable Google, Email/Password and Apple.
+- **Google on Android:** add the release and debug SHA-1 fingerprints to the Android app in Firebase. Set `GOOGLE_SERVER_CLIENT_ID` in `app/config/<flavor>.json` to the project's **Web** OAuth client id (Google Cloud → Credentials). With it empty, the app offers no Google button.
+- **Google on iOS:** add the `REVERSED_CLIENT_ID` URL scheme from `GoogleService-Info.plist` to `ios/Runner/Info.plist`.
+- **Apple:** turn on the *Sign in with Apple* capability for the iOS app in Xcode and the Apple Developer portal. Apple is offered on iOS only. Set `APPLE_ON_ANDROID` to `true` to offer it on Android, which also needs a Services ID and return URL.
+- Merges are logged as `guest_merged` with both uids. Rejected guest tokens are logged as `merge_token_rejected`.

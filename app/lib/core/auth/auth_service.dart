@@ -57,6 +57,41 @@ abstract class AuthBackend {
 
   /// A fresh-enough ID token for the signed-in user, or null when signed out.
   Future<String?> idToken({bool forceRefresh = false});
+
+  /// Adds [credential] to the signed-in user, keeping the uid. Throws
+  /// [CredentialInUseException] when it already belongs to another account,
+  /// and [AuthFailure] for anything else.
+  Future<void> linkWithCredential(AuthCredential credential);
+
+  /// Signs in as the account [credential] belongs to. Throws [AuthFailure].
+  Future<void> signInWithCredential(AuthCredential credential);
+
+  /// Throws [AuthFailure].
+  Future<void> sendPasswordResetEmail(String email);
+}
+
+/// The credential belongs to another Firebase account (`credential-already-in-use`, or
+/// `email-already-in-use` for email). [credential] is the one to sign in with: Firebase hands back
+/// a fresh one for Google and Apple, whose original cannot be used twice.
+class CredentialInUseException implements Exception {
+  const CredentialInUseException(this.credential);
+
+  final AuthCredential credential;
+
+  @override
+  String toString() => 'CredentialInUseException(${credential.providerId})';
+}
+
+/// A Firebase Auth error the UI shows, by its Firebase code (`wrong-password`,
+/// `invalid-email`, `weak-password`, `network-request-failed`, ...).
+class AuthFailure implements Exception {
+  const AuthFailure(this.code, [this.message]);
+
+  final String code;
+  final String? message;
+
+  @override
+  String toString() => 'AuthFailure($code${message == null ? '' : ': $message'})';
 }
 
 class FirebaseAuthBackend implements AuthBackend {
@@ -86,6 +121,38 @@ class FirebaseAuthBackend implements AuthBackend {
   @override
   Future<String?> idToken({bool forceRefresh = false}) async =>
       _auth.currentUser?.getIdToken(forceRefresh);
+
+  @override
+  Future<void> linkWithCredential(AuthCredential credential) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure('no-current-user');
+    try {
+      await user.linkWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'credential-already-in-use' || e.code == 'email-already-in-use') {
+        throw CredentialInUseException(e.credential ?? credential);
+      }
+      throw AuthFailure(e.code, e.message);
+    }
+  }
+
+  @override
+  Future<void> signInWithCredential(AuthCredential credential) async {
+    try {
+      await _auth.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
+    }
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
+    }
+  }
 }
 
 typedef RetryTimerFactory = Timer Function(Duration delay, void Function() callback);

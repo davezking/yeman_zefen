@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart' show AuthCredential;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/auth/auth_service.dart';
 
@@ -36,6 +37,15 @@ class FakeBackend implements AuthBackend {
 
   @override
   Future<String?> idToken({bool forceRefresh = false}) async => _current.hasUid ? 'token' : null;
+
+  @override
+  Future<void> linkWithCredential(AuthCredential credential) => throw UnimplementedError();
+
+  @override
+  Future<void> signInWithCredential(AuthCredential credential) => throw UnimplementedError();
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) => throw UnimplementedError();
 }
 
 /// Records retry timers instead of waiting for them.

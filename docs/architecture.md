@@ -176,7 +176,8 @@ All JSON. Errors use the shape `{ error: { code, message } }`. Versioned under `
 | `GET /v1/packs` | Published packs with current version, size, track count, manifest URL |
 | `PUT /v1/me` | Upsert user (display name, country from `cf.country`), updates last_seen |
 | `DELETE /v1/me` | Account deletion (required by both stores); anonymizes sessions, removes leaderboard rows |
-| `POST /v1/me/merge` | Conflict-case merge: body carries the old anonymous ID token; moves its sessions into the caller's account |
+| `POST /v1/me/registered` | After linking kept the uid (registered only): marks the user registered and rebuilds their leaderboard rows from their sessions |
+| `POST /v1/me/merge` | Conflict-case merge (registered only): body carries the old anonymous ID token (accepted up to 30 days old); moves its sessions into the caller's account and rebuilds the caller's leaderboard rows. 409 if that uid is not a guest |
 | `POST /v1/sessions` | Submit a session's round events plus ad event counts. Idempotent on `id`. Returns the computed score. |
 | `GET /v1/leaderboard?period=all\|week&generation=` | Top 100. Registered, non-shadow-banned users only. |
 | `GET /v1/leaderboard/me?period=&generation=` | Caller's points and rank (registered only) |
