@@ -14,3 +14,13 @@ export function isoWeek(ms: number): string {
   const week = Math.floor((thursday - Date.UTC(year, 0, 1)) / DAY_MS / 7) + 1;
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
+
+/** The ISO week of `date` (default: now). Same as `isoWeek`, for callers holding a Date. */
+export function currentIsoWeek(date: Date = new Date()): string {
+  return isoWeek(date.getTime());
+}
+
+/** The stored period key for a request's `period` choice at time `now`. */
+export function periodKey(period: "all" | "week", now: number): string {
+  return period === "all" ? ALL_TIME : currentIsoWeek(new Date(now));
+}

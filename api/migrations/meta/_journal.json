@@ -50,6 +50,13 @@
       "when": 1792157584523,
       "tag": "0006_deleted_user_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792183597453,
+      "tag": "0007_leaderboard_hidden_users",
+      "breakpoints": true
     }
   ]
 }

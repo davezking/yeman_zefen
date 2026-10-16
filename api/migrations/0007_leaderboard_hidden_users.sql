@@ -1,0 +1,1 @@
+CREATE INDEX `users_hidden_idx` ON `users` (`id`) WHERE "users"."shadow_banned" = 1 OR "users"."deleted_at" IS NOT NULL;
