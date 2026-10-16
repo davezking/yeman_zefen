@@ -277,9 +277,9 @@ describe("/v1 routing", () => {
     expect((await worker("/v1/packs")).status).toBe(200);
   });
 
-  it("GET /v1/config is not behind auth (404 until the route exists in P3S2)", async () => {
+  it("GET /v1/config is not behind auth", async () => {
     jwksServer.fail = true; // auth would answer 503; the public path never reaches it
-    expect((await worker("/v1/config")).status).toBe(404);
+    expect((await worker("/v1/config")).status).toBe(200);
   });
 
   it("any other /v1 route needs a token", async () => {

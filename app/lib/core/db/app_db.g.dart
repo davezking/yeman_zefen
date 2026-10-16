@@ -2465,6 +2465,216 @@ class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
   }
 }
 
+class $RemoteConfigCacheTable extends RemoteConfigCache
+    with TableInfo<$RemoteConfigCacheTable, RemoteConfigCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RemoteConfigCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _jsonMeta = const VerificationMeta('json');
+  @override
+  late final GeneratedColumn<String> json = GeneratedColumn<String>(
+    'json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, json];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'remote_config_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RemoteConfigCacheData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('json')) {
+      context.handle(
+        _jsonMeta,
+        json.isAcceptableOrUnknown(data['json']!, _jsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_jsonMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  RemoteConfigCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RemoteConfigCacheData(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      json: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}json'],
+      )!,
+    );
+  }
+
+  @override
+  $RemoteConfigCacheTable createAlias(String alias) {
+    return $RemoteConfigCacheTable(attachedDatabase, alias);
+  }
+}
+
+class RemoteConfigCacheData extends DataClass
+    implements Insertable<RemoteConfigCacheData> {
+  final String key;
+  final String json;
+  const RemoteConfigCacheData({required this.key, required this.json});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['json'] = Variable<String>(json);
+    return map;
+  }
+
+  RemoteConfigCacheCompanion toCompanion(bool nullToAbsent) {
+    return RemoteConfigCacheCompanion(key: Value(key), json: Value(json));
+  }
+
+  factory RemoteConfigCacheData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RemoteConfigCacheData(
+      key: serializer.fromJson<String>(json['key']),
+      json: serializer.fromJson<String>(json['json']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'json': serializer.toJson<String>(json),
+    };
+  }
+
+  RemoteConfigCacheData copyWith({String? key, String? json}) =>
+      RemoteConfigCacheData(key: key ?? this.key, json: json ?? this.json);
+  RemoteConfigCacheData copyWithCompanion(RemoteConfigCacheCompanion data) {
+    return RemoteConfigCacheData(
+      key: data.key.present ? data.key.value : this.key,
+      json: data.json.present ? data.json.value : this.json,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteConfigCacheData(')
+          ..write('key: $key, ')
+          ..write('json: $json')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, json);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RemoteConfigCacheData &&
+          other.key == this.key &&
+          other.json == this.json);
+}
+
+class RemoteConfigCacheCompanion
+    extends UpdateCompanion<RemoteConfigCacheData> {
+  final Value<String> key;
+  final Value<String> json;
+  final Value<int> rowid;
+  const RemoteConfigCacheCompanion({
+    this.key = const Value.absent(),
+    this.json = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RemoteConfigCacheCompanion.insert({
+    required String key,
+    required String json,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       json = Value(json);
+  static Insertable<RemoteConfigCacheData> custom({
+    Expression<String>? key,
+    Expression<String>? json,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (json != null) 'json': json,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RemoteConfigCacheCompanion copyWith({
+    Value<String>? key,
+    Value<String>? json,
+    Value<int>? rowid,
+  }) {
+    return RemoteConfigCacheCompanion(
+      key: key ?? this.key,
+      json: json ?? this.json,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (json.present) {
+      map['json'] = Variable<String>(json.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RemoteConfigCacheCompanion(')
+          ..write('key: $key, ')
+          ..write('json: $json, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -2476,6 +2686,8 @@ abstract class _$AppDb extends GeneratedDatabase {
   late final $LocalBestsTable localBests = $LocalBestsTable(this);
   late final $LocalCountersTable localCounters = $LocalCountersTable(this);
   late final $RecentSessionsTable recentSessions = $RecentSessionsTable(this);
+  late final $RemoteConfigCacheTable remoteConfigCache =
+      $RemoteConfigCacheTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2487,6 +2699,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     localBests,
     localCounters,
     recentSessions,
+    remoteConfigCache,
   ];
 }
 
@@ -3831,6 +4044,164 @@ typedef $$RecentSessionsTableProcessedTableManager =
       RecentSession,
       PrefetchHooks Function()
     >;
+typedef $$RemoteConfigCacheTableCreateCompanionBuilder =
+    RemoteConfigCacheCompanion Function({
+      required String key,
+      required String json,
+      Value<int> rowid,
+    });
+typedef $$RemoteConfigCacheTableUpdateCompanionBuilder =
+    RemoteConfigCacheCompanion Function({
+      Value<String> key,
+      Value<String> json,
+      Value<int> rowid,
+    });
+
+class $$RemoteConfigCacheTableFilterComposer
+    extends Composer<_$AppDb, $RemoteConfigCacheTable> {
+  $$RemoteConfigCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get json => $composableBuilder(
+    column: $table.json,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RemoteConfigCacheTableOrderingComposer
+    extends Composer<_$AppDb, $RemoteConfigCacheTable> {
+  $$RemoteConfigCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get json => $composableBuilder(
+    column: $table.json,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RemoteConfigCacheTableAnnotationComposer
+    extends Composer<_$AppDb, $RemoteConfigCacheTable> {
+  $$RemoteConfigCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get json =>
+      $composableBuilder(column: $table.json, builder: (column) => column);
+}
+
+class $$RemoteConfigCacheTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $RemoteConfigCacheTable,
+          RemoteConfigCacheData,
+          $$RemoteConfigCacheTableFilterComposer,
+          $$RemoteConfigCacheTableOrderingComposer,
+          $$RemoteConfigCacheTableAnnotationComposer,
+          $$RemoteConfigCacheTableCreateCompanionBuilder,
+          $$RemoteConfigCacheTableUpdateCompanionBuilder,
+          (
+            RemoteConfigCacheData,
+            BaseReferences<
+              _$AppDb,
+              $RemoteConfigCacheTable,
+              RemoteConfigCacheData
+            >,
+          ),
+          RemoteConfigCacheData,
+          PrefetchHooks Function()
+        > {
+  $$RemoteConfigCacheTableTableManager(
+    _$AppDb db,
+    $RemoteConfigCacheTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RemoteConfigCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RemoteConfigCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RemoteConfigCacheTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback: ({
+            Value<String> key = const Value.absent(),
+            Value<String> json = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => RemoteConfigCacheCompanion(key: key, json: json, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String json,
+                Value<int> rowid = const Value.absent(),
+              }) => RemoteConfigCacheCompanion.insert(
+                key: key,
+                json: json,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$RemoteConfigCacheTable, RemoteConfigCacheData>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDb,
+                    $RemoteConfigCacheTable,
+                    RemoteConfigCacheData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RemoteConfigCacheTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $RemoteConfigCacheTable,
+      RemoteConfigCacheData,
+      $$RemoteConfigCacheTableFilterComposer,
+      $$RemoteConfigCacheTableOrderingComposer,
+      $$RemoteConfigCacheTableAnnotationComposer,
+      $$RemoteConfigCacheTableCreateCompanionBuilder,
+      $$RemoteConfigCacheTableUpdateCompanionBuilder,
+      (
+        RemoteConfigCacheData,
+        BaseReferences<_$AppDb, $RemoteConfigCacheTable, RemoteConfigCacheData>,
+      ),
+      RemoteConfigCacheData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -3847,4 +4218,6 @@ class $AppDbManager {
       $$LocalCountersTableTableManager(_db, _db.localCounters);
   $$RecentSessionsTableTableManager get recentSessions =>
       $$RecentSessionsTableTableManager(_db, _db.recentSessions);
+  $$RemoteConfigCacheTableTableManager get remoteConfigCache =>
+      $$RemoteConfigCacheTableTableManager(_db, _db.remoteConfigCache);
 }

@@ -104,14 +104,24 @@ class RecentSessions extends Table {
   Set<Column> get primaryKey => {sessionId};
 }
 
+/// The last `GET /v1/config` answer as JSON (one row, key `config`), so a launch with no network
+/// still uses the server's tunables. Empty until the first successful fetch.
+class RemoteConfigCache extends Table {
+  TextColumn get key => text()();
+  TextColumn get json => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 @DriftDatabase(
-  tables: [InstalledPacks, LocalTracks, PendingSessions, LocalBests, LocalCounters, RecentSessions],
+  tables: [InstalledPacks, LocalTracks, PendingSessions, LocalBests, LocalCounters, RecentSessions, RemoteConfigCache],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -133,6 +143,7 @@ class AppDb extends _$AppDb {
             // recent_sessions made by the `from < 3` step above already has this column.
             if (from >= 3) await m.addColumn(recentSessions, recentSessions.serverScore);
           }
+          if (from < 5) await m.createTable(remoteConfigCache);
         },
       );
 }

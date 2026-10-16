@@ -831,4 +831,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loadingGeneric => 'Loading…';
+
+  @override
+  String get updateRequiredTitle => 'Update needed';
+
+  @override
+  String get updateRequiredBody =>
+      'This version of the app is out of date. Please update to keep playing.';
+
+  @override
+  String get updateRequiredButton => 'Update app';
 }

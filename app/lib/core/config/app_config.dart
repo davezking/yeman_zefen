@@ -4,6 +4,8 @@ class AppConfig {
 
   static const flavor = String.fromEnvironment('APP_FLAVOR');
   static const apiBase = String.fromEnvironment('API_BASE');
+  /// Where the update screen sends players (the Play Store listing). Empty: the screen shows no button.
+  static const storeUrl = String.fromEnvironment('STORE_URL');
 
   /// Fails fast when the app was built without a config file, rather than
   /// sending requests to an empty base URL.

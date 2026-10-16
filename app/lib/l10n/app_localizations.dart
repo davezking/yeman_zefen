@@ -1513,6 +1513,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading…'**
   String get loadingGeneric;
+
+  /// Title of the screen shown when this app version is too old to play
+  ///
+  /// In en, this message translates to:
+  /// **'Update needed'**
+  String get updateRequiredTitle;
+
+  /// No description provided for @updateRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app is out of date. Please update to keep playing.'**
+  String get updateRequiredBody;
+
+  /// Button that opens the app store listing
+  ///
+  /// In en, this message translates to:
+  /// **'Update app'**
+  String get updateRequiredButton;
 }
 
 class _AppLocalizationsDelegate

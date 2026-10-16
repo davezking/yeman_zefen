@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/config/remote_config.dart';
+import 'core/config/update_required_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/debug/sessions_debug_screen.dart';
@@ -37,16 +40,21 @@ GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
 
 final _router = buildRouter();
 
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final updateRequired = ref.watch(updateRequiredProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: _themeFor(const Locale('en')),
       // The theme depends on the language, which is only known below MaterialApp.
-      builder: (context, child) => Theme(data: _themeFor(Localizations.localeOf(context)), child: child!),
+      // An app too old to play shows only the update screen; the router below is not built.
+      builder: (context, child) => Theme(
+        data: _themeFor(Localizations.localeOf(context)),
+        child: updateRequired ? const UpdateRequiredScreen() : child!,
+      ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: _router,

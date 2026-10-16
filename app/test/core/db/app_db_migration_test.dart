@@ -111,4 +111,23 @@ void main() {
     expect(queued.lastStatus, isNull);
     expect((await db.select(db.recentSessions).getSingle()).serverScore, isNull);
   });
+
+  test('upgrading from schema 4 keeps rows and adds the remote config cache', () async {
+    final db = AppDb(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('CREATE TABLE local_counters (name TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, '
+              'PRIMARY KEY (name))');
+          raw.execute("INSERT INTO local_counters (name, count) VALUES ('clip_errors', 3)");
+          raw.execute('PRAGMA user_version = 4');
+        },
+      ),
+    );
+    addTearDown(db.close);
+
+    expect((await db.select(db.localCounters).getSingle()).count, 3);
+    expect(await db.select(db.remoteConfigCache).get(), isEmpty);
+    await db.into(db.remoteConfigCache).insert(RemoteConfigCacheCompanion.insert(key: 'config', json: '{}'));
+    expect(await db.select(db.remoteConfigCache).get(), hasLength(1));
+  });
 }
