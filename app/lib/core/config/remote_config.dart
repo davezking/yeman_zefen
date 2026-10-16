@@ -51,24 +51,23 @@ class RemoteConfig {
   /// so a bad answer never replaces a good cached one.
   factory RemoteConfig.fromJson(Object? json) {
     if (json is! Map<String, Object?>) throw const FormatException('the config is not an object');
-    int count(String key) {
+    // The same bounds as the server (api/src/lib/remoteConfig.ts), so a bad answer is refused here too.
+    int count(String key, {int min = 0, int max = 1000}) {
       final v = json[key];
-      if (v is int && v >= 0) return v;
-      throw FormatException('$key is not a whole number');
+      if (v is int && v >= min && v <= max) return v;
+      throw FormatException('$key is not a whole number from $min to $max');
     }
 
     final minVersion = json['minAppVersion'];
     if (minVersion is! String || !_version.hasMatch(minVersion)) {
       throw const FormatException('minAppVersion is not major.minor.patch');
     }
-    final clip = count('defaultClipMs');
-    if (clip < 1000) throw const FormatException('defaultClipMs is under one second');
     return RemoteConfig(
-      interstitialEveryRounds: count('interstitialEveryRounds'),
+      interstitialEveryRounds: count('interstitialEveryRounds', min: 1),
       registerPromptAfterSessions: count('registerPromptAfterSessions'),
       registerPromptCooldownDays: count('registerPromptCooldownDays'),
       minAppVersion: minVersion,
-      defaultClipMs: clip,
+      defaultClipMs: count('defaultClipMs', min: 1000, max: 60000),
     );
   }
 
@@ -153,19 +152,26 @@ class RemoteConfigService {
   /// The config to start with: the last one the server sent, else [RemoteConfig.defaults].
   Future<RemoteConfig> cached() async => (await store.read()) ?? RemoteConfig.defaults;
 
-  /// Asks the server. On a good answer, stores it and returns it. Offline, a server error or a
-  /// bad answer returns [current] and leaves the stored config alone.
+  /// Asks the server. On a good answer, stores it and returns it (even if storing fails: the app
+  /// still uses it this launch). Offline, a server error or a bad answer returns [current] and
+  /// leaves the stored config alone.
   Future<RemoteConfig> refresh(RemoteConfig current) async {
+    final RemoteConfig fresh;
     try {
-      final fresh = RemoteConfig.fromJson(await api.getJson('/v1/config'));
-      await store.write(fresh);
-      return fresh;
+      fresh = RemoteConfig.fromJson(await api.getJson('/v1/config'));
     } on ApiException catch (e) {
       developer.log('config not refreshed: $e', name: 'remote_config');
+      return current;
     } on FormatException catch (e) {
       developer.log('config not refreshed: $e', name: 'remote_config');
+      return current;
     }
-    return current;
+    try {
+      await store.write(fresh);
+    } catch (e, st) {
+      developer.log('config not cached', name: 'remote_config', error: e, stackTrace: st);
+    }
+    return fresh;
   }
 }
 
@@ -197,18 +203,31 @@ final updateRequiredProvider = Provider<bool>((ref) {
   return isBelowMinimum(version, ref.watch(remoteConfigProvider).minAppVersion);
 });
 
-/// Loads the cached config (so an offline launch has the server's values), then asks the server.
-/// Read once in main.dart, so it runs on every app start.
+/// Applies the cached config (so an offline launch has the server's values) and reads the installed
+/// version. main.dart awaits this before the first frame, so an app that the cached config blocks
+/// never shows its screens first. Local reads only; never throws.
+Future<void> primeRemoteConfig(ProviderContainer container) async {
+  try {
+    container.read(remoteConfigProvider.notifier).replace(await container.read(remoteConfigServiceProvider).cached());
+  } catch (e, st) {
+    developer.log('cached config not loaded', name: 'remote_config', error: e, stackTrace: st);
+  }
+  try {
+    await container.read(appVersionProvider.future);
+  } catch (e, st) {
+    developer.log('app version not read', name: 'remote_config', error: e, stackTrace: st);
+  }
+}
+
+/// Asks the server for the config, once per app start (read in main.dart after [primeRemoteConfig]).
 final remoteConfigStarterProvider = Provider<void>((ref) {
   final service = ref.watch(remoteConfigServiceProvider);
   final notifier = ref.read(remoteConfigProvider.notifier);
   unawaited(() async {
     try {
-      final cached = await service.cached();
-      notifier.replace(cached);
-      notifier.replace(await service.refresh(cached));
+      notifier.replace(await service.refresh(ref.read(remoteConfigProvider)));
     } catch (e, st) {
-      developer.log('config load failed', name: 'remote_config', error: e, stackTrace: st);
+      developer.log('config refresh failed', name: 'remote_config', error: e, stackTrace: st);
     }
   }());
 });

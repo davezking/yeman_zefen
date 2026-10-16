@@ -1,5 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import app from "../src/index";
+import wranglerToml from "../wrangler.toml?raw";
 import { describe, expect, it } from "vitest";
 
 const DEFAULTS = {
@@ -40,6 +41,9 @@ describe("GET /v1/config", () => {
     ["CONFIG_REGISTER_PROMPT_AFTER_SESSIONS", "-1"],
     ["CONFIG_MIN_APP_VERSION", "1.2"],
     ["CONFIG_DEFAULT_CLIP_MS", "500"],
+    ["CONFIG_REGISTER_PROMPT_AFTER_SESSIONS", ""],
+    ["CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS", " "],
+    ["CONFIG_DEFAULT_CLIP_MS", "1e4"],
     ["CONFIG_DEFAULT_CLIP_MS", undefined as unknown as string],
   ])("a bad %s (%s) is a 500 that names the var", async (name, value) => {
     const bad = { ...env, [name]: value };
@@ -48,5 +52,19 @@ describe("GET /v1/config", () => {
     const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe("config_invalid");
     expect(body.error.message).toContain(name);
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("every CONFIG_ var is set for prod too (environments do not inherit vars)", () => {
+    const section = (header: string) => {
+      const start = wranglerToml.indexOf(`[${header}]\n`);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const rest = wranglerToml.slice(start + header.length + 3);
+      return rest.slice(0, rest.search(/^\[/m) === -1 ? undefined : rest.search(/^\[/m));
+    };
+    const names = (text: string) => [...text.matchAll(/^(CONFIG_[A-Z_]+) = /gm)].map((m) => m[1]).sort();
+    const dev = names(section("vars"));
+    expect(dev).toHaveLength(5);
+    expect(names(section("env.prod.vars"))).toEqual(dev);
   });
 });

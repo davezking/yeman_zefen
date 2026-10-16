@@ -21,7 +21,8 @@ Future<void> main() async {
   container.read(authServiceProvider);
   // Tells the server who the player is once signed in, and again on each app open (at most every 6 hours).
   container.read(profileSyncStarterProvider);
-  // The server's tunables: the cached ones at once, the server's on every start.
+  // The server's tunables: the cached ones before the first frame, the server's on every start.
+  await primeRemoteConfig(container);
   container.read(remoteConfigStarterProvider);
   // Uploads finished sessions: on start, once signed in, when back online, after each session, on resume.
   container.read(sessionSyncStarterProvider);

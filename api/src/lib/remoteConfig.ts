@@ -18,16 +18,18 @@ export type RemoteConfig = {
 };
 
 const version = z.string().regex(/^\d+\.\d+\.\d+$/, "must look like 1.2.3");
-const count = z.coerce.number().int().min(0).max(1000);
+// Digits only: coercing would read "" or " " as 0 and "1e3" as 1000.
+const whole = (min: number, max: number) =>
+  z.string().regex(/^\d+$/, "must be a whole number").transform(Number).pipe(z.number().min(min).max(max));
 
 // The vars as wrangler sets them (strings). A bad value is a 500 that names the var: the app then
 // keeps its cached or built-in values, so a typo must be loud here rather than silently default.
 const VARS = {
-  interstitialEveryRounds: ["CONFIG_INTERSTITIAL_EVERY_ROUNDS", count.min(1)],
-  registerPromptAfterSessions: ["CONFIG_REGISTER_PROMPT_AFTER_SESSIONS", count],
-  registerPromptCooldownDays: ["CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS", count],
+  interstitialEveryRounds: ["CONFIG_INTERSTITIAL_EVERY_ROUNDS", whole(1, 1000)],
+  registerPromptAfterSessions: ["CONFIG_REGISTER_PROMPT_AFTER_SESSIONS", whole(0, 1000)],
+  registerPromptCooldownDays: ["CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS", whole(0, 1000)],
   minAppVersion: ["CONFIG_MIN_APP_VERSION", version],
-  defaultClipMs: ["CONFIG_DEFAULT_CLIP_MS", z.coerce.number().int().min(1000).max(60_000)],
+  defaultClipMs: ["CONFIG_DEFAULT_CLIP_MS", whole(1000, 60_000)],
 } as const;
 
 /** The current config, read from the Worker's vars. */

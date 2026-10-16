@@ -67,6 +67,8 @@ void main() {
       'a text count': {..._server, 'registerPromptCooldownDays': '3'},
       'a version without patch': {..._server, 'minAppVersion': '1.2'},
       'a clip under a second': {..._server, 'defaultClipMs': 500},
+      'a clip over a minute': {..._server, 'defaultClipMs': 60001},
+      'no rounds between ads': {..._server, 'interstitialEveryRounds': 0},
     };
     bad.forEach((name, json) {
       test('refuses $name', () {
@@ -139,6 +141,11 @@ void main() {
     });
   });
 
+  test('a good answer is used this launch even when storing it fails', () async {
+    final service = _service(answer: _ok, store: _FailingStore());
+    expect(await service.refresh(RemoteConfig.defaults), RemoteConfig.fromJson(_server));
+  });
+
   group('DbRemoteConfigStore', () {
     test('stores, reads back, and treats a corrupt row as nothing stored', () async {
       final db = AppDb(NativeDatabase.memory());
@@ -182,12 +189,33 @@ void main() {
       expect(c.read(updateRequiredProvider), isTrue);
     });
 
+    test('primeRemoteConfig applies a cached block before the first frame', () async {
+      final store = _MemoryStore(RemoteConfig.defaults.toJsonWith(minAppVersion: '0.3.0'));
+      final api = ApiClient(baseUrl: 'https://api.test', idToken: ({bool forceRefresh = false}) async => null,
+          client: MockClient((_) async => throw http.ClientException('offline')));
+      final c = ProviderContainer(overrides: [
+        remoteConfigServiceProvider.overrideWithValue(RemoteConfigService(api: api, store: store)),
+      ]);
+      addTearDown(c.dispose);
+      expect(c.read(updateRequiredProvider), isFalse);
+      await primeRemoteConfig(c);
+      expect(c.read(updateRequiredProvider), isTrue);
+    });
+
     test('is false when the installed version meets the minimum', () async {
       final c = container('0.1.0');
       await c.read(appVersionProvider.future);
       expect(c.read(updateRequiredProvider), isFalse);
     });
   });
+}
+
+class _FailingStore implements RemoteConfigStore {
+  @override
+  Future<RemoteConfig?> read() async => null;
+
+  @override
+  Future<void> write(RemoteConfig config) => Future.error(StateError('disk full'));
 }
 
 class _FixedConfig extends RemoteConfigNotifier {

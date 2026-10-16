@@ -27,8 +27,10 @@ v1.route("/sessions", sessions);
 
 // Tunables for the app (public, see PUBLIC_ROUTES). Cached for 10 minutes at the edge and in the app.
 v1.get("/config", (c) => {
+  // Read first: a config_invalid 500 must not carry the cache header.
+  const config = remoteConfig(c.env);
   c.header("Cache-Control", "public, max-age=600");
-  return c.json(remoteConfig(c.env));
+  return c.json(config);
 });
 
 // Published packs at their current version. The app downloads each manifest from `manifestUrl`.
