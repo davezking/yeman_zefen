@@ -6,6 +6,7 @@ import 'core/audio/game_audio_session.dart';
 import 'core/auth/auth_service.dart';
 import 'core/config/app_config.dart';
 import 'core/config/firebase_bootstrap.dart';
+import 'core/config/remote_config.dart';
 import 'core/profile/profile_sync.dart';
 import 'features/game/application/session_sync_providers.dart';
 
@@ -20,6 +21,8 @@ Future<void> main() async {
   container.read(authServiceProvider);
   // Tells the server who the player is once signed in, and again on each app open (at most every 6 hours).
   container.read(profileSyncStarterProvider);
+  // The server's tunables: the cached ones at once, the server's on every start.
+  container.read(remoteConfigStarterProvider);
   // Uploads finished sessions: on start, once signed in, when back online, after each session, on resume.
   container.read(sessionSyncStarterProvider);
   runApp(UncontrolledProviderScope(container: container, child: const App()));

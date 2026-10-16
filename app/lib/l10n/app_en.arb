@@ -501,5 +501,14 @@
   "errorPackCorrupt": "Part of this pack didn't download correctly. Downloading it again…",
   "errorSync": "Couldn't send your scores. We'll try again automatically.",
   "loadingApp": "Tuning up…",
-  "loadingGeneric": "Loading…"
+  "loadingGeneric": "Loading…",
+  "updateRequiredTitle": "Update needed",
+  "@updateRequiredTitle": {
+    "description": "Title of the screen shown when this app version is too old to play"
+  },
+  "updateRequiredBody": "This version of the app is out of date. Please update to keep playing.",
+  "updateRequiredButton": "Update app",
+  "@updateRequiredButton": {
+    "description": "Button that opens the app store listing"
+  }
 }

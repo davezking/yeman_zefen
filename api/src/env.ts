@@ -24,6 +24,12 @@ export type Bindings = {
   /** Secrets. An R2 API token that can read `yz-source`: `wrangler secret put R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. */
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
+  /** Remote config tunables (GET /v1/config). Plain vars in wrangler.toml; see src/lib/remoteConfig.ts. */
+  CONFIG_INTERSTITIAL_EVERY_ROUNDS: string;
+  CONFIG_REGISTER_PROMPT_AFTER_SESSIONS: string;
+  CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS: string;
+  CONFIG_MIN_APP_VERSION: string;
+  CONFIG_DEFAULT_CLIP_MS: string;
   /** Dev-only: when ENV=dev, lets a request with no Access header act as this admin email. */
   DEV_ADMIN_EMAIL?: string;
 };

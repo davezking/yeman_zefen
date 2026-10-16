@@ -235,5 +235,8 @@
   "errorPackCorrupt": "የጥቅሉ የተወሰነ ክፍል በትክክል አልወረደም። እንደገና በማውረድ ላይ…",
   "errorSync": "ውጤቶችዎን መላክ አልተቻለም። በራሱ እንደገና ይሞክራል።",
   "loadingApp": "በመዘጋጀት ላይ…",
-  "loadingGeneric": "በመጫን ላይ…"
+  "loadingGeneric": "በመጫን ላይ…",
+  "updateRequiredTitle": "ዝማኔ ያስፈልጋል",
+  "updateRequiredBody": "ይህ የመተግበሪያ ስሪት ጊዜው አልፎበታል። መጫወቱን ለመቀጠል እባክዎ ያዘምኑ።",
+  "updateRequiredButton": "መተግበሪያውን አዘምን"
 }

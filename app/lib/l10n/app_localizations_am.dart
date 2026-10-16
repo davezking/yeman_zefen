@@ -820,4 +820,14 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get loadingGeneric => 'በመጫን ላይ…';
+
+  @override
+  String get updateRequiredTitle => 'ዝማኔ ያስፈልጋል';
+
+  @override
+  String get updateRequiredBody =>
+      'ይህ የመተግበሪያ ስሪት ጊዜው አልፎበታል። መጫወቱን ለመቀጠል እባክዎ ያዘምኑ።';
+
+  @override
+  String get updateRequiredButton => 'መተግበሪያውን አዘምን';
 }

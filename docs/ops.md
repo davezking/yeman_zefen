@@ -436,3 +436,11 @@ A Cron Trigger (`30 0 * * *`, UTC; `api/src/cron/rollups.ts`) rolls the previous
 - **Missed nights fill themselves.** Each run rolls up yesterday and any day of the last 7 with no `sessions` row, at most 6 days per run (Free plan: 50 D1 queries per invocation). A failing day does not stop the others; the run then fails visibly and the next one retries it. Each day logs `rollup <date>: sessions=.. rounds=.. royalty_rows=.. ad_rows=.. analytics_rows=..`.
 - **Backfill or fix a day:** `POST /admin/rollups/run { "date": "2026-10-14" }` (admins only; the day must have ended, UTC). Answers with the same summary.
 - **Prod:** `npm run deploy` registers the trigger (`[env.prod.triggers]`); the dev worker has none (try it with `wrangler dev --test-scheduled`). A play of a track id missing from `tracks` is left out of `royalty_daily` rather than failing the day.
+
+## Remote config (`GET /v1/config`)
+
+The app's tunables come from the Worker's vars: `CONFIG_INTERSTITIAL_EVERY_ROUNDS`, `CONFIG_REGISTER_PROMPT_AFTER_SESSIONS`, `CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS`, `CONFIG_MIN_APP_VERSION` and `CONFIG_DEFAULT_CLIP_MS` (set in `api/wrangler.toml`). Change one and redeploy; the app picks it up on its next start.
+
+- The endpoint is public and answers with `Cache-Control: public, max-age=600`.
+- A var that is missing or not valid is a 500 `config_invalid` that names the var. The app then keeps its cached or built-in values, so check the var before deploying.
+- `CONFIG_MIN_APP_VERSION` (`major.minor.patch`): an app older than it shows an "Update needed" screen instead of playing. Its store link is `STORE_URL` in `app/config/<flavor>.json`.

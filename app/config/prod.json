@@ -1,4 +1,5 @@
 {
   "APP_FLAVOR": "prod",
-  "API_BASE": "https://api.TODO-set-domain"
+  "API_BASE": "https://api.TODO-set-domain",
+  "STORE_URL": "https://play.google.com/store/apps/details?id=com.yemanzefen.yeman_zefen"
 }
