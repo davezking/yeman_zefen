@@ -1,23 +1,26 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/features/game/domain/scorer.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 
 import 'doc_files.dart';
 
-/// One row of the worked-examples table in docs/scoring.md.
-class _Example {
-  _Example(List<String> c)
-      : id = c[0],
-        mode = GameMode.values.byName(c[1]),
-        difficulty = c[2] == '-' ? Difficulty.easy : Difficulty.values.byName(c[2]),
-        correct = c[3] == 'yes',
-        responseMs = int.parse(c[4]),
-        hint = c[5] == 'yes',
-        base = int.parse(c[6]),
-        window = int.parse(c[7]),
-        bonus = int.parse(c[8]),
-        points = int.parse(c[9]),
-        valid = c[10] == 'yes';
+/// One round case from docs/fixtures/scoring.json, the cases the server's
+/// scorer also runs (api/test/scoring.test.ts).
+class _RoundCase {
+  _RoundCase(Map<String, Object?> j)
+      : id = j['id']! as String,
+        mode = GameMode.values.byName(j['mode']! as String),
+        difficulty = _difficulty(j['difficulty']),
+        correct = j['correct']! as bool,
+        responseMs = j['responseMs']! as int,
+        hint = j['hintUsed']! as bool,
+        base = j['base']! as int,
+        window = j['windowMs']! as int,
+        bonus = j['bonus']! as int,
+        points = j['points']! as int,
+        valid = j['valid']! as bool;
 
   final String id;
   final GameMode mode;
@@ -32,29 +35,34 @@ class _Example {
   final bool valid;
 }
 
-List<_Example> _examplesFromDoc() {
-  final rows = <_Example>[];
-  final exampleRow = RegExp(r'^\| E\d+ \|');
-  for (final line in readDoc('scoring.md').split('\n')) {
-    if (!exampleRow.hasMatch(line)) continue;
-    final cells = line.split('|').map((c) => c.trim()).toList();
-    // A row starts and ends with '|', so the first and last cells are empty.
-    rows.add(_Example(cells.sublist(1, cells.length - 1)));
-  }
-  return rows;
-}
+/// Generation mode ignores difficulty; the fixture says so with null.
+Difficulty _difficulty(Object? name) =>
+    name == null ? Difficulty.easy : Difficulty.values.byName(name as String);
+
+Map<String, Object?> _fixture() =>
+    jsonDecode(readDoc('fixtures/scoring.json')) as Map<String, Object?>;
+
+List<_RoundCase> _roundCases() => [
+      for (final r in _fixture()['rounds']! as List<Object?>)
+        _RoundCase(r! as Map<String, Object?>),
+    ];
+
+List<Map<String, Object?>> _sessionCases() => [
+      for (final s in _fixture()['sessions']! as List<Object?>)
+        s! as Map<String, Object?>,
+    ];
 
 void main() {
   const scorer = Scorer();
 
-  group('worked examples in docs/scoring.md', () {
-    final examples = _examplesFromDoc();
+  group('shared fixture docs/fixtures/scoring.json', () {
+    final cases = _roundCases();
 
-    test('the table was read, with every example', () {
-      expect(examples.map((e) => e.id), [for (var i = 1; i <= 17; i++) 'E$i']);
+    test('the fixture was read, with every worked example', () {
+      expect(cases.map((e) => e.id), [for (var i = 1; i <= 17; i++) 'E$i']);
     });
 
-    for (final e in examples) {
+    for (final e in cases) {
       test('${e.id}: ${e.mode.name} ${e.difficulty.name} '
           '${e.correct ? 'correct' : 'wrong'} at ${e.responseMs} ms${e.hint ? ' with hint' : ''}', () {
         final score = scorer.scoreRound(
@@ -74,33 +82,25 @@ void main() {
       });
     }
 
-    test('the session example adds up', () {
-      final session = scorer.scoreSession(
-        mode: GameMode.intro,
-        difficulty: Difficulty.easy,
-        answers: const [
-          RoundAnswer(correct: true, responseMs: 2000), // E1
-          RoundAnswer(correct: false, responseMs: 2000), // E4
-          RoundAnswer(correct: true, responseMs: 2000, hintUsed: true), // E8
-        ],
-      );
-      expect(session.rounds.map((r) => r.points), [143, 0, 72]);
-      expect(session.total, 215);
-      expect(session.flagged, isFalse);
-
-      final withInvalid = scorer.scoreSession(
-        mode: GameMode.intro,
-        difficulty: Difficulty.easy,
-        answers: const [
-          RoundAnswer(correct: true, responseMs: 2000),
-          RoundAnswer(correct: false, responseMs: 2000),
-          RoundAnswer(correct: true, responseMs: 2000, hintUsed: true),
-          RoundAnswer(correct: true, responseMs: 199), // E12
-        ],
-      );
-      expect(withInvalid.total, 215);
-      expect(withInvalid.flagged, isTrue);
-    });
+    for (final s in _sessionCases()) {
+      test('session ${s['id']}', () {
+        final session = scorer.scoreSession(
+          mode: GameMode.values.byName(s['mode']! as String),
+          difficulty: _difficulty(s['difficulty']),
+          answers: [
+            for (final a in (s['answers']! as List<Object?>).cast<Map<String, Object?>>())
+              RoundAnswer(
+                correct: a['correct']! as bool,
+                responseMs: a['responseMs']! as int,
+                hintUsed: a['hintUsed']! as bool,
+              ),
+          ],
+        );
+        expect(session.rounds.map((r) => r.points).toList(), s['points']);
+        expect(session.total, s['score']);
+        expect(session.flagged, s['flagged']);
+      });
+    }
   });
 
   group('base points and window', () {

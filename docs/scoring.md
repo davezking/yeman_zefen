@@ -3,9 +3,10 @@
 The single source of truth for how a round and a session score. The app shows a provisional score while the player
 plays. The server (`POST /v1/sessions`, Phase 3) recomputes the score from the round events and decides the real one.
 
-The app implements this in `app/lib/features/game/domain/scorer.dart`. The worked examples below are a table that a
-test reads (`app/test/features/game/domain/scorer_test.dart`) and runs through the code, so this document and the app
-cannot drift apart. The server must pass the same table.
+The app implements this in `app/lib/features/game/domain/scorer.dart` and the server in `api/src/lib/scoring.ts`. The
+worked examples below are also in `docs/fixtures/scoring.json`, which both test suites run through their scorer
+(`app/test/features/game/domain/scorer_test.dart`, `api/test/scoring.test.ts`). The API test also checks that the table
+in this document matches the fixture, so the document, the app and the server cannot drift apart.
 
 ## The rules
 
@@ -29,7 +30,7 @@ marked **open** are not settled by the architecture doc and need a decision befo
 | Exact arithmetic | All formulas are computed on integers, below, so the app and the server cannot differ through floating point. They give the same result as exact arithmetic with round half up. |
 | Middle multiplier | Applied to the base before the bonus, then rounded: 100 → 125, 150 → 187.5 → **188**, 200 → 250. The bonus uses the rounded base. |
 | `response_ms` | From the moment audio actually starts playing to the moment the player taps an option. In the app it starts when `ClipPlayer.play()` returns, not when the screen is built. |
-| Answer after the window (**open**) | The formula clamps the bonus to 0, so a correct answer after the window would still earn the base. The app never allows it: when the window runs out the round ends as a timeout, recorded with `chosenId: null`, which scores 0. The server should treat `chosenId: null` as wrong, and decide whether a late non-null answer should score by the formula or be flagged. |
+| Answer after the window | The formula clamps the bonus to 0, so a correct answer after the window would still earn the base (E10, E11). The app never allows it: when the window runs out the round ends as a timeout, recorded with `chosenId: null`, which scores 0. The server treats `chosenId: null` as wrong, scores a late non-null answer by the formula, and flags the session (`late_answer`) when the answer came more than 1 s after the window closed. |
 | Paused timer | The round timer pauses while the hint sheet is open (at most 8 s, then it closes itself) and while the rewarded ad plays (design decision, `docs/design/screens.md`). `response_ms` excludes that paused time, so asking for a hint never costs speed bonus or runs out the window. The window itself does not change. |
 | Hint | Halves the total (base + bonus), rounded half up. The payload's `optionIds` still holds all 4 options; `hintUsed: true` says 2 were removed on screen. |
 | Invalid round | `response_ms < 200` scores 0 and flags the session, whether the answer was right or wrong. The round still counts as played. 200 ms exactly is valid. |
@@ -91,6 +92,27 @@ What the rows show:
 
 A session's score is the sum of its rounds' points. Rounds E1, E4 and E8 played in an intro/easy session give
 143 + 0 + 72 = **215**. If a fourth round were E12, the total stays 215 and the session is flagged.
+
+## What the server adds
+
+`POST /v1/sessions` (`api/src/routes/v1/sessions.ts`) scores each round with the rules above, after checking it against
+the catalog. A payload that cannot come from a real game is rejected with 422 `invalid_session` and nothing is stored:
+an unknown track or session era; a `song` round whose options include an unknown track or leave out the track; a chosen
+id that is not an option; an `era` question outside generation mode, or another kind inside it.
+
+A session that breaks a sanity bound is stored (its plays still count for royalties) and **flagged**, which keeps it off
+every leaderboard. `flag_reason` lists why, comma-separated:
+
+| Reason | When |
+|---|---|
+| `fast_response` | Any round under 200 ms. |
+| `late_answer` | A non-null answer more than 1 s after the window closed. |
+| `duration_mismatch` | The response times add up to more than `clientEndedAt − clientStartedAt` + 10 s, or the session ends before it starts. |
+| `clock_out_of_range` | `clientStartedAt` is more than 14 days old, or `clientEndedAt` is more than 5 minutes in the future. |
+| `era_mismatch` | An era session (`generationId` ≠ 0) played a track from another era. |
+| `catalog_mismatch` | An `artist` or `era` round no longer matches the catalog: an option is not an artist (or era), or the track's artist (or era) is not among the options. The round scores 0. Artists can be merged and eras changed after a pack was downloaded, so this is not rejected. |
+
+The leaderboard week comes from the server's clock when the session arrives, never from the device.
 
 ## Checks the app does and does not do
 
