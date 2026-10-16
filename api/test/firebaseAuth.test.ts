@@ -45,6 +45,7 @@ type Opts = {
   iss?: string;
   provider?: string;
   email?: string;
+  emailVerified?: boolean;
   exp?: number;
   iat?: number;
   authTime?: number | null;
@@ -56,7 +57,10 @@ async function firebaseToken(opts: Opts = {}): Promise<string> {
     firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} },
   };
   if (opts.authTime !== null) claims.auth_time = opts.authTime ?? now - 10;
-  if (opts.email) claims.email = opts.email;
+  if (opts.email) {
+    claims.email = opts.email;
+    claims.email_verified = opts.emailVerified ?? true;
+  }
   const jwt = new SignJWT(claims)
     .setProtectedHeader({ alg: "RS256", kid: KID, typ: "JWT" })
     .setIssuer(opts.iss ?? ISS)
@@ -108,6 +112,13 @@ describe("requireUser: valid tokens", () => {
     const res = await call("/registered", bearer(t));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user: { uid: "uid-g", isAnonymous: false, provider: "google.com", email: "p@yz.test" } });
+  });
+
+  it("leaves out an unverified email", async () => {
+    const t = await firebaseToken({ provider: "password", email: "not-mine@yz.test", emailVerified: false, sub: "uid-p" });
+    const res = await call("/any", bearer(t));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user: { uid: "uid-p", isAnonymous: false, provider: "password" } });
   });
 
   it("allows 60 s of clock skew on iat and auth_time", async () => {
@@ -266,8 +277,9 @@ describe("/v1 routing", () => {
     expect((await worker("/v1/packs")).status).toBe(200);
   });
 
-  it("GET /v1/config is not behind auth (404 until it exists, never 401)", async () => {
-    expect((await worker("/v1/config")).status).not.toBe(401);
+  it("GET /v1/config is not behind auth (404 until the route exists in P3S2)", async () => {
+    jwksServer.fail = true; // auth would answer 503; the public path never reaches it
+    expect((await worker("/v1/config")).status).toBe(404);
   });
 
   it("any other /v1 route needs a token", async () => {

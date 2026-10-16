@@ -38,23 +38,33 @@ export type PlayerUser = {
   isAnonymous: boolean;
   /** `firebase.sign_in_provider`, e.g. "anonymous", "google.com", "password", "apple.com". */
   provider: string;
+  /** Present only when the token says the email is verified. */
   email?: string;
 };
 
 export interface FirebaseClaims extends JWTPayload {
   auth_time?: unknown;
   email?: unknown;
+  email_verified?: unknown;
   firebase?: { sign_in_provider?: unknown };
 }
 
 /** The token is not acceptable. Maps to 401. */
-export class InvalidTokenError extends Error {}
+export class InvalidTokenError extends Error {
+  override name = "InvalidTokenError";
+}
 /** The signing keys could not be fetched or used. Maps to 503. */
-export class KeysUnavailableError extends Error {}
+export class KeysUnavailableError extends Error {
+  override name = "KeysUnavailableError";
+}
 
 // One remote JWKS per isolate, created on first use. jose caches the fetched
-// keys inside it (10 min max age) and refetches on an unknown `kid`, which is
-// how Google key rotation is picked up.
+// keys inside it and refetches on an unknown `kid` (at most every 30 s), which
+// is how Google key rotation is picked up. A stale cache is refetched before
+// use and a failed refetch is a 503, so keep the max age long: Google publishes
+// new keys hours before signing with them and serves the JWKS with a
+// multi-hour max-age.
+const JWKS_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 let jwks: JWTVerifyGetKey | null = null;
 let jwksFetch: FetchImplementation | undefined;
 
@@ -69,7 +79,10 @@ export function __setFirebaseJwksFetch(fetchImpl: FetchImplementation | null): v
 
 function remoteKeys(): JWTVerifyGetKey {
   if (!jwks) {
-    jwks = createRemoteJWKSet(new URL(FIREBASE_JWKS_URL), jwksFetch ? { [customFetch]: jwksFetch } : {});
+    jwks = createRemoteJWKSet(new URL(FIREBASE_JWKS_URL), {
+      cacheMaxAge: JWKS_CACHE_MAX_AGE_MS,
+      ...(jwksFetch ? { [customFetch]: jwksFetch } : {}),
+    });
   }
   return jwks;
 }
@@ -116,7 +129,7 @@ export async function verifyFirebaseIdToken(token: string, projectId: string): P
       requiredClaims: ["exp", "iat", "sub", "auth_time"],
     }));
   } catch (err) {
-    if (err instanceof KeysUnavailableError) throw err;
+    if (err instanceof KeysUnavailableError || err instanceof InvalidTokenError) throw err;
     throw new InvalidTokenError(describe(err), { cause: err });
   }
 
@@ -140,7 +153,11 @@ export async function verifyFirebaseIdToken(token: string, projectId: string): P
   }
 
   const user: PlayerUser = { uid, isAnonymous: provider === "anonymous", provider };
-  if (typeof payload.email === "string" && payload.email.length > 0) user.email = payload.email;
+  // Only a verified email: the password provider issues tokens for addresses
+  // nobody has proven they own.
+  if (typeof payload.email === "string" && payload.email.length > 0 && payload.email_verified === true) {
+    user.email = payload.email;
+  }
   return user;
 }
 
