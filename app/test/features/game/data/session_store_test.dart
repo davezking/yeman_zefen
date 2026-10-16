@@ -19,6 +19,26 @@ void main() {
 
   tearDown(() => db.close());
 
+  test('announces each saved session, so the upload can start at once', () async {
+    final events = <void>[];
+    final sub = store.saved.listen(events.add);
+    addTearDown(sub.cancel);
+
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
+    await store.saveCompleted(payload: payloadOf(id: 'b'), score: 10, nowMs: 2);
+    await pumpEventQueue();
+
+    expect(events, hasLength(2));
+  });
+
+  test('a new session has no server score and is due for upload', () async {
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
+    final pending = await db.select(db.pendingSessions).getSingle();
+    expect(pending.nextAttemptAt, 0);
+    expect(pending.parked, isFalse);
+    expect((await db.select(db.recentSessions).getSingle()).serverScore, isNull);
+  });
+
   test('stores the payload for upload exactly as built', () async {
     final payload = payloadOf();
 

@@ -88,6 +88,21 @@ the payload differs. An `id` another player already used is `409 session_conflic
 `400 validation_error`, and one that cannot come from a real game is `422 invalid_session` (`docs/scoring.md`, "What the
 server adds"). Unknown fields are ignored, so an older server accepts a newer app's payload.
 
+## How the app uploads
+
+`app/lib/features/game/data/session_sync.dart` sends the sessions in `pending_sessions`, oldest first, one at a time:
+when the app starts, once the player has a uid (a session played before the first sign-in waits for it), when the
+connection comes back, after each session ends, and when the app returns to the foreground.
+
+| Answer | What the app does |
+|---|---|
+| `200` | Deletes the row and keeps the server's `score` in `recent_sessions.server_score`, which is the number a results list should show. |
+| Offline, `5xx`, `429`, `401`, `403`, `404`, `408` | Keeps the row and waits 30 s, doubling each failed attempt up to 1 hour (`Retry-After` if longer). Starting the app and the connection coming back skip the wait. The rest of the queue waits for the next pass. |
+| Any other `4xx` (`400`, `409`, `413`, `422`) | Parks the row for good (`parked`), with the reason in `last_error`. The rest of the queue carries on. |
+
+A row is deleted only after a `200`, and the server answers a repeated `id` with the stored result, so an app killed
+mid-upload loses nothing and counts nothing twice.
+
 ## Rules the app keeps
 
 - A session has 1 to 50 rounds. The app plays 10.

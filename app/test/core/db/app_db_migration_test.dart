@@ -85,4 +85,29 @@ void main() {
     expect((await db.select(db.localCounters).getSingle()).count, 0);
     expect((await db.select(db.recentSessions).getSingle()).trackIdsJson, '[1]');
   });
+
+  test('upgrading from schema 3 keeps queued sessions and adds the sync columns', () async {
+    final db = AppDb(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('CREATE TABLE pending_sessions (id TEXT NOT NULL, payload_json TEXT NOT NULL, '
+              'created_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, '
+              'PRIMARY KEY (id))');
+          raw.execute('CREATE TABLE recent_sessions (session_id TEXT NOT NULL, played_at INTEGER NOT NULL, '
+              'track_ids_json TEXT NOT NULL, PRIMARY KEY (session_id))');
+          raw.execute("INSERT INTO pending_sessions (id, payload_json, created_at, attempts) VALUES ('s1', '{}', 5, 2)");
+          raw.execute("INSERT INTO recent_sessions (session_id, played_at, track_ids_json) VALUES ('s1', 5, '[1]')");
+          raw.execute('PRAGMA user_version = 3');
+        },
+      ),
+    );
+    addTearDown(db.close);
+
+    final queued = await db.select(db.pendingSessions).getSingle();
+    expect(queued.id, 's1');
+    expect(queued.attempts, 2);
+    expect(queued.nextAttemptAt, 0, reason: 'a queued session is due straight away');
+    expect(queued.parked, isFalse);
+    expect((await db.select(db.recentSessions).getSingle()).serverScore, isNull);
+  });
 }

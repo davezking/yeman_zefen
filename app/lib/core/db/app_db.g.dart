@@ -1129,6 +1129,31 @@ class $PendingSessionsTable extends PendingSessions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<int> nextAttemptAt = GeneratedColumn<int>(
+    'next_attempt_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _parkedMeta = const VerificationMeta('parked');
+  @override
+  late final GeneratedColumn<bool> parked = GeneratedColumn<bool>(
+    'parked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("parked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1136,6 +1161,8 @@ class $PendingSessionsTable extends PendingSessions
     createdAt,
     attempts,
     lastError,
+    nextAttemptAt,
+    parked,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1185,6 +1212,21 @@ class $PendingSessionsTable extends PendingSessions
         lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
       );
     }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('parked')) {
+      context.handle(
+        _parkedMeta,
+        parked.isAcceptableOrUnknown(data['parked']!, _parkedMeta),
+      );
+    }
     return context;
   }
 
@@ -1214,6 +1256,14 @@ class $PendingSessionsTable extends PendingSessions
         DriftSqlType.string,
         data['${effectivePrefix}last_error'],
       ),
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_attempt_at'],
+      )!,
+      parked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}parked'],
+      )!,
     );
   }
 
@@ -1229,12 +1279,21 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
   final int createdAt;
   final int attempts;
   final String? lastError;
+
+  /// Not sent before this time (epoch ms, UTC): the backoff after a failed attempt. 0 = send now.
+  final int nextAttemptAt;
+
+  /// The API refused the session for good (a 4xx), so it is never sent again. The row stays for
+  /// debugging, with [lastError] saying why.
+  final bool parked;
   const PendingSession({
     required this.id,
     required this.payloadJson,
     required this.createdAt,
     required this.attempts,
     this.lastError,
+    required this.nextAttemptAt,
+    required this.parked,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1246,6 +1305,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
     }
+    map['next_attempt_at'] = Variable<int>(nextAttemptAt);
+    map['parked'] = Variable<bool>(parked);
     return map;
   }
 
@@ -1258,6 +1319,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
+      nextAttemptAt: Value(nextAttemptAt),
+      parked: Value(parked),
     );
   }
 
@@ -1272,6 +1335,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       attempts: serializer.fromJson<int>(json['attempts']),
       lastError: serializer.fromJson<String?>(json['lastError']),
+      nextAttemptAt: serializer.fromJson<int>(json['nextAttemptAt']),
+      parked: serializer.fromJson<bool>(json['parked']),
     );
   }
   @override
@@ -1283,6 +1348,8 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       'createdAt': serializer.toJson<int>(createdAt),
       'attempts': serializer.toJson<int>(attempts),
       'lastError': serializer.toJson<String?>(lastError),
+      'nextAttemptAt': serializer.toJson<int>(nextAttemptAt),
+      'parked': serializer.toJson<bool>(parked),
     };
   }
 
@@ -1292,12 +1359,16 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
     int? createdAt,
     int? attempts,
     Value<String?> lastError = const Value.absent(),
+    int? nextAttemptAt,
+    bool? parked,
   }) => PendingSession(
     id: id ?? this.id,
     payloadJson: payloadJson ?? this.payloadJson,
     createdAt: createdAt ?? this.createdAt,
     attempts: attempts ?? this.attempts,
     lastError: lastError.present ? lastError.value : this.lastError,
+    nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+    parked: parked ?? this.parked,
   );
   PendingSession copyWithCompanion(PendingSessionsCompanion data) {
     return PendingSession(
@@ -1308,6 +1379,10 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       attempts: data.attempts.present ? data.attempts.value : this.attempts,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+      parked: data.parked.present ? data.parked.value : this.parked,
     );
   }
 
@@ -1318,14 +1393,23 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           ..write('payloadJson: $payloadJson, ')
           ..write('createdAt: $createdAt, ')
           ..write('attempts: $attempts, ')
-          ..write('lastError: $lastError')
+          ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('parked: $parked')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, payloadJson, createdAt, attempts, lastError);
+  int get hashCode => Object.hash(
+    id,
+    payloadJson,
+    createdAt,
+    attempts,
+    lastError,
+    nextAttemptAt,
+    parked,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1334,7 +1418,9 @@ class PendingSession extends DataClass implements Insertable<PendingSession> {
           other.payloadJson == this.payloadJson &&
           other.createdAt == this.createdAt &&
           other.attempts == this.attempts &&
-          other.lastError == this.lastError);
+          other.lastError == this.lastError &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.parked == this.parked);
 }
 
 class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
@@ -1343,6 +1429,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
   final Value<int> createdAt;
   final Value<int> attempts;
   final Value<String?> lastError;
+  final Value<int> nextAttemptAt;
+  final Value<bool> parked;
   final Value<int> rowid;
   const PendingSessionsCompanion({
     this.id = const Value.absent(),
@@ -1350,6 +1438,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     this.createdAt = const Value.absent(),
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.parked = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PendingSessionsCompanion.insert({
@@ -1358,6 +1448,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     required int createdAt,
     this.attempts = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.parked = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        payloadJson = Value(payloadJson),
@@ -1368,6 +1460,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     Expression<int>? createdAt,
     Expression<int>? attempts,
     Expression<String>? lastError,
+    Expression<int>? nextAttemptAt,
+    Expression<bool>? parked,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1376,6 +1470,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
       if (createdAt != null) 'created_at': createdAt,
       if (attempts != null) 'attempts': attempts,
       if (lastError != null) 'last_error': lastError,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (parked != null) 'parked': parked,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1386,6 +1482,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     Value<int>? createdAt,
     Value<int>? attempts,
     Value<String?>? lastError,
+    Value<int>? nextAttemptAt,
+    Value<bool>? parked,
     Value<int>? rowid,
   }) {
     return PendingSessionsCompanion(
@@ -1394,6 +1492,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
       createdAt: createdAt ?? this.createdAt,
       attempts: attempts ?? this.attempts,
       lastError: lastError ?? this.lastError,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      parked: parked ?? this.parked,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1416,6 +1516,12 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
     }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<int>(nextAttemptAt.value);
+    }
+    if (parked.present) {
+      map['parked'] = Variable<bool>(parked.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1430,6 +1536,8 @@ class PendingSessionsCompanion extends UpdateCompanion<PendingSession> {
           ..write('createdAt: $createdAt, ')
           ..write('attempts: $attempts, ')
           ..write('lastError: $lastError, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('parked: $parked, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2006,8 +2114,24 @@ class $RecentSessionsTable extends RecentSessions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _serverScoreMeta = const VerificationMeta(
+    'serverScore',
+  );
   @override
-  List<GeneratedColumn> get $columns => [sessionId, playedAt, trackIdsJson];
+  late final GeneratedColumn<int> serverScore = GeneratedColumn<int>(
+    'server_score',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sessionId,
+    playedAt,
+    trackIdsJson,
+    serverScore,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2047,6 +2171,15 @@ class $RecentSessionsTable extends RecentSessions
     } else if (isInserting) {
       context.missing(_trackIdsJsonMeta);
     }
+    if (data.containsKey('server_score')) {
+      context.handle(
+        _serverScoreMeta,
+        serverScore.isAcceptableOrUnknown(
+          data['server_score']!,
+          _serverScoreMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2068,6 +2201,10 @@ class $RecentSessionsTable extends RecentSessions
         DriftSqlType.string,
         data['${effectivePrefix}track_ids_json'],
       )!,
+      serverScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_score'],
+      ),
     );
   }
 
@@ -2081,10 +2218,15 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
   final String sessionId;
   final int playedAt;
   final String trackIdsJson;
+
+  /// The score the server computed once the session was uploaded; null until then.
+  /// The server decides the real score, so a results list shows this over the local one.
+  final int? serverScore;
   const RecentSession({
     required this.sessionId,
     required this.playedAt,
     required this.trackIdsJson,
+    this.serverScore,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2092,6 +2234,9 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
     map['session_id'] = Variable<String>(sessionId);
     map['played_at'] = Variable<int>(playedAt);
     map['track_ids_json'] = Variable<String>(trackIdsJson);
+    if (!nullToAbsent || serverScore != null) {
+      map['server_score'] = Variable<int>(serverScore);
+    }
     return map;
   }
 
@@ -2100,6 +2245,9 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
       sessionId: Value(sessionId),
       playedAt: Value(playedAt),
       trackIdsJson: Value(trackIdsJson),
+      serverScore: serverScore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverScore),
     );
   }
 
@@ -2112,6 +2260,7 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
       sessionId: serializer.fromJson<String>(json['sessionId']),
       playedAt: serializer.fromJson<int>(json['playedAt']),
       trackIdsJson: serializer.fromJson<String>(json['trackIdsJson']),
+      serverScore: serializer.fromJson<int?>(json['serverScore']),
     );
   }
   @override
@@ -2121,6 +2270,7 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
       'sessionId': serializer.toJson<String>(sessionId),
       'playedAt': serializer.toJson<int>(playedAt),
       'trackIdsJson': serializer.toJson<String>(trackIdsJson),
+      'serverScore': serializer.toJson<int?>(serverScore),
     };
   }
 
@@ -2128,10 +2278,12 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
     String? sessionId,
     int? playedAt,
     String? trackIdsJson,
+    Value<int?> serverScore = const Value.absent(),
   }) => RecentSession(
     sessionId: sessionId ?? this.sessionId,
     playedAt: playedAt ?? this.playedAt,
     trackIdsJson: trackIdsJson ?? this.trackIdsJson,
+    serverScore: serverScore.present ? serverScore.value : this.serverScore,
   );
   RecentSession copyWithCompanion(RecentSessionsCompanion data) {
     return RecentSession(
@@ -2140,6 +2292,9 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
       trackIdsJson: data.trackIdsJson.present
           ? data.trackIdsJson.value
           : this.trackIdsJson,
+      serverScore: data.serverScore.present
+          ? data.serverScore.value
+          : this.serverScore,
     );
   }
 
@@ -2148,37 +2303,43 @@ class RecentSession extends DataClass implements Insertable<RecentSession> {
     return (StringBuffer('RecentSession(')
           ..write('sessionId: $sessionId, ')
           ..write('playedAt: $playedAt, ')
-          ..write('trackIdsJson: $trackIdsJson')
+          ..write('trackIdsJson: $trackIdsJson, ')
+          ..write('serverScore: $serverScore')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(sessionId, playedAt, trackIdsJson);
+  int get hashCode =>
+      Object.hash(sessionId, playedAt, trackIdsJson, serverScore);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is RecentSession &&
           other.sessionId == this.sessionId &&
           other.playedAt == this.playedAt &&
-          other.trackIdsJson == this.trackIdsJson);
+          other.trackIdsJson == this.trackIdsJson &&
+          other.serverScore == this.serverScore);
 }
 
 class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
   final Value<String> sessionId;
   final Value<int> playedAt;
   final Value<String> trackIdsJson;
+  final Value<int?> serverScore;
   final Value<int> rowid;
   const RecentSessionsCompanion({
     this.sessionId = const Value.absent(),
     this.playedAt = const Value.absent(),
     this.trackIdsJson = const Value.absent(),
+    this.serverScore = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RecentSessionsCompanion.insert({
     required String sessionId,
     required int playedAt,
     required String trackIdsJson,
+    this.serverScore = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : sessionId = Value(sessionId),
        playedAt = Value(playedAt),
@@ -2187,12 +2348,14 @@ class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
     Expression<String>? sessionId,
     Expression<int>? playedAt,
     Expression<String>? trackIdsJson,
+    Expression<int>? serverScore,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (sessionId != null) 'session_id': sessionId,
       if (playedAt != null) 'played_at': playedAt,
       if (trackIdsJson != null) 'track_ids_json': trackIdsJson,
+      if (serverScore != null) 'server_score': serverScore,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2201,12 +2364,14 @@ class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
     Value<String>? sessionId,
     Value<int>? playedAt,
     Value<String>? trackIdsJson,
+    Value<int?>? serverScore,
     Value<int>? rowid,
   }) {
     return RecentSessionsCompanion(
       sessionId: sessionId ?? this.sessionId,
       playedAt: playedAt ?? this.playedAt,
       trackIdsJson: trackIdsJson ?? this.trackIdsJson,
+      serverScore: serverScore ?? this.serverScore,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2223,6 +2388,9 @@ class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
     if (trackIdsJson.present) {
       map['track_ids_json'] = Variable<String>(trackIdsJson.value);
     }
+    if (serverScore.present) {
+      map['server_score'] = Variable<int>(serverScore.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2235,6 +2403,7 @@ class RecentSessionsCompanion extends UpdateCompanion<RecentSession> {
           ..write('sessionId: $sessionId, ')
           ..write('playedAt: $playedAt, ')
           ..write('trackIdsJson: $trackIdsJson, ')
+          ..write('serverScore: $serverScore, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2815,6 +2984,8 @@ typedef $$PendingSessionsTableCreateCompanionBuilder =
       required int createdAt,
       Value<int> attempts,
       Value<String?> lastError,
+      Value<int> nextAttemptAt,
+      Value<bool> parked,
       Value<int> rowid,
     });
 typedef $$PendingSessionsTableUpdateCompanionBuilder =
@@ -2824,6 +2995,8 @@ typedef $$PendingSessionsTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<int> attempts,
       Value<String?> lastError,
+      Value<int> nextAttemptAt,
+      Value<bool> parked,
       Value<int> rowid,
     });
 
@@ -2858,6 +3031,16 @@ class $$PendingSessionsTableFilterComposer
 
   ColumnFilters<String> get lastError => $composableBuilder(
     column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get parked => $composableBuilder(
+    column: $table.parked,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2895,6 +3078,16 @@ class $$PendingSessionsTableOrderingComposer
     column: $table.lastError,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get parked => $composableBuilder(
+    column: $table.parked,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PendingSessionsTableAnnotationComposer
@@ -2922,6 +3115,14 @@ class $$PendingSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<int> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get parked =>
+      $composableBuilder(column: $table.parked, builder: (column) => column);
 }
 
 class $$PendingSessionsTableTableManager
@@ -2960,6 +3161,8 @@ class $$PendingSessionsTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<int> nextAttemptAt = const Value.absent(),
+                Value<bool> parked = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingSessionsCompanion(
                 id: id,
@@ -2967,6 +3170,8 @@ class $$PendingSessionsTableTableManager
                 createdAt: createdAt,
                 attempts: attempts,
                 lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                parked: parked,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2976,6 +3181,8 @@ class $$PendingSessionsTableTableManager
                 required int createdAt,
                 Value<int> attempts = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
+                Value<int> nextAttemptAt = const Value.absent(),
+                Value<bool> parked = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingSessionsCompanion.insert(
                 id: id,
@@ -2983,6 +3190,8 @@ class $$PendingSessionsTableTableManager
                 createdAt: createdAt,
                 attempts: attempts,
                 lastError: lastError,
+                nextAttemptAt: nextAttemptAt,
+                parked: parked,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3357,6 +3566,7 @@ typedef $$RecentSessionsTableCreateCompanionBuilder =
       required String sessionId,
       required int playedAt,
       required String trackIdsJson,
+      Value<int?> serverScore,
       Value<int> rowid,
     });
 typedef $$RecentSessionsTableUpdateCompanionBuilder =
@@ -3364,6 +3574,7 @@ typedef $$RecentSessionsTableUpdateCompanionBuilder =
       Value<String> sessionId,
       Value<int> playedAt,
       Value<String> trackIdsJson,
+      Value<int?> serverScore,
       Value<int> rowid,
     });
 
@@ -3388,6 +3599,11 @@ class $$RecentSessionsTableFilterComposer
 
   ColumnFilters<String> get trackIdsJson => $composableBuilder(
     column: $table.trackIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverScore => $composableBuilder(
+    column: $table.serverScore,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3415,6 +3631,11 @@ class $$RecentSessionsTableOrderingComposer
     column: $table.trackIdsJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get serverScore => $composableBuilder(
+    column: $table.serverScore,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RecentSessionsTableAnnotationComposer
@@ -3434,6 +3655,11 @@ class $$RecentSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get trackIdsJson => $composableBuilder(
     column: $table.trackIdsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverScore => $composableBuilder(
+    column: $table.serverScore,
     builder: (column) => column,
   );
 }
@@ -3472,11 +3698,13 @@ class $$RecentSessionsTableTableManager
                 Value<String> sessionId = const Value.absent(),
                 Value<int> playedAt = const Value.absent(),
                 Value<String> trackIdsJson = const Value.absent(),
+                Value<int?> serverScore = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RecentSessionsCompanion(
                 sessionId: sessionId,
                 playedAt: playedAt,
                 trackIdsJson: trackIdsJson,
+                serverScore: serverScore,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3484,11 +3712,13 @@ class $$RecentSessionsTableTableManager
                 required String sessionId,
                 required int playedAt,
                 required String trackIdsJson,
+                Value<int?> serverScore = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RecentSessionsCompanion.insert(
                 sessionId: sessionId,
                 playedAt: playedAt,
                 trackIdsJson: trackIdsJson,
+                serverScore: serverScore,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

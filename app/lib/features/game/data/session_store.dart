@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -22,6 +23,11 @@ class SessionStore {
   SessionStore(this.db);
 
   final AppDb db;
+
+  final _saved = StreamController<void>.broadcast();
+
+  /// Fires after each finished session is saved, so the upload can start right away.
+  Stream<void> get saved => _saved.stream;
 
   static const clipErrorsCounter = 'clip_errors';
 
@@ -62,8 +68,8 @@ class SessionStore {
     required SessionPayload payload,
     required int score,
     required int nowMs,
-  }) {
-    return db.transaction(() async {
+  }) async {
+    final result = await db.transaction(() async {
       await db.into(db.pendingSessions).insert(
             PendingSessionsCompanion.insert(
               id: payload.id,
@@ -102,5 +108,7 @@ class SessionStore {
 
       return SessionSaveResult(previousBest: previous, isNewBest: isNewBest);
     });
+    _saved.add(null);
+    return result;
   }
 }
