@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { cdnUrl } from "../lib/cdn";
 import { requireUser } from "../lib/firebaseAuth";
+import { me } from "./me";
 
 export const v1 = new Hono<AppEnv>();
 
@@ -18,6 +19,8 @@ v1.use("*", async (c, next) => {
   if ((method === "GET" || method === "HEAD") && PUBLIC_ROUTES.has(sub)) return next();
   return authenticate(c, next);
 });
+
+v1.route("/me", me);
 
 // Published packs at their current version. The app downloads each manifest from `manifestUrl`.
 v1.get("/packs", async (c) => {
