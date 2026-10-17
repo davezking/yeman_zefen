@@ -5,6 +5,7 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/http/api_client.dart';
 import '../../../core/http/api_providers.dart';
 import '../../../prototype/models.dart';
+import '../../account/data/profile_api.dart';
 import '../data/leaderboard_api.dart';
 
 final leaderboardApiProvider = Provider<LeaderboardApi>((ref) => LeaderboardApi(ref.watch(apiClientProvider)));
@@ -38,50 +39,50 @@ final leaderboardQueryProvider = NotifierProvider<LeaderboardQueryNotifier, Lead
   LeaderboardQueryNotifier.new,
 );
 
-/// The signed-in player's display name from `GET /v1/me`, or null when none is chosen yet (or
-/// the device is offline). Refreshed after a sign-in or a name change.
-final ownNameProvider = FutureProvider.autoDispose<String?>((ref) async {
-  final auth = ref.watch(authStateProvider).value ?? AuthState.signedOut;
-  if (!auth.hasUid) return null;
-  try {
-    final json = await ref.watch(apiClientProvider).getJson('/v1/me');
-    final name = json is Map<String, Object?> ? json['displayName'] : null;
-    return name is String ? name : null;
-  } on ApiException {
-    return null;
-  }
-});
-
-/// The board for the query, as the screen shows it. A failed request (offline, server error)
-/// becomes [LeaderboardState.offlineNone] rather than an error: the screen has a state for it.
+/// The board for the query, as the screen shows it. When the board itself cannot be read
+/// (offline, a server error, an answer the app cannot parse) the view is
+/// [LeaderboardState.offlineNone]: the screen has a state for it. When only the player's own row
+/// cannot be read, the board still shows, without that row.
 final leaderboardProvider = FutureProvider.autoDispose<LeaderboardView>((ref) async {
   final query = ref.watch(leaderboardQueryProvider);
   final auth = ref.watch(authStateProvider).value ?? AuthState.signedOut;
   final api = ref.watch(leaderboardApiProvider);
-  final name = await ref.watch(ownNameProvider.future);
+  final registered = auth.hasUid && !auth.isAnonymous;
+  // All three start at once. A guest's own row is not read: the server answers 403 to a guest.
+  final nameFuture = ref.watch(ownNameProvider.future);
+  final topFuture = api.top(query.scope, query.generationId);
+  final meFuture = registered ? _ownRow(api, query) : Future<LeaderboardEntry?>.value();
+
+  // The board is awaited first: it is the only one of the three that can fail.
+  List<LeaderboardEntry> entries;
+  LeaderboardState state;
   try {
-    final entries = await api.top(query.scope, query.generationId);
-    // The guest's row is not read: the server answers 403 to a guest.
-    final me = auth.hasUid && !auth.isAnonymous
-        ? await api.me(query.scope, query.generationId, displayName: name)
-        : null;
-    return LeaderboardView(
-      scope: query.scope,
-      generationId: query.generationId,
-      entries: entries,
-      user: auth.hasUid && !auth.isAnonymous
-          ? UserInfo.signedIn(displayName: name ?? '', weeklyRank: me?.rank)
-          : const UserInfo.guest(),
-      me: me,
-      state: entries.isEmpty ? LeaderboardState.empty : LeaderboardState.ready,
-    );
+    entries = await topFuture;
+    state = entries.isEmpty ? LeaderboardState.empty : LeaderboardState.ready;
   } on ApiException {
-    return LeaderboardView(
-      scope: query.scope,
-      generationId: query.generationId,
-      entries: const [],
-      user: const UserInfo.guest(),
-      state: LeaderboardState.offlineNone,
-    );
+    (entries, state) = (const [], LeaderboardState.offlineNone);
+  } on FormatException {
+    (entries, state) = (const [], LeaderboardState.offlineNone);
   }
+  final name = await nameFuture;
+  final me = await meFuture;
+  return LeaderboardView(
+    scope: query.scope,
+    generationId: query.generationId,
+    entries: entries,
+    user: registered ? UserInfo.signedIn(displayName: name ?? '', weeklyRank: me?.rank) : const UserInfo.guest(),
+    me: me == null ? null : LeaderboardEntry(rank: me.rank, name: name ?? '', points: me.points),
+    state: state,
+  );
 });
+
+/// The player's own row, or null when it cannot be read. The board shows without it.
+Future<LeaderboardEntry?> _ownRow(LeaderboardApi api, LeaderboardQuery query) async {
+  try {
+    return await api.me(query.scope, query.generationId, displayName: null);
+  } on ApiException {
+    return null;
+  } on FormatException {
+    return null;
+  }
+}

@@ -25,7 +25,19 @@ class LeaderboardPage extends ConsumerWidget {
       user: const UserInfo.guest(),
       state: LeaderboardState.loading,
     );
-    final view = board.isLoading ? loading : (board.value ?? loading);
+    final view = switch (board) {
+      _ when board.isLoading => loading,
+      AsyncData(:final value) => value,
+      // The provider turns failed requests into the offline state itself; anything else that
+      // escapes it shows the same state rather than a skeleton that never ends.
+      _ => LeaderboardView(
+        scope: query.scope,
+        generationId: query.generationId,
+        entries: const [],
+        user: const UserInfo.guest(),
+        state: LeaderboardState.offlineNone,
+      ),
+    };
 
     return LeaderboardScreen(
       view: view,
@@ -37,11 +49,11 @@ class LeaderboardPage extends ConsumerWidget {
   }
 
   /// The guest's sign-in bar. Tapping it is the guest asking, so the sheet opens unless the
-  /// controller says no; closing it without registering counts as a dismissal.
+  /// controller says no; closing it while still a guest counts as a dismissal.
   Future<void> _signIn(BuildContext context, WidgetRef ref) async {
     final controller = ref.read(registerPromptControllerProvider);
     if (!controller.shouldPromptFromLeaderboard()) return;
     final done = await showRegisterSheet(context);
-    if (!done) await controller.dismiss();
+    if (!done && !controller.isRegistered) await controller.dismiss();
   }
 }

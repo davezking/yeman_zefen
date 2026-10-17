@@ -9,15 +9,14 @@ import '../../../core/http/api_client.dart';
 import '../../../core/http/api_providers.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../prototype/models.dart';
-import '../../leaderboard/application/leaderboard_providers.dart';
 import '../data/profile_api.dart';
 import 'sign_in_sheet.dart';
 
 /// Opens the register sheet over the current screen. Resolves to true once the player is signed
-/// in and has a name; false when they closed it without finishing, which the caller should count
-/// as a dismissal.
-Future<bool> showRegisterSheet(BuildContext context) async {
-  final done = await showAppBottomSheet<bool>(context, builder: (_) => const RegisterSheet());
+/// in and has a name; false when they closed it before that. [nameOnly] skips straight to the
+/// name, for a registered player who closed the sheet at that step before.
+Future<bool> showRegisterSheet(BuildContext context, {bool nameOnly = false}) async {
+  final done = await showAppBottomSheet<bool>(context, builder: (_) => RegisterSheet(nameOnly: nameOnly));
   return done ?? false;
 }
 
@@ -27,14 +26,17 @@ enum _Step { choose, email, name }
 /// asks for it) and email, then the display name. The sheets it shows come from
 /// `sign_in_sheet.dart`, which takes plain data and callbacks.
 class RegisterSheet extends ConsumerStatefulWidget {
-  const RegisterSheet({super.key});
+  const RegisterSheet({super.key, this.nameOnly = false});
+
+  /// Opens at the name step.
+  final bool nameOnly;
 
   @override
   ConsumerState<RegisterSheet> createState() => _RegisterSheetState();
 }
 
 class _RegisterSheetState extends ConsumerState<RegisterSheet> {
-  _Step _step = _Step.choose;
+  late _Step _step = widget.nameOnly ? _Step.name : _Step.choose;
   SignInStatus _status = SignInStatus.idle;
   SignInProvider? _with;
   bool _creating = false;
@@ -57,8 +59,9 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
       final result = provider == SignInProvider.apple ? await linker.linkWithApple() : await linker.linkWithGoogle();
       await _afterLink(result);
     } on Exception {
-      // The provider refused, was closed by the platform, or failed. The buttons come back.
-      _back(SignInStatus.idle);
+      // The provider refused, was closed by the platform, or failed. The buttons come back, with
+      // the message that the account could not be linked.
+      _back(SignInStatus.linkFailed);
     }
   }
 
@@ -87,12 +90,19 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
           : await linker.signInWithEmail(email, password);
       await _afterLink(result);
     } on AuthFailure catch (e) {
+      if (!mounted) return;
+      final error = emailErrorFor(e.code);
+      if (error == EmailError.none) {
+        // Not about what was typed (offline, too many tries, a disabled account).
+        _back(SignInStatus.linkFailed);
+        return;
+      }
       setState(() {
         _status = SignInStatus.idle;
-        _emailError = emailErrorFor(e.code);
+        _emailError = error;
       });
     } on Exception {
-      _back(SignInStatus.idle);
+      _back(SignInStatus.linkFailed);
     }
   }
 
@@ -103,11 +113,15 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
       return;
     }
     // Signed in (even when the server step is still waiting to go through). A signed-in account
-    // with a name is done; anything else is asked for its name.
-    ref.invalidate(ownNameProvider);
-    final name = await ref.read(ownNameProvider.future);
+    // with a name is done; anything else, or a name that cannot be read, is asked for its name.
+    String? name;
+    try {
+      name = await fetchDisplayName(ref.read(apiClientProvider));
+    } on ApiException {
+      name = null;
+    }
     if (!mounted) return;
-    if (name != null && name.isNotEmpty) {
+    if (name != null) {
       _finish();
     } else {
       setState(() {
@@ -125,8 +139,9 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     });
   }
 
+  /// The board rebuilds by itself: it watches the account and [ownNameProvider].
   void _finish() {
-    ref.invalidate(leaderboardProvider);
+    ref.invalidate(ownNameProvider);
     Navigator.of(context).pop(true);
   }
 
@@ -142,7 +157,6 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     });
     try {
       await saveDisplayName(ref.read(apiClientProvider), raw.trim());
-      ref.invalidate(ownNameProvider);
       if (mounted) _finish();
     } on ApiException catch (e) {
       if (!mounted) return;

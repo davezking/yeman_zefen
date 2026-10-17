@@ -167,12 +167,18 @@ void main() {
       expect(controller.shouldPromptFromLeaderboard(), isFalse);
     });
 
-    test('a device with no account yet is not asked', () async {
+    test('a device with no account yet is not asked after results', () async {
       who = AuthState.signedOut;
       await finishSessions(5);
 
       expect(await controller.shouldPromptAfterResults(), isFalse);
-      expect(controller.shouldPromptFromLeaderboard(), isFalse);
+    });
+
+    test('a device with no account yet can still sign in from "see my rank"', () {
+      who = AuthState.signedOut;
+
+      expect(controller.shouldPromptFromLeaderboard(), isTrue);
+      expect(controller.isRegistered, isFalse);
     });
 
     test('a guest who has just registered is no longer asked', () async {

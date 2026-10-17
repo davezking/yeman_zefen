@@ -330,6 +330,7 @@ class _DisplayNameSheetState extends State<DisplayNameSheet> {
     final error = switch (widget.error) {
       NameError.tooShort => l10n.authNameErrorShort,
       NameError.taken => l10n.authNameErrorTaken,
+      NameError.failed => l10n.errorGenericTitle,
       NameError.none => null,
     };
     return Padding(
