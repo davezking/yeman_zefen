@@ -198,7 +198,7 @@ All JSON. Errors use the shape `{ error: { code, message } }`. Versioned under `
 - Clips: `PATCH /admin/clips/:id` (start_ms triggers a recut job)
 - Jobs: `POST /admin/jobs` (scrape | cut | recut), `GET /admin/jobs`
 - Packs: `POST /admin/packs`, `POST /admin/packs/:id/versions` (build and publish)
-- Reports: `GET /admin/reports/royalty?from&to&format=csv`, `GET /admin/analytics?from&to`
+- Reports: `GET /admin/reports/royalty?from&to&format=json|csv` (admin role; UTC days, both included, at most 366; the CSV is UTF-8 with a byte order mark and a final total row; `includesToday` flags a range the roll-up has not finished), `GET /admin/analytics?from&to`
 - Moderation: `GET /admin/sessions?flagged=1`, `POST /admin/users/:id/shadow-ban`
 - Ingest (Access **service token**, used by GitHub Actions): `POST /admin/ingest/tracks`, `POST /admin/ingest/clips`, `POST /admin/ingest/jobs/:id/status`, `GET /admin/ingest/catalog-snapshot` (for dedupe)
 

@@ -3,6 +3,7 @@ import { AppShell } from "./layout/AppShell";
 import { JobsPage } from "./pages/JobsPage";
 import { PacksPage } from "./pages/PacksPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { TrackDetailPage } from "./pages/TrackDetailPage";
 import { TracksPage } from "./pages/TracksPage";
@@ -18,8 +19,9 @@ export function App() {
         <Route path="review" element={<ReviewPage />} />
         <Route path="packs" element={<PacksPage />} />
         <Route path="jobs" element={<JobsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         {navItems
-          .filter((item) => item.path !== "/tracks" && item.path !== "/review" && item.path !== "/packs" && item.path !== "/jobs")
+          .filter((item) => !["/tracks", "/review", "/packs", "/jobs", "/reports"].includes(item.path))
           .map((item) => (
             <Route key={item.path} path={item.path.slice(1)} element={<PlaceholderPage title={item.label} />} />
           ))}
