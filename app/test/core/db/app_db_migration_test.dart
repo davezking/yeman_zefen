@@ -130,4 +130,22 @@ void main() {
     await db.into(db.remoteConfigCache).insert(RemoteConfigCacheCompanion.insert(key: 'config', json: '{}'));
     expect(await db.select(db.remoteConfigCache).get(), hasLength(1));
   });
+
+  test('upgrading from schema 5 keeps rows and adds the pending account sync table', () async {
+    final db = AppDb(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('CREATE TABLE remote_config_cache (key TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (key))');
+          raw.execute("INSERT INTO remote_config_cache (key, json) VALUES ('config', '{}')");
+          raw.execute('PRAGMA user_version = 5');
+        },
+      ),
+    );
+    addTearDown(db.close);
+
+    expect(await db.select(db.remoteConfigCache).get(), hasLength(1));
+    expect(await db.select(db.pendingAccountSync).get(), isEmpty);
+    await db.into(db.pendingAccountSync).insert(PendingAccountSyncCompanion.insert(kind: 'merge', createdAt: 1));
+    expect((await db.select(db.pendingAccountSync).getSingle()).id, 1);
+  });
 }

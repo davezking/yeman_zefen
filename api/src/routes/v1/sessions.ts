@@ -5,8 +5,8 @@
 // scores it, stores one game_sessions row, and adds the score to the leaderboards when the player
 // is registered, not shadow-banned, and the session is not flagged.
 //
-// D1 cost is constant: 2 reads (one batch) and at most 6 row writes (one batch): the user touch,
-// up to 4 leaderboard upserts and the session row.
+// D1 cost is constant: 2 reads (one batch) and at most 3 statements (one batch): the user touch,
+// one leaderboard upsert (up to 4 rows) and the session row.
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../env";
@@ -108,17 +108,23 @@ const USER_TOUCH_SQL = `
   INSERT INTO users (id, display_name, is_anonymous, country, created_at, last_seen_at)
   VALUES (?1, NULL, ?2, ?3, ?4, ?4)
   ON CONFLICT (id) DO UPDATE SET
-    is_anonymous = excluded.is_anonymous,
+    is_anonymous = MIN(users.is_anonymous, excluded.is_anonymous),
     last_seen_at = excluded.last_seen_at,
     country = COALESCE(excluded.country, users.country)`;
 
 // Runs before the session insert in the same batch (a D1 batch is one transaction), so the
 // NOT EXISTS sees whether this id was already stored: a replay, even a concurrent one, adds
-// nothing. The shadow-ban check reads the row as it is at write time.
+// nothing. The registered and shadow-ban checks read the row as it is at write time (after the
+// user touch), so a guest token still cached right after linking counts for the account.
+// One statement for every row the session adds to: json_each supplies the periods (?1) and the
+// generations (?2), so a guest's session (which adds nothing) costs one statement, not four.
 const LEADERBOARD_SQL = `
   INSERT INTO leaderboard_entries (period, generation_id, user_id, points, updated_at)
-  SELECT ?1, ?2, u.id, ?3, ?4 FROM users u
-   WHERE u.id = ?5 AND u.shadow_banned = 0
+  SELECT p.value, g.value, u.id, ?3, ?4
+    FROM users u
+    CROSS JOIN json_each(?1) p
+    CROSS JOIN json_each(?2) g
+   WHERE u.id = ?5 AND u.is_anonymous = 0 AND u.shadow_banned = 0
      AND NOT EXISTS (SELECT 1 FROM game_sessions WHERE id = ?6)
   ON CONFLICT (period, generation_id, user_id) DO UPDATE SET
     points = points + excluded.points,
@@ -258,15 +264,13 @@ sessions.post("/", async (c) => {
   const events: StoredEvents = { clientEndedAt: p.clientEndedAt, rounds, ads: p.ads };
 
   const statements = [DB.prepare(USER_TOUCH_SQL).bind(user.uid, user.isAnonymous ? 1 : 0, country, now)];
-  if (!user.isAnonymous && !flagged && score > 0) {
+  if (!flagged && score > 0) {
     // The server's clock decides the week, so a device clock cannot move points between weeks.
     const periods = [ALL_TIME, isoWeek(now)];
     const generations = p.generationId === 0 ? [0] : [0, p.generationId];
-    for (const period of periods) {
-      for (const generation of generations) {
-        statements.push(DB.prepare(LEADERBOARD_SQL).bind(period, generation, score, now, user.uid, p.id));
-      }
-    }
+    statements.push(
+      DB.prepare(LEADERBOARD_SQL).bind(JSON.stringify(periods), JSON.stringify(generations), score, now, user.uid, p.id),
+    );
   }
   statements.push(
     DB.prepare(SESSION_SQL).bind(

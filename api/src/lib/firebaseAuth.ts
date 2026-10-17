@@ -115,9 +115,14 @@ function describe(err: unknown): string {
 /**
  * Verify a Firebase ID token for `projectId` and return the player it names.
  * Throws `InvalidTokenError` for a bad token and `KeysUnavailableError` when
- * Google's keys cannot be fetched.
+ * Google's keys cannot be fetched. `allowExpiredUpToS` accepts an expired token
+ * issued at most that many seconds ago (POST /v1/me/merge only).
  */
-export async function verifyFirebaseIdToken(token: string, projectId: string): Promise<PlayerUser> {
+export async function verifyFirebaseIdToken(
+  token: string,
+  projectId: string,
+  { allowExpiredUpToS }: { allowExpiredUpToS?: number } = {},
+): Promise<PlayerUser> {
   if (!projectId) throw new KeysUnavailableError("FIREBASE_PROJECT_ID is not configured");
   if (token.length > MAX_TOKEN_LENGTH) throw new InvalidTokenError("token too long");
 
@@ -127,7 +132,10 @@ export async function verifyFirebaseIdToken(token: string, projectId: string): P
       algorithms: ["RS256"],
       issuer: `https://securetoken.google.com/${projectId}`,
       audience: projectId,
-      clockTolerance: CLOCK_TOLERANCE_S,
+      // An expired token is still accepted when the caller allows it: the signature, issuer and
+      // audience are checked as usual, and its age is checked below. (Not jose's maxTokenAge,
+      // which would add this same tolerance to the age.)
+      clockTolerance: allowExpiredUpToS ?? CLOCK_TOLERANCE_S,
       requiredClaims: ["exp", "iat", "sub", "auth_time"],
     }));
   } catch (err) {
@@ -140,6 +148,9 @@ export async function verifyFirebaseIdToken(token: string, projectId: string): P
   const now = Math.floor(Date.now() / 1000);
   if (typeof payload.iat !== "number" || payload.iat > now + CLOCK_TOLERANCE_S) {
     throw new InvalidTokenError("iat is not in the past");
+  }
+  if (allowExpiredUpToS !== undefined && now - payload.iat > allowExpiredUpToS) {
+    throw new InvalidTokenError("token is too old");
   }
   const authTime = payload.auth_time;
   if (typeof authTime !== "number" || !Number.isFinite(authTime) || authTime > now + CLOCK_TOLERANCE_S) {

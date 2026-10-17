@@ -232,18 +232,24 @@ export function removeFirebaseJwks(): void {
   __setFirebaseJwksFetch(null);
 }
 
-/** A valid Firebase ID token for `uid` (anonymous unless `provider` says otherwise). */
-export async function signFirebaseToken(uid: string, opts: { provider?: string } = {}): Promise<string> {
+/**
+ * A valid Firebase ID token for `uid` (anonymous unless `provider` says otherwise). `ageS` backdates
+ * it (a token is good for an hour, so over 3600 it is expired); `key` signs it with another key.
+ */
+export async function signFirebaseToken(
+  uid: string,
+  opts: { provider?: string; ageS?: number; key?: CryptoKey } = {},
+): Promise<string> {
   const projectId = (env as { FIREBASE_PROJECT_ID: string }).FIREBASE_PROJECT_ID;
-  const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ auth_time: now - 10, firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} } })
+  const iat = Math.floor(Date.now() / 1000) - (opts.ageS ?? 10);
+  return new SignJWT({ auth_time: iat, firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} } })
     .setProtectedHeader({ alg: "RS256", kid: "fb-test-key", typ: "JWT" })
     .setIssuer(`https://securetoken.google.com/${projectId}`)
     .setAudience(projectId)
     .setSubject(uid)
-    .setIssuedAt(now - 10)
-    .setExpirationTime(now + 3600)
-    .sign(firebaseKey);
+    .setIssuedAt(iat)
+    .setExpirationTime(iat + 3600)
+    .sign(opts.key ?? firebaseKey);
 }
 
 /** Call the Worker as a signed-in player. */

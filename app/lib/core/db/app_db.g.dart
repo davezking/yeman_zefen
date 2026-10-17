@@ -2675,6 +2675,365 @@ class RemoteConfigCacheCompanion
   }
 }
 
+class $PendingAccountSyncTable extends PendingAccountSync
+    with TableInfo<$PendingAccountSyncTable, PendingAccountSyncData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingAccountSyncTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _anonymousIdTokenMeta = const VerificationMeta(
+    'anonymousIdToken',
+  );
+  @override
+  late final GeneratedColumn<String> anonymousIdToken = GeneratedColumn<String>(
+    'anonymous_id_token',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetUidMeta = const VerificationMeta(
+    'targetUid',
+  );
+  @override
+  late final GeneratedColumn<String> targetUid = GeneratedColumn<String>(
+    'target_uid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    kind,
+    anonymousIdToken,
+    targetUid,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_account_sync';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingAccountSyncData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('anonymous_id_token')) {
+      context.handle(
+        _anonymousIdTokenMeta,
+        anonymousIdToken.isAcceptableOrUnknown(
+          data['anonymous_id_token']!,
+          _anonymousIdTokenMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_uid')) {
+      context.handle(
+        _targetUidMeta,
+        targetUid.isAcceptableOrUnknown(data['target_uid']!, _targetUidMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PendingAccountSyncData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingAccountSyncData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      anonymousIdToken: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}anonymous_id_token'],
+      ),
+      targetUid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_uid'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingAccountSyncTable createAlias(String alias) {
+    return $PendingAccountSyncTable(attachedDatabase, alias);
+  }
+}
+
+class PendingAccountSyncData extends DataClass
+    implements Insertable<PendingAccountSyncData> {
+  final int id;
+  final String kind;
+  final String? anonymousIdToken;
+  final String? targetUid;
+  final int createdAt;
+  const PendingAccountSyncData({
+    required this.id,
+    required this.kind,
+    this.anonymousIdToken,
+    this.targetUid,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || anonymousIdToken != null) {
+      map['anonymous_id_token'] = Variable<String>(anonymousIdToken);
+    }
+    if (!nullToAbsent || targetUid != null) {
+      map['target_uid'] = Variable<String>(targetUid);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  PendingAccountSyncCompanion toCompanion(bool nullToAbsent) {
+    return PendingAccountSyncCompanion(
+      id: Value(id),
+      kind: Value(kind),
+      anonymousIdToken: anonymousIdToken == null && nullToAbsent
+          ? const Value.absent()
+          : Value(anonymousIdToken),
+      targetUid: targetUid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetUid),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PendingAccountSyncData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingAccountSyncData(
+      id: serializer.fromJson<int>(json['id']),
+      kind: serializer.fromJson<String>(json['kind']),
+      anonymousIdToken: serializer.fromJson<String?>(json['anonymousIdToken']),
+      targetUid: serializer.fromJson<String?>(json['targetUid']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'kind': serializer.toJson<String>(kind),
+      'anonymousIdToken': serializer.toJson<String?>(anonymousIdToken),
+      'targetUid': serializer.toJson<String?>(targetUid),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  PendingAccountSyncData copyWith({
+    int? id,
+    String? kind,
+    Value<String?> anonymousIdToken = const Value.absent(),
+    Value<String?> targetUid = const Value.absent(),
+    int? createdAt,
+  }) => PendingAccountSyncData(
+    id: id ?? this.id,
+    kind: kind ?? this.kind,
+    anonymousIdToken: anonymousIdToken.present
+        ? anonymousIdToken.value
+        : this.anonymousIdToken,
+    targetUid: targetUid.present ? targetUid.value : this.targetUid,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PendingAccountSyncData copyWithCompanion(PendingAccountSyncCompanion data) {
+    return PendingAccountSyncData(
+      id: data.id.present ? data.id.value : this.id,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      anonymousIdToken: data.anonymousIdToken.present
+          ? data.anonymousIdToken.value
+          : this.anonymousIdToken,
+      targetUid: data.targetUid.present ? data.targetUid.value : this.targetUid,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingAccountSyncData(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('anonymousIdToken: $anonymousIdToken, ')
+          ..write('targetUid: $targetUid, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, kind, anonymousIdToken, targetUid, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingAccountSyncData &&
+          other.id == this.id &&
+          other.kind == this.kind &&
+          other.anonymousIdToken == this.anonymousIdToken &&
+          other.targetUid == this.targetUid &&
+          other.createdAt == this.createdAt);
+}
+
+class PendingAccountSyncCompanion
+    extends UpdateCompanion<PendingAccountSyncData> {
+  final Value<int> id;
+  final Value<String> kind;
+  final Value<String?> anonymousIdToken;
+  final Value<String?> targetUid;
+  final Value<int> createdAt;
+  const PendingAccountSyncCompanion({
+    this.id = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.anonymousIdToken = const Value.absent(),
+    this.targetUid = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  PendingAccountSyncCompanion.insert({
+    this.id = const Value.absent(),
+    required String kind,
+    this.anonymousIdToken = const Value.absent(),
+    this.targetUid = const Value.absent(),
+    required int createdAt,
+  }) : kind = Value(kind),
+       createdAt = Value(createdAt);
+  static Insertable<PendingAccountSyncData> custom({
+    Expression<int>? id,
+    Expression<String>? kind,
+    Expression<String>? anonymousIdToken,
+    Expression<String>? targetUid,
+    Expression<int>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (kind != null) 'kind': kind,
+      if (anonymousIdToken != null) 'anonymous_id_token': anonymousIdToken,
+      if (targetUid != null) 'target_uid': targetUid,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  PendingAccountSyncCompanion copyWith({
+    Value<int>? id,
+    Value<String>? kind,
+    Value<String?>? anonymousIdToken,
+    Value<String?>? targetUid,
+    Value<int>? createdAt,
+  }) {
+    return PendingAccountSyncCompanion(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      anonymousIdToken: anonymousIdToken ?? this.anonymousIdToken,
+      targetUid: targetUid ?? this.targetUid,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (anonymousIdToken.present) {
+      map['anonymous_id_token'] = Variable<String>(anonymousIdToken.value);
+    }
+    if (targetUid.present) {
+      map['target_uid'] = Variable<String>(targetUid.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingAccountSyncCompanion(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('anonymousIdToken: $anonymousIdToken, ')
+          ..write('targetUid: $targetUid, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -2688,6 +3047,8 @@ abstract class _$AppDb extends GeneratedDatabase {
   late final $RecentSessionsTable recentSessions = $RecentSessionsTable(this);
   late final $RemoteConfigCacheTable remoteConfigCache =
       $RemoteConfigCacheTable(this);
+  late final $PendingAccountSyncTable pendingAccountSync =
+      $PendingAccountSyncTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2700,6 +3061,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     localCounters,
     recentSessions,
     remoteConfigCache,
+    pendingAccountSync,
   ];
 }
 
@@ -4202,6 +4564,226 @@ typedef $$RemoteConfigCacheTableProcessedTableManager =
       RemoteConfigCacheData,
       PrefetchHooks Function()
     >;
+typedef $$PendingAccountSyncTableCreateCompanionBuilder =
+    PendingAccountSyncCompanion Function({
+      Value<int> id,
+      required String kind,
+      Value<String?> anonymousIdToken,
+      Value<String?> targetUid,
+      required int createdAt,
+    });
+typedef $$PendingAccountSyncTableUpdateCompanionBuilder =
+    PendingAccountSyncCompanion Function({
+      Value<int> id,
+      Value<String> kind,
+      Value<String?> anonymousIdToken,
+      Value<String?> targetUid,
+      Value<int> createdAt,
+    });
+
+class $$PendingAccountSyncTableFilterComposer
+    extends Composer<_$AppDb, $PendingAccountSyncTable> {
+  $$PendingAccountSyncTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get anonymousIdToken => $composableBuilder(
+    column: $table.anonymousIdToken,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetUid => $composableBuilder(
+    column: $table.targetUid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingAccountSyncTableOrderingComposer
+    extends Composer<_$AppDb, $PendingAccountSyncTable> {
+  $$PendingAccountSyncTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get anonymousIdToken => $composableBuilder(
+    column: $table.anonymousIdToken,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetUid => $composableBuilder(
+    column: $table.targetUid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingAccountSyncTableAnnotationComposer
+    extends Composer<_$AppDb, $PendingAccountSyncTable> {
+  $$PendingAccountSyncTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get anonymousIdToken => $composableBuilder(
+    column: $table.anonymousIdToken,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetUid =>
+      $composableBuilder(column: $table.targetUid, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$PendingAccountSyncTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $PendingAccountSyncTable,
+          PendingAccountSyncData,
+          $$PendingAccountSyncTableFilterComposer,
+          $$PendingAccountSyncTableOrderingComposer,
+          $$PendingAccountSyncTableAnnotationComposer,
+          $$PendingAccountSyncTableCreateCompanionBuilder,
+          $$PendingAccountSyncTableUpdateCompanionBuilder,
+          (
+            PendingAccountSyncData,
+            BaseReferences<
+              _$AppDb,
+              $PendingAccountSyncTable,
+              PendingAccountSyncData
+            >,
+          ),
+          PendingAccountSyncData,
+          PrefetchHooks Function()
+        > {
+  $$PendingAccountSyncTableTableManager(
+    _$AppDb db,
+    $PendingAccountSyncTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingAccountSyncTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PendingAccountSyncTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PendingAccountSyncTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> anonymousIdToken = const Value.absent(),
+                Value<String?> targetUid = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+              }) => PendingAccountSyncCompanion(
+                id: id,
+                kind: kind,
+                anonymousIdToken: anonymousIdToken,
+                targetUid: targetUid,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String kind,
+                Value<String?> anonymousIdToken = const Value.absent(),
+                Value<String?> targetUid = const Value.absent(),
+                required int createdAt,
+              }) => PendingAccountSyncCompanion.insert(
+                id: id,
+                kind: kind,
+                anonymousIdToken: anonymousIdToken,
+                targetUid: targetUid,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PendingAccountSyncTable, PendingAccountSyncData>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDb,
+                    $PendingAccountSyncTable,
+                    PendingAccountSyncData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingAccountSyncTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $PendingAccountSyncTable,
+      PendingAccountSyncData,
+      $$PendingAccountSyncTableFilterComposer,
+      $$PendingAccountSyncTableOrderingComposer,
+      $$PendingAccountSyncTableAnnotationComposer,
+      $$PendingAccountSyncTableCreateCompanionBuilder,
+      $$PendingAccountSyncTableUpdateCompanionBuilder,
+      (
+        PendingAccountSyncData,
+        BaseReferences<
+          _$AppDb,
+          $PendingAccountSyncTable,
+          PendingAccountSyncData
+        >,
+      ),
+      PendingAccountSyncData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -4220,4 +4802,6 @@ class $AppDbManager {
       $$RecentSessionsTableTableManager(_db, _db.recentSessions);
   $$RemoteConfigCacheTableTableManager get remoteConfigCache =>
       $$RemoteConfigCacheTableTableManager(_db, _db.remoteConfigCache);
+  $$PendingAccountSyncTableTableManager get pendingAccountSync =>
+      $$PendingAccountSyncTableTableManager(_db, _db.pendingAccountSync);
 }
