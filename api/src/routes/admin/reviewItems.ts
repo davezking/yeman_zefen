@@ -87,7 +87,8 @@ reviewRoutes.get("/review-items/counts", async (c) => {
     .innerJoin(artists, eq(artists.id, tracks.artistId))
     .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open"), notInArray(tracks.status, [...OUT_OF_CATALOG])))
     .groupBy(reviewItems.reason);
-  const counts = Object.fromEntries(REVIEW_REASONS.map((r) => [r, 0])) as Record<(typeof REVIEW_REASONS)[number], number>;
+  // This is the track queue; score_anomaly items belong to users and are not shown here.
+  const counts: Record<string, number> = Object.fromEntries(REVIEW_REASONS.filter((r) => r !== "score_anomaly").map((r) => [r, 0]));
   for (const r of rows) counts[r.reason] = r.n;
   return c.json({ counts });
 });

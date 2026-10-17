@@ -3,6 +3,7 @@
 // Each run REPLACES the day's rows in one batch (delete, then insert), so reruns give identical rows
 // and a failure leaves the day either untouched or complete.
 import type { Bindings } from "../env";
+import { flagAnomalies } from "./anomalies";
 
 const DAY_MS = 86_400_000;
 /** How far back a run looks for days that were never rolled up. */
@@ -182,6 +183,15 @@ export async function runScheduled(env: Pick<Bindings, "DB">, now: number = Date
       console.error(`rollup ${date} failed`, e);
     }
   }
-  if (failed.length > 0) throw new Error(`rollup failed for ${failed.join(", ")}`);
+  // The anomaly pass (at most ANOMALY_QUERIES more queries; 5 days x 8 + 1 + 5 stays under 50) is separate
+  // from the roll-ups: its failure must not undo them, and theirs must not skip it.
+  try {
+    const flags = await flagAnomalies(env, yesterday);
+    console.log(`anomalies ${yesterday}: flagged=${flags.length}`);
+  } catch (e) {
+    failed.push(`anomalies ${yesterday}`);
+    console.error(`anomaly pass ${yesterday} failed`, e);
+  }
+  if (failed.length > 0) throw new Error(`nightly run failed for ${failed.join(", ")}`);
   return done;
 }

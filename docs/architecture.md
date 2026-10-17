@@ -142,7 +142,7 @@ erDiagram
 - `genres` (id, slug, name_am, name_en) and `track_genres` (track_id, genre_id). Seeded with tizita, ethio-jazz, traditional, pop, hip-hop.
 - `tracks` (id, artist_id, title_am, title_latin, album, release_year, generation_id, generation_overridden, source_url, source_audio_key, duration_ms, **status** `ingested | needs_review | approved | rejected | retired`, canonical_track_id NULL, created_at, updated_at)
 - `clips` (id, track_id, **type** `intro | middle`, start_ms, length_ms default 10000, r2_key, sha256, bytes, version, status `pending | ready | failed`)
-- `review_items` (id, entity_type, entity_id, **reason** `translit_uncertain | possible_duplicate | missing_audio | short_audio | era_unknown`, details_json, status `open | resolved | dismissed`, resolved_by, resolved_at)
+- `review_items` (id, entity_type, entity_id, **reason** `translit_uncertain | possible_duplicate | missing_audio | short_audio | era_unknown | score_anomaly`, entity_ref (text key for user items; `entity_id` is 0), details_json, status `open | resolved | dismissed`, resolved_by, resolved_at)
 - `packs` (id, slug, name_am, name_en, generation_id NULL, genre_id NULL, current_version)
 - `pack_versions` (id, pack_id, version, manifest_key, track_count, total_bytes, published_at, published_by)
 - `pack_tracks` (pack_version_id, track_id, intro_clip_id, middle_clip_id)
