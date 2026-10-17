@@ -1,27 +1,42 @@
 import { Alert, Button, Group, Loader, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useState } from "react";
 import { downloadRoyaltyCsv, useRoyaltyReport } from "../api/reports";
-import { includesToday, lastMonth, lastQuarter, rangeError, type DayRange } from "../lib/reports";
+import { useWhoami } from "../api/whoami";
+import { lastMonth, lastQuarter, missingDaysText, rangeError, type DayRange } from "../lib/reports";
 
 /** Rows shown in the preview. The total and the CSV always cover every track. */
 const PREVIEW_ROWS = 200;
 const number = (n: number) => n.toLocaleString("en-US");
 
 export function ReportsPage() {
+  const whoami = useWhoami();
+  // The Worker refuses the editor role; say so here instead of showing a failed request.
+  if (whoami.data && whoami.data.role !== "admin") {
+    return (
+      <Stack>
+        <Title order={2}>Royalty report</Title>
+        <Text c="dimmed">The royalty report is for admins.</Text>
+      </Stack>
+    );
+  }
+  return <Report />;
+}
+
+function Report() {
   const [range, setRange] = useState<DayRange>(() => lastMonth(Date.now()));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const error = rangeError(range.from, range.to);
   const report = useRoyaltyReport(error === null ? range : null);
-  // The page's clock decides before the answer arrives; the Worker's `includesToday` agrees once it has.
-  const today = error === null && (report.data?.includesToday ?? includesToday(range.to, Date.now()));
+  // The Worker says which days are not rolled up: today, yesterday before 00:30 UTC, or a failed run.
+  const missing = report.data?.missingDays ?? [];
 
-  async function download() {
+  async function download(partial: boolean) {
     setSaving(true);
     setSaveError(null);
     try {
-      await downloadRoyaltyCsv(range);
+      await downloadRoyaltyCsv(range, partial);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "The download failed.");
     } finally {
@@ -41,13 +56,15 @@ export function ReportsPage() {
         <TextInput label="To" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.currentTarget.value })} />
         <Button variant="default" onClick={() => setRange(lastMonth(Date.now()))}>Last month</Button>
         <Button variant="default" onClick={() => setRange(lastQuarter(Date.now()))}>Last quarter</Button>
-        <Button disabled={error !== null || !report.data} loading={saving} onClick={() => void download()}>Download CSV</Button>
+        <Button disabled={error !== null || !report.data} loading={saving} onClick={() => void download(missing.length > 0)}>Download CSV</Button>
       </Group>
 
       {error && <Text c="red" size="sm">{error}</Text>}
-      {today && (
-        <Alert color="yellow" title="Today is not counted yet">
-          The roll-up runs after midnight UTC, so plays from today are missing. Pick an end day before today for the final figure.
+      {missing.length > 0 && (
+        <Alert color="yellow" title="This report is not final">
+          {report.data?.includesToday ? "Today is not counted yet: " : ""}
+          Plays are missing for {missingDaysText(missing)}, which {missing.length === 1 ? "has" : "have"} not been rolled up. The roll-up runs at 00:30 UTC for the day
+          before; a day that stays missing means its run failed. The CSV is named <code>-partial</code> until the range is complete.
         </Alert>
       )}
       {saveError && <Alert color="red" title="Could not download the CSV">{saveError}</Alert>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_REPORT_DAYS, includesToday, isDay, lastMonth, lastQuarter, rangeError, reportFilename } from "../src/lib/reports";
+import { MAX_REPORT_DAYS, isDay, lastMonth, lastQuarter, missingDaysText, rangeError, reportFilename } from "../src/lib/reports";
 
 const at = (day: string, time = "12:00:00") => Date.parse(`${day}T${time}Z`);
 
@@ -66,19 +66,19 @@ describe("isDay", () => {
   });
 });
 
-describe("includesToday", () => {
-  it("is true when the range ends today (UTC) or later", () => {
-    expect(includesToday("2026-10-17", at("2026-10-17", "00:00:01"))).toBe(true);
-    expect(includesToday("2026-10-20", at("2026-10-17"))).toBe(true);
-  });
-
-  it("is false when the range ended before today", () => {
-    expect(includesToday("2026-10-16", at("2026-10-17"))).toBe(false);
+describe("missingDaysText", () => {
+  it("lists a few days and counts the rest", () => {
+    expect(missingDaysText(["2026-10-02"])).toBe("2026-10-02");
+    expect(missingDaysText(["2026-10-01", "2026-10-02", "2026-10-03"])).toBe("2026-10-01, 2026-10-02, 2026-10-03");
+    expect(missingDaysText(["a", "b", "c", "d", "e", "f"])).toBe("a, b, c and 3 more");
   });
 });
 
 describe("reportFilename", () => {
   it("puts the range in the name, as the Worker does", () => {
     expect(reportFilename({ from: "2026-07-01", to: "2026-09-30" })).toBe("royalty-report-2026-07-01_to_2026-09-30.csv");
+    expect(reportFilename({ from: "2026-07-01", to: "2026-09-30" }, true)).toBe(
+      "royalty-report-2026-07-01_to_2026-09-30-partial.csv",
+    );
   });
 });

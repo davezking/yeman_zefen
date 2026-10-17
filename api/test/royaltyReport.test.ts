@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { MAX_REPORT_DAYS, csvCell, reportFilename, royaltyCsv, type RoyaltyRow } from "../src/lib/royaltyReport";
+import { MAX_REPORT_DAYS, csvCell, missingDays, reportFilename, royaltyCsv, type RoyaltyRow } from "../src/lib/royaltyReport";
 import { adminWithQueryCount, api, installTestJwks, makeArtist, makeTrack, rawRequest, removeTestJwks, resetCatalog, seedAdmins } from "./helpers";
 
 let ids: { a: number; b: number; c: number };
@@ -18,8 +18,18 @@ beforeAll(async () => {
 });
 afterAll(removeTestJwks);
 
+/** Marks days as rolled up, the way the nightly run does: a `sessions` metric, even for a day with none. */
+async function rolledUp(...days: string[]) {
+  await env.DB.batch(
+    days.map((d) =>
+      env.DB.prepare("INSERT OR REPLACE INTO analytics_daily (date, metric, dimension, value) VALUES (?1, 'sessions', '', 0)").bind(d),
+    ),
+  );
+}
+
 beforeEach(async () => {
-  await env.DB.prepare("DELETE FROM royalty_daily").run();
+  await env.DB.batch([env.DB.prepare("DELETE FROM royalty_daily"), env.DB.prepare("DELETE FROM analytics_daily")]);
+  await rolledUp("2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04");
   const rows: [string, number, number][] = [
     ["2026-09-30", ids.a, 100], // before the range
     ["2026-10-01", ids.a, 5],
@@ -91,11 +101,55 @@ describe("GET /admin/reports/royalty (json)", () => {
     expect(incl.includesToday).toBe(true);
   });
 
-  it("is one D1 query for the report (plus the admin check), whatever the range holds", async () => {
+  it("is two D1 queries for the report (plus the admin check), whatever the range holds", async () => {
     const { response, queries } = await adminWithQueryCount(url(RANGE));
 
     expect(response.status).toBe(200);
-    expect(queries).toBe(2);
+    expect(queries).toBe(3);
+  });
+});
+
+describe("completeness", () => {
+  const json = async (q: Record<string, string>) =>
+    (await (await api(url(q))).json()) as { missingDays: string[]; includesToday: boolean };
+
+  it("a range of rolled-up days has nothing missing", async () => {
+    expect((await json(RANGE)).missingDays).toEqual([]);
+  });
+
+  it("lists a day with no roll-up (a failed run, or one not run yet)", async () => {
+    await env.DB.prepare("DELETE FROM analytics_daily WHERE date = '2026-10-02'").run();
+
+    expect((await json(RANGE)).missingDays).toEqual(["2026-10-02"]);
+  });
+
+  it("a day with no sessions is still done once its roll-up ran", async () => {
+    await env.DB.prepare("DELETE FROM royalty_daily WHERE date = '2026-10-03'").run();
+
+    expect((await json(RANGE)).missingDays).toEqual([]);
+  });
+
+  it("yesterday is missing until its 00:30 UTC run, so a range ending yesterday is not final either", async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const body = await json({ from: yesterday, to: yesterday });
+
+    expect(body.missingDays).toEqual([yesterday]);
+    expect(body.includesToday).toBe(false);
+  });
+
+  it("names a CSV with days missing -partial, and a complete one plainly", async () => {
+    const complete = await api(url({ ...RANGE, format: "csv" }));
+    await env.DB.prepare("DELETE FROM analytics_daily WHERE date = '2026-10-02'").run();
+    const partial = await api(url({ ...RANGE, format: "csv" }));
+
+    expect(complete.headers.get("content-disposition")).toContain('royalty-report-2026-10-01_to_2026-10-03.csv"');
+    expect(partial.headers.get("content-disposition")).toContain('royalty-report-2026-10-01_to_2026-10-03-partial.csv"');
+  });
+
+  it("missingDays lists each absent day in order", () => {
+    expect(missingDays("2026-10-01", "2026-10-05", ["2026-10-02", "2026-10-04"])).toEqual(["2026-10-01", "2026-10-03", "2026-10-05"]);
+    expect(missingDays("2026-10-01", "2026-10-01", ["2026-10-01"])).toEqual([]);
+    expect(missingDays("2028-02-28", "2028-03-01", [])).toEqual(["2028-02-28", "2028-02-29", "2028-03-01"]);
   });
 });
 
@@ -123,7 +177,7 @@ describe("GET /admin/reports/royalty (csv)", () => {
 
   it("has a header row, one row per track, and a final total row", async () => {
     const { text } = await csv();
-    const lines = text.replace("﻿", "").trimEnd().split("\r\n");
+    const lines = text.replace("\uFEFF", "").trimEnd().split("\r\n");
 
     expect(lines[0]).toBe("Track ID,Title (Amharic),Title (Latin),Artist (Amharic),Artist (Latin),Album,Release year,Plays");
     expect(lines).toHaveLength(1 + 3 + 1);
@@ -142,7 +196,7 @@ describe("GET /admin/reports/royalty (csv)", () => {
   it("an empty range is the header and a total of 0", async () => {
     const { text } = await csv({ from: "2026-01-01", to: "2026-01-31" });
 
-    expect(text.replace("﻿", "").trimEnd().split("\r\n")).toHaveLength(2);
+    expect(text.replace("\uFEFF", "").trimEnd().split("\r\n")).toHaveLength(2);
     expect(text).toContain("Total,,,,,,,0");
   });
 });
@@ -199,11 +253,16 @@ describe("csv helpers", () => {
 
   it("names the file with the range", () => {
     expect(reportFilename("2026-07-01", "2026-09-30")).toBe("royalty-report-2026-07-01_to_2026-09-30.csv");
+    expect(reportFilename("2026-07-01", "2026-09-30", true)).toBe("royalty-report-2026-07-01_to_2026-09-30-partial.csv");
+  });
+
+  it("starts with an explicit byte order mark", () => {
+    expect(royaltyCsv([]).charCodeAt(0)).toBe(0xfeff);
   });
 
   it("builds a report for no rows", () => {
     expect(royaltyCsv([])).toBe(
-      "﻿Track ID,Title (Amharic),Title (Latin),Artist (Amharic),Artist (Latin),Album,Release year,Plays\r\nTotal,,,,,,,0\r\n",
+      "\uFEFFTrack ID,Title (Amharic),Title (Latin),Artist (Amharic),Artist (Latin),Album,Release year,Plays\r\nTotal,,,,,,,0\r\n",
     );
   });
 });

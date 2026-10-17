@@ -1,5 +1,5 @@
 // The royalty usage report (FR-22): plays per track over a date range, from the nightly roll-up
-// `royalty_daily`. Spec: docs/architecture.md §6.
+// `royalty_daily`. Spec: docs/architecture.md §5 "Reports".
 import { z } from "zod";
 import { dayBounds } from "../cron/rollups";
 
@@ -52,6 +52,27 @@ export const ROYALTY_SQL = `
    GROUP BY r.track_id
    ORDER BY plays DESC, t.id ASC`;
 
+/** The days in the range that have finished their roll-up. A day is done once it has its `sessions` metric, which the roll-up writes even for a day with no sessions (as `missingDates` in cron/rollups.ts reads it). */
+export const ROLLED_UP_SQL = `
+  SELECT DISTINCT date FROM analytics_daily
+   WHERE metric = 'sessions' AND date >= ?1 AND date <= ?2`;
+
+/**
+ * The days from `from` to `to` that are not rolled up, oldest first: today, yesterday before the
+ * 00:30 UTC run, a day whose run failed, or a day before roll-ups began. Their plays are missing
+ * from the report, so a report that lists any is not final.
+ */
+export function missingDays(from: string, to: string, rolledUp: Iterable<string>): string[] {
+  const done = new Set(rolledUp);
+  const out: string[] = [];
+  const end = Date.parse(`${to}T00:00:00Z`);
+  for (let t = Date.parse(`${from}T00:00:00Z`); t <= end; t += DAY_MS) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    if (!done.has(d)) out.push(d);
+  }
+  return out;
+}
+
 export function totalPlays(rows: readonly RoyaltyRow[]): number {
   return rows.reduce((sum, r) => sum + r.plays, 0);
 }
@@ -91,10 +112,10 @@ export function royaltyCsv(rows: readonly RoyaltyRow[]): string {
     ),
     ["Total", "", "", "", "", "", "", totalPlays(rows)].map(csvCell).join(","),
   ];
-  return `﻿${lines.join("\r\n")}\r\n`;
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
 
-/** The download's name, with the range in it. */
-export function reportFilename(from: string, to: string): string {
-  return `royalty-report-${from}_to_${to}.csv`;
+/** The download's name, with the range in it. A report with days missing says so in the name, so it is not sent on as final. */
+export function reportFilename(from: string, to: string, partial = false): string {
+  return `royalty-report-${from}_to_${to}${partial ? "-partial" : ""}.csv`;
 }

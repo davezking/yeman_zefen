@@ -41,17 +41,7 @@ export async function apiFetch<T>(path: string, schema: z.ZodType<T>, init: ApiR
     body = JSON.stringify(json);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, { ...rest, headers, body, credentials: "include" });
-  } catch {
-    // Behind Cloudflare Access an expired session also lands here: the redirect to the login page fails CORS.
-    throw new ApiError(
-      0,
-      "network",
-      "Can't reach the API. If your sign-in has expired, reload the page to sign in again.",
-    );
-  }
+  const res = await send(path, { ...rest, headers, body });
 
   const requestId = res.headers.get("x-request-id") ?? undefined;
   const text = await res.text().catch(() => "");
@@ -74,6 +64,20 @@ export async function apiFetch<T>(path: string, schema: z.ZodType<T>, init: ApiR
   return data.data;
 }
 
+/** fetch with the Access cookie. An unreachable API becomes an ApiError. */
+async function send(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
+  } catch {
+    // Behind Cloudflare Access an expired session also lands here: the redirect to the login page fails CORS.
+    throw new ApiError(
+      0,
+      "network",
+      "Can't reach the API. If your sign-in has expired, reload the page to sign in again.",
+    );
+  }
+}
+
 /** The ApiError for a non-2xx answer: the Worker's `{ error }` body when it sent one, else the status. */
 function failure(status: number, body: unknown, requestId: string | undefined): ApiError {
   const err = errorBodySchema.safeParse(body);
@@ -86,16 +90,7 @@ function failure(status: number, body: unknown, requestId: string | undefined): 
  * throws ApiError, so a refused request shows the Worker's message rather than a broken download.
  */
 export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
-  } catch {
-    throw new ApiError(
-      0,
-      "network",
-      "Can't reach the API. If your sign-in has expired, reload the page to sign in again.",
-    );
-  }
+  const res = await send(path, init);
   const requestId = res.headers.get("x-request-id") ?? undefined;
   if (!res.ok) {
     let body: unknown;

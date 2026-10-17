@@ -19,6 +19,8 @@ const reportSchema = z.object({
   from: z.string(),
   to: z.string(),
   includesToday: z.boolean(),
+  /** Days in the range with no finished roll-up: their plays are not in the report. */
+  missingDays: z.array(z.string()),
   totalPlays: z.number(),
   rows: z.array(rowSchema),
 });
@@ -34,15 +36,16 @@ export const useRoyaltyReport = (range: DayRange | null) =>
     queryFn: () => apiFetch(`/admin/reports/royalty${query(range!, "json")}`, reportSchema),
   });
 
-/** Fetches the CSV (with the Access cookie, which a plain link would not carry) and saves it. */
-export async function downloadRoyaltyCsv(range: DayRange): Promise<void> {
+/** Fetches the CSV (with the Access cookie, which a plain link would not carry) and saves it. `partial` names it `-partial`. */
+export async function downloadRoyaltyCsv(range: DayRange, partial: boolean): Promise<void> {
   const blob = await apiFetchBlob(`/admin/reports/royalty${query(range, "csv")}`);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = reportFilename(range);
+  link.download = reportFilename(range, partial);
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Some browsers start the save after click() returns; revoking at once would cancel it.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

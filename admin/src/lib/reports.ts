@@ -16,8 +16,6 @@ export function isDay(s: string): boolean {
   return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s;
 }
 
-export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-
 const day = (y: number, m: number, d: number): string => new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
 
 /** The calendar month before the one containing `now`. */
@@ -45,8 +43,12 @@ export function rangeError(from: string, to: string): string | null {
   return null;
 }
 
-/** Today (UTC) is not rolled up until tomorrow's run, so a range ending today is short of today's plays. */
-export const includesToday = (to: string, now: number): boolean => to >= utcDay(now);
+/** The download's name, as the Worker names it: `-partial` when days of the range are not rolled up. */
+export const reportFilename = (r: DayRange, partial = false): string =>
+  `royalty-report-${r.from}_to_${r.to}${partial ? "-partial" : ""}.csv`;
 
-/** The download's name. The same as the Worker names it. */
-export const reportFilename = (r: DayRange): string => `royalty-report-${r.from}_to_${r.to}.csv`;
+/** "2026-10-02", or "2026-10-02, 2026-10-03 and 4 more" for a long list. */
+export function missingDaysText(days: readonly string[], show = 3): string {
+  if (days.length <= show) return days.join(", ");
+  return `${days.slice(0, show).join(", ")} and ${days.length - show} more`;
+}
