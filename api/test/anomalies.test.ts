@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { coefficientOfVariation, dayRules, flagAnomalies, median, weeklyOutlier, type UserDay } from "../src/cron/anomalies";
-import { runScheduled } from "../src/cron/rollups";
+import { cvFromMoments, dayRules, flagAnomalies, weeklyOutlier, type UserDay } from "../src/cron/anomalies";
+import { missingDates, rollUpDay, runScheduled } from "../src/cron/rollups";
 import { isoWeek } from "../src/lib/period";
 
 const DAY = "2026-10-14";
@@ -43,19 +43,25 @@ const play = (userId: string, at: number, ms: number[], o: { correct?: (i: numbe
 /** A deterministic human-looking spread around `mean` (about +/-35 %). */
 const spread = (count: number, mean: number) => Array.from({ length: count }, (_, i) => Math.round(mean * (1 + 0.35 * Math.sin(i * 2.1))));
 
+const DAY_MS = 86_400_000;
+const NEXT = new Date(START + DAY_MS).toISOString().slice(0, 10);
+const bot = async (id: string, start = START) => {
+  for (let i = 0; i < 6; i++) await play(id, start + i * 7_200_000, Array(10).fill(600));
+};
+const days = (row: { details_json: string }) => JSON.parse(row.details_json).days as Record<string, Record<string, unknown>>;
+
 const open = async () =>
   (await env.DB.prepare("SELECT entity_type, entity_ref, reason, status, details_json FROM review_items").all<{
     entity_type: string; entity_ref: string; reason: string; status: string; details_json: string;
   }>()).results;
 
 describe("statistics", () => {
-  it("median and coefficient of variation", () => {
-    expect(median([5, 1, 3])).toBe(3);
-    expect(median([1, 2, 3, 4])).toBe(2.5);
-    expect(coefficientOfVariation([1000, 1000, 1000])).toBe(0);
-    expect(coefficientOfVariation([])).toBeNull();
-    expect(coefficientOfVariation([0, 0])).toBeNull();
-    expect(coefficientOfVariation([900, 1100])).toBeCloseTo(0.1, 5);
+  it("coefficient of variation from moments", () => {
+    expect(cvFromMoments(1000, 1_000_000)).toBe(0);
+    expect(cvFromMoments(1000, 999_999.9999)).toBe(0); // rounding below zero variance
+    expect(cvFromMoments(0, 0)).toBeNull();
+    // 900 and 1100: mean 1000, mean of squares 1_010_000, sd 100.
+    expect(cvFromMoments(1000, 1_010_000)).toBeCloseTo(0.1, 9);
   });
 
   const base: UserDay = { userId: "u", sessions: 6, rounds: 60, maxSessionsPerHour: 3, hardShare: 0, accuracy: 0.7, medianResponseMs: 3000, responseCv: 0.4 };
@@ -97,8 +103,8 @@ describe("flagAnomalies", () => {
     const items = await open();
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ entity_type: "user", entity_ref: "bot", reason: "score_anomaly", status: "open" });
-    const d = JSON.parse(items[0]!.details_json);
-    expect(d).toMatchObject({ date: DAY, rounds: 60, accuracy: 1, medianResponseMs: 600, responseCv: 0, hardShare: 1 });
+    const d = days(items[0]!)[DAY];
+    expect(d).toMatchObject({ rules: ["inhuman_accuracy", "bot_regularity"], rounds: 60, accuracy: 1, medianResponseMs: 600, responseCv: 0, hardShare: 1 });
   });
 
   it("an elite human who is fast and accurate trips neither regularity nor accuracy", async () => {
@@ -108,14 +114,30 @@ describe("flagAnomalies", () => {
     expect(await open()).toEqual([]);
   });
 
-  it("flags 20 sessions in one clock hour, not 19 spread over two", async () => {
-    await Promise.all([user("flood"), user("busy")]);
-    for (let i = 0; i < 20; i++) await play("flood", START + 3_600_000 + i * 1000, [3000]);
-    for (let i = 0; i < 19; i++) await play("busy", START + 3_600_000 + i * 1000, [3000]);
-    for (let i = 0; i < 5; i++) await play("busy", START + 7_200_000 + i * 1000, [3000]);
+  it("flags 20 sessions within any 60 minutes, even across a clock hour; not 19, or 20 spread over 61", async () => {
+    await Promise.all(["flood", "straddle", "busy", "slow"].map((u) => user(u)));
+    const h = START + 3_600_000;
+    for (let i = 0; i < 20; i++) await play("flood", h + i * 1000, [3000]);
+    // 10 at :50-:59, 10 at :00-:09 of the next hour: each clock hour has 10.
+    for (let i = 0; i < 10; i++) await play("straddle", h - 600_000 + i * 60_000, [3000]);
+    for (let i = 0; i < 10; i++) await play("straddle", h + i * 60_000, [3000]);
+    for (let i = 0; i < 19; i++) await play("busy", h + i * 1000, [3000]);
+    // 20 sessions, first and last exactly 60 minutes apart: no window of 60 minutes holds all 20.
+    for (let i = 0; i < 20; i++) await play("slow", h + Math.round((i * 3_600_000) / 19), [3000]);
     const flags = await flagAnomalies(env, DAY);
-    expect(flags).toHaveLength(1);
-    expect(flags[0]).toMatchObject({ userId: "flood", rules: ["session_flood"] });
+    expect(flags.map((f) => f.userId).sort()).toEqual(["flood", "straddle"]);
+    expect(flags[0]!.rules).toEqual(["session_flood"]);
+  });
+
+  it("takes the exact median of an even number of rounds, in SQL", async () => {
+    await user("m");
+    // 50 rounds, all right: 25 at 400 ms and 25 at 800 ms, in two sessions. Median (400 + 800) / 2 = 600, CV 1/3.
+    await play("m", START, [...Array(15).fill(800), ...Array(10).fill(400)]);
+    await play("m", START + 1, [...Array(15).fill(400), ...Array(10).fill(800)]);
+    const [f, ...rest] = await flagAnomalies(env, DAY);
+    expect(rest).toEqual([]);
+    expect(f).toMatchObject({ userId: "m", rules: ["inhuman_accuracy"] });
+    expect(f!.metrics).toMatchObject({ medianResponseMs: 600, responseCv: 0.333, accuracy: 1, rounds: 50 });
   });
 
   it("ignores anonymous, shadow-banned users and other days", async () => {
@@ -141,7 +163,12 @@ describe("flagAnomalies", () => {
     const flags = await flagAnomalies(env, DAY);
     expect(flags).toHaveLength(1);
     expect(flags[0]).toMatchObject({ userId: "a", rules: ["weekly_outlier"] });
-    expect(JSON.parse((await open())[0]!.details_json)).toMatchObject({ week: WEEK, weeklyPoints: 9000, runnerUpPoints: 3000 });
+    expect(days((await open())[0]!)[DAY]).toMatchObject({ rules: ["weekly_outlier"], week: WEEK, weeklyPoints: 9000, runnerUpPoints: 3000 });
+
+    // Dismissed: the same week's lead is not raised again on a later day of the week.
+    await env.DB.prepare("UPDATE review_items SET status = 'dismissed'").run();
+    expect(await flagAnomalies(env, NEXT)).toEqual([]);
+    expect((await open()).map((r) => r.status)).toEqual(["dismissed"]);
 
     await env.DB.prepare("DELETE FROM review_items").run();
     await board([["a", 8999], ["b", 3000], ["c", 100]]);
@@ -164,15 +191,46 @@ describe("flagAnomalies", () => {
     expect(flags.map((f) => f.userId)).toEqual(["u0"]);
   });
 
-  it("re-running a day does not duplicate an open flag; a closed one can be raised again", async () => {
+  it("re-running a day does not duplicate an open flag", async () => {
     await user("bot");
-    for (let i = 0; i < 6; i++) await play("bot", START + i * 7_200_000, Array(10).fill(600));
+    await bot("bot");
     await flagAnomalies(env, DAY);
     await flagAnomalies(env, DAY);
-    expect(await open()).toHaveLength(1);
+    const items = await open();
+    expect(items).toHaveLength(1);
+    expect(Object.keys(days(items[0]!))).toEqual([DAY]);
+  });
+
+  it("adds a later day's evidence to the open item", async () => {
+    await user("bot");
+    await bot("bot");
+    await flagAnomalies(env, DAY);
+    await bot("bot", START + DAY_MS);
+    await flagAnomalies(env, NEXT);
+    const items = await open();
+    expect(items).toHaveLength(1);
+    expect(Object.keys(days(items[0]!)).sort()).toEqual([DAY, NEXT]);
+  });
+
+  it("a dismissal sticks for that day; new evidence on a later day opens a new item", async () => {
+    await user("bot");
+    await bot("bot");
+    await flagAnomalies(env, DAY);
     await env.DB.prepare("UPDATE review_items SET status = 'dismissed'").run();
     await flagAnomalies(env, DAY);
-    expect((await open()).map((r) => r.status).sort()).toEqual(["dismissed", "open"]);
+    expect((await open()).map((r) => r.status)).toEqual(["dismissed"]);
+    await bot("bot", START + DAY_MS);
+    await flagAnomalies(env, NEXT);
+    const items = await open();
+    expect(items.map((r) => r.status).sort()).toEqual(["dismissed", "open"]);
+    expect(Object.keys(days(items.find((r) => r.status === "open")!))).toEqual([NEXT]);
+  });
+
+  it("marks the day as checked, with the number of users flagged", async () => {
+    await user("bot");
+    await bot("bot");
+    await flagAnomalies(env, DAY);
+    expect(await env.DB.prepare("SELECT value FROM analytics_daily WHERE date = ?1 AND metric = 'anomaly_pass'").bind(DAY).first()).toEqual({ value: 1 });
   });
 
   it("only flags: no ban, no score change, no session change", async () => {
@@ -193,8 +251,29 @@ describe("flagAnomalies", () => {
 describe("nightly run", () => {
   it("flags yesterday's bot as part of runScheduled", async () => {
     await user("bot");
-    for (let i = 0; i < 6; i++) await play("bot", START + i * 7_200_000, Array(10).fill(600));
-    await runScheduled(env, START + 86_400_000 + 3_600_000);
+    await bot("bot");
+    await runScheduled(env, START + DAY_MS + 3_600_000);
     expect((await open()).map((r) => r.entity_ref)).toEqual(["bot"]);
+  });
+
+  it("retries a day whose anomaly pass never ran, even though it is already rolled up", async () => {
+    await user("bot");
+    await bot("bot");
+    // The 14th's night ran the roll-ups but its pass failed (no marker); the 15th's run catches up.
+    await rollUpDay(env, DAY);
+    for (let d = 1; d <= 6; d++) {
+      const date = new Date(START - d * DAY_MS).toISOString().slice(0, 10);
+      await rollUpDay(env, date);
+      await flagAnomalies(env, date);
+    }
+    await runScheduled(env, START + 2 * DAY_MS + 3_600_000);
+    expect((await open()).map((r) => r.entity_ref)).toEqual(["bot"]);
+    expect(await missingDates(env, START + 2 * DAY_MS + 3_600_000, "anomaly_pass")).toEqual([]);
+  });
+
+  it("a roll-up re-run keeps the day's anomaly marker", async () => {
+    await flagAnomalies(env, DAY);
+    await rollUpDay(env, DAY);
+    expect(await missingDates(env, START + DAY_MS + 1, "anomaly_pass")).not.toContain(DAY);
   });
 });

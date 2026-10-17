@@ -88,8 +88,10 @@ reviewRoutes.get("/review-items/counts", async (c) => {
     .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open"), notInArray(tracks.status, [...OUT_OF_CATALOG])))
     .groupBy(reviewItems.reason);
   // This is the track queue; score_anomaly items belong to users and are not shown here.
-  const counts: Record<string, number> = Object.fromEntries(REVIEW_REASONS.filter((r) => r !== "score_anomaly").map((r) => [r, 0]));
-  for (const r of rows) counts[r.reason] = r.n;
+  type TrackReason = Exclude<(typeof REVIEW_REASONS)[number], "score_anomaly">;
+  const trackReasons = REVIEW_REASONS.filter((r): r is TrackReason => r !== "score_anomaly");
+  const counts = Object.fromEntries(trackReasons.map((r) => [r, 0])) as Record<TrackReason, number>;
+  for (const r of rows) if (r.reason !== "score_anomaly") counts[r.reason] = r.n;
   return c.json({ counts });
 });
 

@@ -3,9 +3,10 @@
 // Each run REPLACES the day's rows in one batch (delete, then insert), so reruns give identical rows
 // and a failure leaves the day either untouched or complete.
 import type { Bindings } from "../env";
-import { flagAnomalies } from "./anomalies";
+import { DAY_MS, dayBounds, utcDate } from "../lib/dayRange";
+import { ANOMALY_PASS_METRIC, ANOMALY_QUERIES, flagAnomalies } from "./anomalies";
 
-const DAY_MS = 86_400_000;
+export { dayBounds, utcDate };
 /** How far back a run looks for days that were never rolled up. */
 export const BACKFILL_DAYS = 7;
 /** Country stored for sessions Cloudflare could not place. */
@@ -21,29 +22,18 @@ export type RollupSummary = {
   analyticsRows: number;
 };
 
-/** `YYYY-MM-DD` for the UTC day containing `ms`. */
-export function utcDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
-/** [start, end) of a UTC day in epoch ms, or null when `date` is not a real calendar day. */
-export function dayBounds(date: string): { start: number; end: number } | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const start = Date.parse(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(start) || utcDate(start) !== date) return null;
-  return { start, end: start + DAY_MS };
-}
-
 // ?1 date, ?2 start (inclusive), ?3 end (exclusive).
 const SESSIONS_IN_DAY = "received_at >= ?2 AND received_at < ?3";
 
 /** Retention counts are keyed by cohort date and written by a LATER day's run, so a day's own re-run must keep them. */
 export const RETENTION_METRICS = ["retention_d1", "retention_d7", "retention_d30"] as const;
+/** Rows a day's roll-up does not own: retention (later days write it) and the anomaly pass's done-marker. */
+const KEPT_METRICS = [...RETENTION_METRICS, ANOMALY_PASS_METRIC];
 
 const DELETE_SQL = [
   "DELETE FROM royalty_daily WHERE date = ?1",
   "DELETE FROM ad_events_daily WHERE date = ?1",
-  `DELETE FROM analytics_daily WHERE date = ?1 AND metric NOT IN (${RETENTION_METRICS.map((m) => `'${m}'`).join(", ")})`,
+  `DELETE FROM analytics_daily WHERE date = ?1 AND metric NOT IN (${KEPT_METRICS.map((m) => `'${m}'`).join(", ")})`,
 ];
 
 // Every track in track_ids_json is one play, right or wrong, flagged or not (FR-22). A play of an ID
@@ -117,8 +107,15 @@ const RETENTION_SQL = `
 /** The inserts in rollUpDay's batch, after DELETE_SQL; STATEMENTS_PER_DAY is derived from both. */
 const INSERT_SQL = [ROYALTY_SQL, ADS_SQL, TOTALS_SQL, BREAKDOWN_SQL, RETENTION_SQL];
 const STATEMENTS_PER_DAY = DELETE_SQL.length + INSERT_SQL.length;
-/** Days one run rolls up at most, derived so that a run (plus its 1 read) stays under the Free plan's 50 queries. */
-export const MAX_DAYS_PER_RUN = Math.floor((45 - 1) / STATEMENTS_PER_DAY);
+/** D1 queries one cron run may make: the Free plan allows 50, and 2 are kept spare. */
+export const RUN_QUERY_BUDGET = 48;
+/** The run's own reads: missing roll-up days, missing anomaly days. */
+const RUN_READS = 2;
+/**
+ * Days one run rolls up at most: as many as fit once the reads and one anomaly pass (yesterday's,
+ * which every run makes) are paid for. Whatever is left over goes to anomaly passes for missed days.
+ */
+export const MAX_DAYS_PER_RUN = Math.floor((RUN_QUERY_BUDGET - RUN_READS - ANOMALY_QUERIES) / STATEMENTS_PER_DAY);
 
 /**
  * Roll up one UTC day, replacing whatever the three tables held for it (retention rows, which belong
@@ -145,25 +142,30 @@ export async function rollUpDay(env: Pick<Bindings, "DB">, date: string): Promis
   };
 }
 
-/** The days in the last BACKFILL_DAYS (yesterday and back) that have no roll-up yet, oldest first. */
-export async function missingDates(env: Pick<Bindings, "DB">, now: number): Promise<string[]> {
+/**
+ * The days in the last BACKFILL_DAYS (yesterday and back) without a `metric` row, oldest first. A day is
+ * rolled up once it has its 'sessions' metric (written even for a day with no sessions), and
+ * anomaly-checked once it has ANOMALY_PASS_METRIC.
+ */
+export async function missingDates(env: Pick<Bindings, "DB">, now: number, metric: string = "sessions"): Promise<string[]> {
   const days = Array.from({ length: BACKFILL_DAYS }, (_, i) => utcDate(now - (BACKFILL_DAYS - i) * DAY_MS));
-  // A day is done once it has its 'sessions' metric: that row is written even for a day with no sessions.
   const { results } = await env.DB.prepare(
-    "SELECT DISTINCT date FROM analytics_daily WHERE metric = 'sessions' AND date IN (SELECT value FROM json_each(?1))",
+    "SELECT DISTINCT date FROM analytics_daily WHERE metric = ?2 AND date IN (SELECT value FROM json_each(?1))",
   )
-    .bind(JSON.stringify(days))
+    .bind(JSON.stringify(days), metric)
     .all<{ date: string }>();
   const done = new Set(results.map((r) => r.date));
   return days.filter((d) => !done.has(d));
 }
 
 /**
- * What the cron runs: yesterday (recomputed even if present, so late rows are picked up) plus any day
- * in the last week that was never rolled up. A failing day does not stop the others; the run then
- * throws, so the failure shows in Cloudflare, and the next run picks the day up again.
- * At most MAX_DAYS_PER_RUN days per run (yesterday first, then the oldest missing), to stay inside the
- * Free plan's 50 queries per invocation; with a week missing, the admin endpoint or the next night's run covers the rest.
+ * What the cron runs, in two parts that fail separately:
+ * 1. Roll-ups: yesterday (recomputed even if present, so late rows are picked up) plus any day in the
+ *    last week that was never rolled up, at most MAX_DAYS_PER_RUN (yesterday first, then the oldest missing).
+ * 2. Anomaly passes: yesterday (again recomputed) plus any day in the last week whose pass never
+ *    finished, as many as the remaining query budget allows.
+ * A failing day does not stop the others; the run then throws, so the failure shows in Cloudflare, and
+ * the next run picks the day up again. Everything stays inside RUN_QUERY_BUDGET (Free plan: 50 per invocation).
  */
 export async function runScheduled(env: Pick<Bindings, "DB">, now: number = Date.now()): Promise<RollupSummary[]> {
   const yesterday = utcDate(now - DAY_MS);
@@ -183,14 +185,17 @@ export async function runScheduled(env: Pick<Bindings, "DB">, now: number = Date
       console.error(`rollup ${date} failed`, e);
     }
   }
-  // The anomaly pass (at most ANOMALY_QUERIES more queries; 5 days x 8 + 1 + 5 stays under 50) is separate
-  // from the roll-ups: its failure must not undo them, and theirs must not skip it.
-  try {
-    const flags = await flagAnomalies(env, yesterday);
-    console.log(`anomalies ${yesterday}: flagged=${flags.length}`);
-  } catch (e) {
-    failed.push(`anomalies ${yesterday}`);
-    console.error(`anomaly pass ${yesterday} failed`, e);
+
+  const passes = Math.floor((RUN_QUERY_BUDGET - RUN_READS - todo.length * STATEMENTS_PER_DAY) / ANOMALY_QUERIES);
+  const unchecked = (await missingDates(env, now, ANOMALY_PASS_METRIC)).filter((d) => d !== yesterday);
+  for (const date of [yesterday, ...unchecked].slice(0, passes).sort()) {
+    try {
+      const flags = await flagAnomalies(env, date);
+      console.log(`anomalies ${date}: users_flagged=${flags.length}`);
+    } catch (e) {
+      failed.push(`anomalies ${date}`);
+      console.error(`anomaly pass ${date} failed`, e);
+    }
   }
   if (failed.length > 0) throw new Error(`nightly run failed for ${failed.join(", ")}`);
   return done;

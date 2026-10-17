@@ -1,10 +1,22 @@
 // A from/to range of UTC days (`YYYY-MM-DD`, both included), as the report and analytics endpoints take it.
 import { z } from "zod";
-import { dayBounds } from "../cron/rollups";
 
 /** Longest range one request covers, in days: a year, plus a leap day. */
 export const MAX_RANGE_DAYS = 366;
 export const DAY_MS = 86_400_000;
+
+/** `YYYY-MM-DD` for the UTC day containing `ms`. */
+export function utcDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** [start, end) of a UTC day in epoch ms, or null when `date` is not a real calendar day. */
+export function dayBounds(date: string): { start: number; end: number } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const start = Date.parse(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(start) || utcDate(start) !== date) return null;
+  return { start, end: start + DAY_MS };
+}
 
 export const day = z.string().refine((s) => dayBounds(s) !== null, "must be a real calendar day, YYYY-MM-DD");
 
