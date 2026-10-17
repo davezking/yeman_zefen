@@ -6,7 +6,7 @@ import 'package:yeman_zefen/core/widgets/widgets.dart';
 import 'package:yeman_zefen/prototype/mock_data.dart';
 import 'package:yeman_zefen/prototype/models.dart';
 import 'package:yeman_zefen/prototype/screens/home_screen.dart';
-import 'package:yeman_zefen/prototype/screens/leaderboard_screen.dart';
+import 'package:yeman_zefen/features/leaderboard/ui/leaderboard_screen.dart';
 import 'package:yeman_zefen/prototype/screens/message_screens.dart';
 import 'package:yeman_zefen/prototype/screens/mode_select_screen.dart';
 import 'package:yeman_zefen/prototype/screens/offline_play_screen.dart';
@@ -15,7 +15,7 @@ import 'package:yeman_zefen/prototype/screens/results_screen.dart';
 import 'package:yeman_zefen/prototype/screens/round_screen.dart';
 import 'package:yeman_zefen/prototype/screens/settings_screen.dart';
 import 'package:yeman_zefen/prototype/screens/setup_screen.dart';
-import 'package:yeman_zefen/prototype/screens/sign_in_sheet.dart';
+import 'package:yeman_zefen/features/account/ui/sign_in_sheet.dart';
 
 void _noop() {}
 void _noopString(String _) {}

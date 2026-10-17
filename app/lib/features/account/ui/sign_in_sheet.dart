@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/models.dart';
 
 /// The contents of the sign-in bottom sheet: "Keep your scores", with Apple
 /// (iOS only, and first), Google and email. Show it in an [AppSheet] (or with

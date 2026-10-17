@@ -17,13 +17,21 @@ void main() {
       RegExp(r'^\.\./\.\./core/widgets/widgets\.dart$'),
       RegExp(r'^\.\./\.\./l10n/app_localizations\.dart$'),
       RegExp(r'^\.\./(labels|models)\.dart$'),
+      // The two screens that moved into features/ (they stay plain widgets, so the same rule applies).
+      RegExp(r'^\.\./\.\./\.\./core/theme/(app_text|theme_context|tokens)\.dart$'),
+      RegExp(r'^\.\./\.\./\.\./core/widgets/widgets\.dart$'),
+      RegExp(r'^\.\./\.\./\.\./l10n/app_localizations\.dart$'),
+      RegExp(r'^\.\./\.\./\.\./prototype/(labels|models)\.dart$'),
     ];
 
-    final files = Directory('lib/prototype/screens')
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.dart'))
-        .toList();
+    final files = [
+      ...Directory('lib/prototype/screens')
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart')),
+      File('lib/features/account/ui/sign_in_sheet.dart'),
+      File('lib/features/leaderboard/ui/leaderboard_screen.dart'),
+    ];
 
     test('there are screens to scan', () => expect(files.length, 11));
 

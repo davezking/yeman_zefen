@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../labels.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/labels.dart';
+import '../../../prototype/models.dart';
 
 /// The leaderboard: yellow from top to bottom, this week or all time, an era
 /// filter, the top three on a podium, the rest in rows, and at the bottom

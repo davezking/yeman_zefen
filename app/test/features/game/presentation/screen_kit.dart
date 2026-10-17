@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yeman_zefen/app.dart';
+import 'package:yeman_zefen/core/auth/auth_service.dart';
+import 'package:yeman_zefen/core/config/remote_config.dart';
+import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/features/account/register_prompt_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
@@ -142,6 +146,17 @@ Future<Harness> pumpScreens(
       installedVersionsProvider.overrideWith((ref) => Stream.value(installed)),
       packServiceProvider.overrideWithValue(packService ?? FakePackService()),
       packInstallProgressProvider.overrideWith((ref, slug) => (progress ?? (_) => const Stream.empty())(slug)),
+      // The results route asks for the register prompt. A signed-out device is never asked, so the
+      // test never reaches Firebase.
+      registerPromptControllerProvider.overrideWith(
+        (ref) => RegisterPromptController(
+          sessions: ref.watch(sessionStoreProvider),
+          db: ref.watch(appDbProvider),
+          config: () => RemoteConfig.defaults,
+          auth: () => AuthState.signedOut,
+          nowMs: () => 0,
+        ),
+      ),
     ],
   );
   addTearDown(container.dispose);

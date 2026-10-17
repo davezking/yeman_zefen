@@ -10,11 +10,11 @@ import 'models.dart';
 import 'prototype_model.dart';
 import 'prototype_paths.dart';
 import 'round_simulation.dart';
-import 'screens/leaderboard_screen.dart';
+import '../features/leaderboard/ui/leaderboard_screen.dart';
 import 'screens/message_screens.dart';
 import 'screens/results_screen.dart';
 import 'screens/round_screen.dart';
-import 'screens/sign_in_sheet.dart';
+import '../features/account/ui/sign_in_sheet.dart';
 
 /// The routes that play a game on mock data: the round (on a fake clock),
 /// Results, the leaderboard, and the sign-in sheets. They wire the screens to
