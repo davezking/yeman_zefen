@@ -2,7 +2,7 @@ import { BarChart, LineChart } from "@mantine/charts";
 import { Alert, Anchor, Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useState } from "react";
 import { useAnalytics } from "../api/analytics";
-import { TARGETS, kpis, lastDays, percent, retentionByWeek, type Kpi } from "../lib/analytics";
+import { TARGETS, axisLabel, kpis, lastDays, percent, retentionByWeek, type Kpi } from "../lib/analytics";
 import { missingDaysText, rangeError, type DayRange } from "../lib/reports";
 
 const number = (n: number) => n.toLocaleString("en-US");
@@ -57,11 +57,12 @@ export function AnalyticsPage() {
 
 function Dashboard({ data }: { data: NonNullable<ReturnType<typeof useAnalytics>["data"]> }) {
   const days = data.days;
+  const label = (date: string) => axisLabel(date, data);
   // A day without a roll-up is a gap (null), not a zero.
-  const dauSeries = days.map((d) => ({ date: d.date.slice(5), DAU: d.rolledUp ? d.dau : null, "New users": d.rolledUp ? d.newUsers : null }));
-  const rpsSeries = days.map((d) => ({ date: d.date.slice(5), "Rounds per session": d.rolledUp && d.sessions > 0 ? d.roundsPerSession : null }));
+  const dauSeries = days.map((d) => ({ date: label(d.date), DAU: d.rolledUp ? d.dau : null, "New users": d.rolledUp ? d.newUsers : null }));
+  const rpsSeries = days.map((d) => ({ date: label(d.date), "Rounds per session": d.rolledUp && d.sessions > 0 ? d.roundsPerSession : null }));
   const adSeries = days.map((d) => ({
-    date: d.date.slice(5),
+    date: label(d.date),
     "Interstitials shown": d.rolledUp ? d.interstitialsShown : null,
     "Rewarded completed": d.rolledUp ? d.rewardedCompleted : null,
   }));
@@ -102,6 +103,7 @@ function Dashboard({ data }: { data: NonNullable<ReturnType<typeof useAnalytics>
           h={220}
           data={rpsSeries}
           dataKey="date"
+          connectNulls={false}
           series={[{ name: "Rounds per session", color: "violet.6" }]}
           referenceLines={[{ y: TARGETS.roundsPerSession, label: `Target ${TARGETS.roundsPerSession}`, color: "red.5" }]}
           withLegend
@@ -126,7 +128,10 @@ function Dashboard({ data }: { data: NonNullable<ReturnType<typeof useAnalytics>
           <Table.Tbody>
             {weeks.map((w) => (
               <Table.Tr key={w.week}>
-                <Table.Td>{w.week}</Table.Td>
+                <Table.Td>
+                  {w.week}
+                  {w.days < 7 && <Text span size="xs" c="dimmed"> ({w.days} of 7 days in range)</Text>}
+                </Table.Td>
                 <Table.Td ta="right">{number(w.newUsers)}</Table.Td>
                 <Table.Td ta="right" c={cellColor(w.d1, TARGETS.d1)}>{percent(w.d1)}</Table.Td>
                 <Table.Td ta="right" c={cellColor(w.d7, TARGETS.d7)}>{percent(w.d7)}</Table.Td>
@@ -164,6 +169,7 @@ function Dashboard({ data }: { data: NonNullable<ReturnType<typeof useAnalytics>
             h={220}
             data={adSeries}
             dataKey="date"
+            connectNulls={false}
             series={[
               { name: "Interstitials shown", color: "orange.6" },
               { name: "Rewarded completed", color: "grape.6" },

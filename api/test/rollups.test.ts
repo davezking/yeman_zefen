@@ -267,7 +267,7 @@ describe("POST /admin/rollups/run", () => {
     const res = await api("/admin/rollups/run", { body: { date: DAY } });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      rollup: { date: DAY, sessions: 4, rounds: 7, royaltyRows: 4, adRows: 4, analyticsRows: 8 },
+      rollup: { date: DAY, sessions: 4, rounds: 7, royaltyRows: 4, adRows: 4, analyticsRows: 11 },
     });
   });
 

@@ -7,10 +7,6 @@ import type { Bindings } from "../env";
 const DAY_MS = 86_400_000;
 /** How far back a run looks for days that were never rolled up. */
 export const BACKFILL_DAYS = 7;
-/** D1 statements in rollUpDay's batch: 3 deletes + royalty + ads + 2 analytics + retention. */
-const STATEMENTS_PER_DAY = 8;
-/** Days one run rolls up at most, derived so that a run (plus its 1 read) stays under the Free plan's 50 queries. */
-export const MAX_DAYS_PER_RUN = Math.floor((45 - 1) / STATEMENTS_PER_DAY);
 /** Country stored for sessions Cloudflare could not place. */
 export const UNKNOWN_COUNTRY = "XX";
 
@@ -18,7 +14,7 @@ export type RollupSummary = {
   date: string;
   sessions: number;
   rounds: number;
-  /** Rows written to royalty_daily, ad_events_daily and analytics_daily. */
+  /** Rows written to royalty_daily, ad_events_daily and analytics_daily (analytics includes the 3 retention rows for earlier cohorts). */
   royaltyRows: number;
   adRows: number;
   analyticsRows: number;
@@ -110,12 +106,18 @@ const RETENTION_SQL = `
   WITH h(n, metric) AS (VALUES (1, 'retention_d1'), (7, 'retention_d7'), (30, 'retention_d30'))
   INSERT OR REPLACE INTO analytics_daily (date, metric, dimension, value)
   SELECT date(?1, '-' || n || ' days'), metric, '',
-         (SELECT COUNT(*) FROM users u
-           WHERE u.id <> 'deleted'
-             AND u.created_at >= CAST(strftime('%s', date(?1, '-' || n || ' days')) AS INTEGER) * 1000
-             AND u.created_at < (CAST(strftime('%s', date(?1, '-' || n || ' days')) AS INTEGER) + 86400) * 1000
-             AND EXISTS (SELECT 1 FROM game_sessions s WHERE s.user_id = u.id AND ${SESSIONS_IN_DAY.replaceAll("received_at", "s.received_at")}))
+         -- Starts from the day's sessions (indexed by received_at), not from all users.
+         (SELECT COUNT(DISTINCT s.user_id) FROM game_sessions s JOIN users u ON u.id = s.user_id
+           WHERE s.received_at >= ?2 AND s.received_at < ?3
+             AND u.id <> 'deleted'
+             AND u.created_at >= ?2 - n * ${DAY_MS} AND u.created_at < ?3 - n * ${DAY_MS})
     FROM h`;
+
+/** The inserts in rollUpDay's batch, after DELETE_SQL; STATEMENTS_PER_DAY is derived from both. */
+const INSERT_SQL = [ROYALTY_SQL, ADS_SQL, TOTALS_SQL, BREAKDOWN_SQL, RETENTION_SQL];
+const STATEMENTS_PER_DAY = DELETE_SQL.length + INSERT_SQL.length;
+/** Days one run rolls up at most, derived so that a run (plus its 1 read) stays under the Free plan's 50 queries. */
+export const MAX_DAYS_PER_RUN = Math.floor((45 - 1) / STATEMENTS_PER_DAY);
 
 /**
  * Roll up one UTC day, replacing whatever the three tables held for it (retention rows, which belong
@@ -128,11 +130,7 @@ export async function rollUpDay(env: Pick<Bindings, "DB">, date: string): Promis
   const bind = (sql: string) => env.DB.prepare(sql).bind(date, bounds.start, bounds.end);
   const results = await env.DB.batch([
     ...DELETE_SQL.map((sql) => env.DB.prepare(sql).bind(date)),
-    bind(ROYALTY_SQL),
-    bind(ADS_SQL),
-    bind(TOTALS_SQL),
-    bind(BREAKDOWN_SQL),
-    bind(RETENTION_SQL),
+    ...INSERT_SQL.map(bind),
   ]);
   const changes = (i: number) => results[i]!.meta.changes ?? 0;
   const total = (name: string) => (results[5]!.results as { metric: string; value: number }[]).find((r) => r.metric === name)!.value;
@@ -142,7 +140,7 @@ export async function rollUpDay(env: Pick<Bindings, "DB">, date: string): Promis
     rounds: total("rounds"),
     royaltyRows: changes(3),
     adRows: changes(4),
-    analyticsRows: changes(5) + changes(6),
+    analyticsRows: changes(5) + changes(6) + changes(7),
   };
 }
 

@@ -45,8 +45,8 @@ export function buildDays(from: string, to: string, metrics: MetricRow[], ads: A
     if (!byDay.has(m.date)) byDay.set(m.date, new Map());
     byDay.get(m.date)!.set(m.metric, m.value);
   }
-  const adAt = (date: string, format: string, event: string) =>
-    ads.find((a) => a.date === date && a.format === format && a.event === event)?.count ?? 0;
+  const adCounts = new Map(ads.map((a) => [`${a.date}|${a.format}|${a.event}`, a.count]));
+  const adAt = (date: string, format: string, event: string) => adCounts.get(`${date}|${format}|${event}`) ?? 0;
   const out: DayStats[] = [];
   const end = Date.parse(`${to}T00:00:00Z`);
   for (let t = Date.parse(`${from}T00:00:00Z`); t <= end; t += DAY_MS) {

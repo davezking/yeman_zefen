@@ -11,7 +11,7 @@ import {
   type CountryRow,
   type MetricRow,
 } from "../../lib/analytics";
-import { rangeQuery } from "../../lib/royaltyReport";
+import { rangeQuery } from "../../lib/dayRange";
 import { parse } from "../../lib/validate";
 
 export const analyticsRoutes = new Hono<AppEnv>();

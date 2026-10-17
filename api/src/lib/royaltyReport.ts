@@ -1,25 +1,10 @@
 // The royalty usage report (FR-22): plays per track over a date range, from the nightly roll-up
 // `royalty_daily`. Spec: docs/architecture.md §5 "Reports".
 import { z } from "zod";
-import { dayBounds } from "../cron/rollups";
+import { DAY_MS, MAX_RANGE_DAYS, checkRange, day } from "./dayRange";
 
-/** Longest range one report covers, in days. A year of the music association's reporting, plus a leap day. */
-export const MAX_REPORT_DAYS = 366;
-const DAY_MS = 86_400_000;
-
-const day = z.string().refine((s) => dayBounds(s) !== null, "must be a real calendar day, YYYY-MM-DD");
-
-function checkRange(q: { from: string; to: string }, ctx: z.RefinementCtx): void {
-  if (dayBounds(q.from) === null || dayBounds(q.to) === null) return;
-  if (q.from > q.to) {
-    ctx.addIssue({ code: "custom", path: ["to"], message: "must not be before from" });
-  } else if (days(q.from, q.to) > MAX_REPORT_DAYS) {
-    ctx.addIssue({ code: "custom", path: ["to"], message: `the range is at most ${MAX_REPORT_DAYS} days` });
-  }
-}
-
-/** A from/to day range, both included; shared with the analytics endpoint. */
-export const rangeQuery = z.object({ from: day, to: day }).superRefine(checkRange);
+/** Longest range one report covers, in days (the shared day-range limit). */
+export const MAX_REPORT_DAYS = MAX_RANGE_DAYS;
 
 export const reportQuery = z
   .object({
@@ -29,10 +14,6 @@ export const reportQuery = z
   })
   .superRefine(checkRange);
 
-/** Days from `from` to `to`, both included. */
-function days(from: string, to: string): number {
-  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
-}
 
 export type RoyaltyRow = {
   trackId: number;

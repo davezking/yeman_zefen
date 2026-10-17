@@ -30,14 +30,15 @@ const rolled = (days: readonly DayStats[]) => days.filter((d) => d.rolledUp);
 
 /**
  * Retention over the range's cohorts: users who came back over users created, counting only the
- * cohorts whose answer is known (a cohort's D7 is not known until a week after it). Null with none.
+ * cohorts whose answer is known (a cohort's D7 is not known until a week after it) and whose own day
+ * is rolled up (otherwise its new_users, the denominator, is unknown). Null with none.
  */
 export function overallRetention(days: readonly DayStats[], k: "d1" | "d7" | "d30"): number | null {
   let back = 0;
   let cohort = 0;
   for (const d of days) {
     const r = d.retained[k];
-    if (r === null) continue;
+    if (r === null || !d.rolledUp) continue;
     back += r;
     cohort += d.newUsers;
   }
@@ -71,6 +72,8 @@ export function weekStart(date: string): string {
 export type WeekRow = {
   /** Monday of the cohort week. */
   week: string;
+  /** Days of the week inside the range: fewer than 7 at the range's ends. */
+  days: number;
   newUsers: number;
   /** Retention of the week's cohorts; null when no day of the week has the answer yet. */
   d1: number | null;
@@ -78,7 +81,10 @@ export type WeekRow = {
   d30: number | null;
 };
 
-/** Cohorts grouped by the week they were created in, oldest first. A week's D7 only uses the cohort days that have it. */
+/**
+ * Cohorts grouped by the week they were created in, oldest first. Only days inside the range count,
+ * so the first and last weeks can be partial (`days` < 7). A week's D7 only uses the cohort days that have it.
+ */
 export function retentionByWeek(days: readonly DayStats[]): WeekRow[] {
   const weeks = new Map<string, DayStats[]>();
   for (const d of days) {
@@ -89,6 +95,7 @@ export function retentionByWeek(days: readonly DayStats[]): WeekRow[] {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([week, list]) => ({
       week,
+      days: list.length,
       newUsers: list.reduce((n, d) => n + d.newUsers, 0),
       d1: overallRetention(list, "d1"),
       d7: overallRetention(list, "d7"),
@@ -102,5 +109,8 @@ export function lastDays(now: number, n: number): DayRange {
   const yesterday = Math.floor(now / DAY_MS) * DAY_MS - DAY_MS;
   return { from: day(yesterday - (n - 1) * DAY_MS), to: day(yesterday) };
 }
+
+/** Chart axis label for a day: MM-DD, or the full day when the range spans more than one year. */
+export const axisLabel = (date: string, range: DayRange) => (range.from.slice(0, 4) === range.to.slice(0, 4) ? date.slice(5) : date);
 
 export const percent = (v: number | null, digits = 1) => (v === null ? "–" : `${(v * 100).toFixed(digits)} %`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DayStats } from "../src/api/analytics";
-import { TARGETS, kpis, lastDays, overallRetention, percent, retentionByWeek, weekStart } from "../src/lib/analytics";
+import { TARGETS, axisLabel, kpis, lastDays, overallRetention, percent, retentionByWeek, weekStart } from "../src/lib/analytics";
 
 const day = (date: string, o: Partial<DayStats> = {}): DayStats => ({
   date,
@@ -51,6 +51,21 @@ describe("retention", () => {
     expect(w2).toMatchObject({ week: "2026-10-19", newUsers: 5, d1: null, d7: null, d30: null });
   });
 
+  it("leaves out a cohort whose own day is not rolled up: its new users are unknown", () => {
+    // Day C failed to roll up, but C+1 did and wrote C's D1 count; adding it over 0 new users would inflate the share.
+    const list = [
+      day("2026-10-12", { newUsers: 10, retained: { d1: 3, d7: null, d30: null } }),
+      day("2026-10-13", { rolledUp: false, retained: { d1: 12, d7: null, d30: null } }),
+    ];
+    expect(overallRetention(list, "d1")).toBeCloseTo(0.3);
+  });
+
+  it("says how many days of a week are inside the range", () => {
+    const [w1, w2] = retentionByWeek([day("2026-10-17"), day("2026-10-18"), day("2026-10-19")]);
+    expect(w1).toMatchObject({ week: "2026-10-12", days: 2 });
+    expect(w2).toMatchObject({ week: "2026-10-19", days: 1 });
+  });
+
   it("a known 0 is 0 %, not a dash", () => {
     expect(overallRetention([day("2026-10-12", { newUsers: 8, retained: { d1: 0, d7: null, d30: null } })], "d1")).toBe(0);
     expect(percent(0)).toBe("0.0 %");
@@ -92,6 +107,13 @@ describe("kpis", () => {
     ]);
     expect(get(list, "dau").value).toBe(2000);
     expect(get(list, "roundsPerSession").value).toBe(20);
+  });
+});
+
+describe("axisLabel", () => {
+  it("drops the year only when the range is within one year", () => {
+    expect(axisLabel("2026-10-17", { from: "2026-01-01", to: "2026-12-31" })).toBe("10-17");
+    expect(axisLabel("2026-10-17", { from: "2025-10-17", to: "2026-10-17" })).toBe("2026-10-17");
   });
 });
 
