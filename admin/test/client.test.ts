@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { API_BASE, ApiError, apiFetch, noContent } from "../src/api/client";
+import { API_BASE, ApiError, apiFetch, apiFetchBlob, noContent } from "../src/api/client";
 import { errorMessage, errorTitle } from "../src/queryClient";
 
 function stubFetch(impl: (url: string, init: RequestInit) => Promise<Response>) {
@@ -89,5 +89,33 @@ describe("error notifications", () => {
       "Internal server error (request abc)",
     );
     expect(errorMessage(new ApiError(0, "network", "offline"))).toBe("offline");
+  });
+});
+
+describe("apiFetchBlob", () => {
+  it("returns the file and sends the Access cookie", async () => {
+    const fetch = stubFetch(async () => new Response("a,b\r\n1,2\r\n", { headers: { "content-type": "text/csv" } }));
+    const blob = await apiFetchBlob("/admin/reports/royalty?from=a");
+    expect(await blob.text()).toBe("a,b\r\n1,2\r\n");
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toBe(`${API_BASE}/admin/reports/royalty?from=a`);
+    expect(init.credentials).toBe("include");
+  });
+
+  it("throws the Worker's error, not a broken download", async () => {
+    stubFetch(async () => Response.json({ error: { code: "forbidden", message: "Requires role: admin" } }, { status: 403 }));
+    await expect(apiFetchBlob("/x")).rejects.toMatchObject({ status: 403, code: "forbidden", message: "Requires role: admin" });
+  });
+
+  it("throws a plain error when the failure has no JSON body", async () => {
+    stubFetch(async () => new Response("<html>bad gateway</html>", { status: 502 }));
+    await expect(apiFetchBlob("/x")).rejects.toMatchObject({ status: 502, code: "http_error" });
+  });
+
+  it("explains an unreachable API", async () => {
+    stubFetch(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await expect(apiFetchBlob("/x")).rejects.toMatchObject({ status: 0, code: "network" });
   });
 });

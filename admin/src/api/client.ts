@@ -41,17 +41,7 @@ export async function apiFetch<T>(path: string, schema: z.ZodType<T>, init: ApiR
     body = JSON.stringify(json);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, { ...rest, headers, body, credentials: "include" });
-  } catch {
-    // Behind Cloudflare Access an expired session also lands here: the redirect to the login page fails CORS.
-    throw new ApiError(
-      0,
-      "network",
-      "Can't reach the API. If your sign-in has expired, reload the page to sign in again.",
-    );
-  }
+  const res = await send(path, { ...rest, headers, body });
 
   const requestId = res.headers.get("x-request-id") ?? undefined;
   const text = await res.text().catch(() => "");
@@ -65,17 +55,51 @@ export async function apiFetch<T>(path: string, schema: z.ZodType<T>, init: ApiR
     }
   }
 
-  if (!res.ok) {
-    const err = errorBodySchema.safeParse(parsedBody);
-    if (err.success) {
-      throw new ApiError(res.status, err.data.error.code, err.data.error.message, requestId);
-    }
-    throw new ApiError(res.status, "http_error", `Request failed with status ${res.status}`, requestId);
-  }
+  if (!res.ok) throw failure(res.status, parsedBody, requestId);
 
   const data = jsonOk ? schema.safeParse(parsedBody) : null;
   if (!data?.success) {
     throw new ApiError(res.status, "bad_response", "The API returned an unexpected response.", requestId);
   }
   return data.data;
+}
+
+/** fetch with the Access cookie. An unreachable API becomes an ApiError. */
+async function send(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, { ...init, credentials: "include" });
+  } catch {
+    // Behind Cloudflare Access an expired session also lands here: the redirect to the login page fails CORS.
+    throw new ApiError(
+      0,
+      "network",
+      "Can't reach the API. If your sign-in has expired, reload the page to sign in again.",
+    );
+  }
+}
+
+/** The ApiError for a non-2xx answer: the Worker's `{ error }` body when it sent one, else the status. */
+function failure(status: number, body: unknown, requestId: string | undefined): ApiError {
+  const err = errorBodySchema.safeParse(body);
+  if (err.success) return new ApiError(status, err.data.error.code, err.data.error.message, requestId);
+  return new ApiError(status, "http_error", `Request failed with status ${status}`, requestId);
+}
+
+/**
+ * A file from the Worker (a CSV report), as a Blob. Like apiFetch it sends the Access cookie and
+ * throws ApiError, so a refused request shows the Worker's message rather than a broken download.
+ */
+export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const res = await send(path, init);
+  const requestId = res.headers.get("x-request-id") ?? undefined;
+  if (!res.ok) {
+    let body: unknown;
+    try {
+      body = JSON.parse(await res.text());
+    } catch {
+      body = undefined;
+    }
+    throw failure(res.status, body, requestId);
+  }
+  return res.blob();
 }

@@ -36,7 +36,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Text fw={700} size="lg" px="xs" pb="sm">
           የማን ዘፈን
         </Text>
-        {navItems.map((item) => (
+        {navItems
+          .filter((item) => !item.adminOnly || whoami.data?.role === "admin")
+          .map((item) => (
           <NavLink
             key={item.path}
             component={RouterNavLink}

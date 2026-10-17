@@ -5,6 +5,7 @@ import { catalog } from "./catalog";
 import { ingestRoutes } from "./ingest";
 import { jobRoutes } from "./jobs";
 import { packRoutes } from "./packs";
+import { reportRoutes } from "./reports";
 import { reviewRoutes } from "./reviewItems";
 import { rollupRoutes } from "./rollups";
 import { taxonomy } from "./taxonomy";
@@ -22,6 +23,7 @@ human.route("/", packRoutes);
 human.route("/", taxonomy);
 human.route("/", reviewRoutes);
 human.route("/", rollupRoutes);
+human.route("/", reportRoutes);
 
 // Service-token routes for GitHub Actions ingestion. requireService guards these.
 const ingest = new Hono<AppEnv>();
