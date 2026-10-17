@@ -228,6 +228,7 @@ catalog.patch("/tracks/:id", async (c) => {
             id: sql<number>`NULL`.as("id"),
             entityType: sql<string>`'track'`.as("entity_type"),
             entityId: tracks.id,
+            entityRef: sql<string | null>`NULL`.as("entity_ref"),
             reason: sql<"era_unknown">`'era_unknown'`.as("reason"),
             detailsJson: sql<string | null>`NULL`.as("details_json"),
             status: sql<"open">`'open'`.as("status"),
