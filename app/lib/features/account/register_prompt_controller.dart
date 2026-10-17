@@ -11,8 +11,8 @@ import '../game/data/session_store.dart';
 ///
 /// A guest is asked after the results screen of session N (`registerPromptAfterSessions`), and
 /// again at a results screen once the cooldown after a dismissal has passed. Tapping "see my rank"
-/// is the guest asking, so it opens the sheet whatever the count or cooldown. A registered player
-/// is never asked.
+/// is the player asking, so it opens the sheet for anyone not registered, whatever the count or
+/// cooldown. A registered player is never asked.
 class RegisterPromptController {
   RegisterPromptController({
     required this.sessions,
@@ -45,8 +45,15 @@ class RegisterPromptController {
     return _cooldownPassed();
   }
 
-  /// Call when the player taps "see my rank". True for a guest: there is no rank to show yet.
-  bool shouldPromptFromLeaderboard() => _isGuest;
+  /// Call when the player taps "see my rank". True for anyone not registered: there is no rank to
+  /// show yet. A device with no account at all is asked too, since signing in creates one.
+  bool shouldPromptFromLeaderboard() => !isRegistered;
+
+  /// Signed in with a provider (not a guest).
+  bool get isRegistered {
+    final who = auth();
+    return who.hasUid && !who.isAnonymous;
+  }
 
   /// The player closed the sheet without registering. Starts the cooldown.
   Future<void> dismiss() => db.customStatement(
@@ -55,7 +62,8 @@ class RegisterPromptController {
     [dismissedAtKey, nowMs()],
   );
 
-  /// A guest with an account. A signed-out device has no account to link to yet, so it is not asked.
+  /// A guest with an account. A signed-out device is not asked after results: it has no history
+  /// to keep yet.
   bool get _isGuest {
     final who = auth();
     return who.hasUid && who.isAnonymous;

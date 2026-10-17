@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'core/config/remote_config.dart';
 import 'core/config/update_required_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'features/account/ui/register_prompt_on_results.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/debug/sessions_debug_screen.dart';
 import 'features/game/home_screen.dart';
 import 'features/game/presentation/results_screen.dart';
 import 'features/game/presentation/round_screen.dart';
 import 'features/game/presentation/start_screen.dart';
+import 'features/leaderboard/ui/leaderboard_page.dart';
 import 'features/packs/presentation/packs_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -26,7 +28,8 @@ GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
     GoRoute(path: '/packs', builder: (context, state) => const PacksScreen()),
     GoRoute(path: '/start', builder: (context, state) => const StartScreen()),
     GoRoute(path: '/play', builder: (context, state) => const RoundScreen()),
-    GoRoute(path: '/results', builder: (context, state) => const ResultsScreen()),
+    GoRoute(path: '/results', builder: (context, state) => const RegisterPromptOnResults(child: ResultsScreen())),
+    GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardPage()),
     GoRoute(
       path: '/debug/sessions',
       builder: (context, state) => const SessionsDebugScreen(),

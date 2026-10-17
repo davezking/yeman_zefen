@@ -496,4 +496,12 @@ enum SignInStatus {
 
 enum EmailError { none, email, password }
 
-enum NameError { none, tooShort, taken }
+enum NameError {
+  none,
+  tooShort,
+  taken,
+
+  /// The save did not go through for a reason that is not the name's length (offline, a server
+  /// error, a name the server refused).
+  failed,
+}

@@ -23,6 +23,7 @@ class HomeScreen extends StatelessWidget {
             FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.playButton)),
             const SizedBox(height: 8),
             OutlinedButton(onPressed: () => context.go('/packs'), child: const Text('Song packs')),
+            OutlinedButton(onPressed: () => context.go('/leaderboard'), child: const Text('Leaderboard')),
             // Measurement tooling for the spike. Not shown in prod builds.
             if (AppConfig.flavor == 'dev') ...[
               TextButton(
