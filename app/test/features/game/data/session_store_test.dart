@@ -31,6 +31,23 @@ void main() {
     expect(events, hasLength(2));
   });
 
+  test('counts the finished sessions, which the upload does not reduce', () async {
+    expect(await store.completedSessionCount(), 0);
+
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
+    await store.saveCompleted(payload: payloadOf(id: 'b'), score: 0, nowMs: 2);
+    await db.delete(db.pendingSessions).go();
+
+    expect(await store.completedSessionCount(), 2);
+  });
+
+  test('a session saved twice is counted once', () async {
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 2);
+
+    expect(await store.completedSessionCount(), 1);
+  });
+
   test('dispose closes the saved stream', () async {
     final other = SessionStore(db);
     final done = expectLater(other.saved, emitsDone);

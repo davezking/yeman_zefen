@@ -32,6 +32,7 @@ class SessionStore {
   void dispose() => _saved.close();
 
   static const clipErrorsCounter = 'clip_errors';
+  static const completedSessionsCounter = 'completed_sessions';
 
   /// The track ids of the last sessions, newest first.
   Future<List<List<int>>> recentTrackIds() async {
@@ -53,6 +54,14 @@ class SessionStore {
 
   Future<int> clipErrorCount() async {
     final row = await (db.select(db.localCounters)..where((t) => t.name.equals(clipErrorsCounter))).getSingleOrNull();
+    return row?.count ?? 0;
+  }
+
+  /// How many sessions have been finished on this device, kept for good (the saved payloads are
+  /// emptied once uploaded). Drives the register prompt.
+  Future<int> completedSessionCount() async {
+    final row = await (db.select(db.localCounters)..where((t) => t.name.equals(completedSessionsCounter)))
+        .getSingleOrNull();
     return row?.count ?? 0;
   }
 
@@ -80,6 +89,13 @@ class SessionStore {
             ),
             mode: InsertMode.insertOrIgnore,
           );
+      // Counted only when the row above went in, so saving the same session again counts it once.
+      // `changes()` is the insert's: nothing writes in between.
+      await db.customStatement(
+        'INSERT INTO local_counters (name, count) SELECT ?, 1 WHERE changes() > 0 '
+        'ON CONFLICT(name) DO UPDATE SET count = count + 1',
+        [completedSessionsCounter],
+      );
 
       final previous = await bestScore(payload.mode, payload.generationId);
       // A first session that scored nothing is not a best worth showing.
