@@ -25,6 +25,7 @@ export const REVIEW_REASONS = [
   "missing_audio",
   "short_audio",
   "era_unknown",
+  "score_anomaly",
 ] as const;
 export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 export const ADMIN_ROLES = ["admin", "editor"] as const;
@@ -149,6 +150,8 @@ export const reviewItems = sqliteTable(
     // Polymorphic (track / artist), so no FK.
     entityType: text("entity_type").notNull(),
     entityId: integer("entity_id").notNull(),
+    /** The ID of an entity whose key is text (a user's Firebase UID); entity_id is 0 for those. */
+    entityRef: text("entity_ref"),
     reason: text("reason", { enum: REVIEW_REASONS }).notNull(),
     detailsJson: text("details_json"),
     status: text("status", { enum: REVIEW_STATUSES }).notNull().default("open"),
@@ -159,6 +162,8 @@ export const reviewItems = sqliteTable(
     index("review_items_status_reason_idx").on(t.status, t.reason),
     // Per-entity lookups (ingest de-duplication, a track's open items) must not scan the whole queue.
     index("review_items_entity_idx").on(t.entityType, t.entityId),
+    // One open item per (user, reason), so a re-run of the nightly anomaly pass cannot duplicate a flag.
+    uniqueIndex("review_items_open_ref_uq").on(t.entityType, t.entityRef, t.reason).where(sql`${t.status} = 'open' AND ${t.entityRef} IS NOT NULL`),
     check("review_items_reason_check", inList("reason", REVIEW_REASONS)),
     check("review_items_status_check", inList("status", REVIEW_STATUSES)),
   ],

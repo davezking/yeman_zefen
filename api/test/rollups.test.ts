@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { MAX_DAYS_PER_RUN, dayBounds, missingDates, rollUpDay, runScheduled, utcDate } from "../src/cron/rollups";
+import { MAX_DAYS_PER_RUN, RUN_QUERY_BUDGET, dayBounds, missingDates, rollUpDay, runScheduled, utcDate } from "../src/cron/rollups";
+import { isoWeek } from "../src/lib/period";
 import { api, countingDb, makeArtist, makeTrack, installTestJwks, removeTestJwks, resetCatalog, seedAdmins } from "./helpers";
 
 const DAY = "2026-10-14";
@@ -24,6 +25,8 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM royalty_daily"),
     env.DB.prepare("DELETE FROM ad_events_daily"),
     env.DB.prepare("DELETE FROM analytics_daily"),
+    env.DB.prepare("DELETE FROM review_items WHERE entity_type = 'user'"),
+    env.DB.prepare("DELETE FROM leaderboard_entries"),
     env.DB.prepare("DELETE FROM users WHERE id <> 'deleted'"),
   ]);
 });
@@ -213,10 +216,28 @@ describe("runScheduled", () => {
   });
 
   it("stays inside the Free plan's 50 queries even with the whole week missing", async () => {
+    // Worst case for yesterday's anomaly pass too: a user with round data, and a two-player weekly board.
+    await env.DB.prepare("INSERT INTO users (id, is_anonymous, created_at) VALUES ('reg1', 0, 0), ('reg2', 0, 0)").run();
+    const yesterday = Date.parse("2026-10-15T12:00:00Z");
+    await env.DB.prepare(
+      `INSERT INTO game_sessions (id, user_id, mode, received_at, rounds, score, track_ids_json, events_json)
+       VALUES ('budget', 'reg1', 'song', ?1, 40, 0, '[]', ?2)`,
+    )
+      .bind(yesterday, JSON.stringify({ rounds: Array.from({ length: 40 }, (_, i) => ({ responseMs: 1000 + i * 50, correct: true })) }))
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO leaderboard_entries (period, generation_id, user_id, points, updated_at)
+       VALUES (?1, 0, 'reg1', 9000, 0), (?1, 0, 'reg2', 100, 0)`,
+    )
+      .bind(isoWeek(yesterday))
+      .run();
     const { db, counter } = countingDb(env.DB);
     const done = await runScheduled({ DB: db }, NOW);
     expect(done).toHaveLength(MAX_DAYS_PER_RUN);
-    expect(counter.queries).toBeLessThanOrEqual(45);
+    // Every part of the pass ran: users, rounds, board, percentile, and a batch with the flag in it.
+    expect((await env.DB.prepare("SELECT entity_ref FROM review_items WHERE entity_type = 'user'").all()).results).toEqual([{ entity_ref: "reg1" }]);
+    expect(counter.queries).toBeLessThanOrEqual(RUN_QUERY_BUDGET);
+    expect(RUN_QUERY_BUDGET).toBeLessThan(50);
     // The day left over is picked up by the next night's run.
     expect(await missingDates(env, NOW)).toHaveLength(7 - MAX_DAYS_PER_RUN);
   });
