@@ -3034,6 +3034,214 @@ class PendingAccountSyncCompanion
   }
 }
 
+class $LocalValuesTable extends LocalValues
+    with TableInfo<$LocalValuesTable, LocalValue> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalValuesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, value];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_values';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalValue> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  LocalValue map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalValue(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalValuesTable createAlias(String alias) {
+    return $LocalValuesTable(attachedDatabase, alias);
+  }
+}
+
+class LocalValue extends DataClass implements Insertable<LocalValue> {
+  final String key;
+  final String value;
+  const LocalValue({required this.key, required this.value});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    return map;
+  }
+
+  LocalValuesCompanion toCompanion(bool nullToAbsent) {
+    return LocalValuesCompanion(key: Value(key), value: Value(value));
+  }
+
+  factory LocalValue.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalValue(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+    };
+  }
+
+  LocalValue copyWith({String? key, String? value}) =>
+      LocalValue(key: key ?? this.key, value: value ?? this.value);
+  LocalValue copyWithCompanion(LocalValuesCompanion data) {
+    return LocalValue(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalValue(')
+          ..write('key: $key, ')
+          ..write('value: $value')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalValue &&
+          other.key == this.key &&
+          other.value == this.value);
+}
+
+class LocalValuesCompanion extends UpdateCompanion<LocalValue> {
+  final Value<String> key;
+  final Value<String> value;
+  final Value<int> rowid;
+  const LocalValuesCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalValuesCompanion.insert({
+    required String key,
+    required String value,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value);
+  static Insertable<LocalValue> custom({
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalValuesCompanion copyWith({
+    Value<String>? key,
+    Value<String>? value,
+    Value<int>? rowid,
+  }) {
+    return LocalValuesCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalValuesCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -3049,6 +3257,7 @@ abstract class _$AppDb extends GeneratedDatabase {
       $RemoteConfigCacheTable(this);
   late final $PendingAccountSyncTable pendingAccountSync =
       $PendingAccountSyncTable(this);
+  late final $LocalValuesTable localValues = $LocalValuesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3062,6 +3271,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     recentSessions,
     remoteConfigCache,
     pendingAccountSync,
+    localValues,
   ];
 }
 
@@ -4784,6 +4994,147 @@ typedef $$PendingAccountSyncTableProcessedTableManager =
       PendingAccountSyncData,
       PrefetchHooks Function()
     >;
+typedef $$LocalValuesTableCreateCompanionBuilder =
+    LocalValuesCompanion Function({
+      required String key,
+      required String value,
+      Value<int> rowid,
+    });
+typedef $$LocalValuesTableUpdateCompanionBuilder =
+    LocalValuesCompanion Function({
+      Value<String> key,
+      Value<String> value,
+      Value<int> rowid,
+    });
+
+class $$LocalValuesTableFilterComposer
+    extends Composer<_$AppDb, $LocalValuesTable> {
+  $$LocalValuesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalValuesTableOrderingComposer
+    extends Composer<_$AppDb, $LocalValuesTable> {
+  $$LocalValuesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalValuesTableAnnotationComposer
+    extends Composer<_$AppDb, $LocalValuesTable> {
+  $$LocalValuesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+}
+
+class $$LocalValuesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $LocalValuesTable,
+          LocalValue,
+          $$LocalValuesTableFilterComposer,
+          $$LocalValuesTableOrderingComposer,
+          $$LocalValuesTableAnnotationComposer,
+          $$LocalValuesTableCreateCompanionBuilder,
+          $$LocalValuesTableUpdateCompanionBuilder,
+          (LocalValue, BaseReferences<_$AppDb, $LocalValuesTable, LocalValue>),
+          LocalValue,
+          PrefetchHooks Function()
+        > {
+  $$LocalValuesTableTableManager(_$AppDb db, $LocalValuesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalValuesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalValuesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalValuesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> key = const Value.absent(),
+            Value<String> value = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => LocalValuesCompanion(key: key, value: value, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String value,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalValuesCompanion.insert(
+                key: key,
+                value: value,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LocalValuesTable, LocalValue>(table),
+                  BaseReferences<_$AppDb, $LocalValuesTable, LocalValue>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalValuesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $LocalValuesTable,
+      LocalValue,
+      $$LocalValuesTableFilterComposer,
+      $$LocalValuesTableOrderingComposer,
+      $$LocalValuesTableAnnotationComposer,
+      $$LocalValuesTableCreateCompanionBuilder,
+      $$LocalValuesTableUpdateCompanionBuilder,
+      (LocalValue, BaseReferences<_$AppDb, $LocalValuesTable, LocalValue>),
+      LocalValue,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -4804,4 +5155,6 @@ class $AppDbManager {
       $$RemoteConfigCacheTableTableManager(_db, _db.remoteConfigCache);
   $$PendingAccountSyncTableTableManager get pendingAccountSync =>
       $$PendingAccountSyncTableTableManager(_db, _db.pendingAccountSync);
+  $$LocalValuesTableTableManager get localValues =>
+      $$LocalValuesTableTableManager(_db, _db.localValues);
 }
