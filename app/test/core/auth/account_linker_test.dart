@@ -17,6 +17,10 @@ class FakeFirebase implements AuthBackend {
   final log = <String>[];
   int tokenSerial = 0;
   String? _cachedToken;
+  bool failRefresh = false;
+
+  /// Runs during sign-in, as the auth-state listener would.
+  Future<void> Function()? onUserChanged;
 
   static String keyOf(AuthCredential c) =>
       c is EmailAuthCredential ? 'password:${c.email}' : '${c.providerId}:${(c as OAuthCredential).idToken}';
@@ -33,11 +37,18 @@ class FakeFirebase implements AuthBackend {
   @override
   Future<String?> idToken({bool forceRefresh = false}) async {
     if (!_current.hasUid) return null;
+    if (forceRefresh && failRefresh) throw const AuthFailure('network-request-failed');
     if (forceRefresh || _cachedToken == null) {
       _cachedToken = '${_current.uid}:${_current.isAnonymous ? 'anon' : 'reg'}:${tokenSerial++}';
     }
     log.add('token:$_cachedToken');
     return _cachedToken;
+  }
+
+  /// Another registered account is signed in (its own token, not the cached one).
+  void switchTo(String uid) {
+    _cachedToken = null;
+    _current = AuthState(uid: uid, isAnonymous: false);
   }
 
   void _setUser(String uid, String provider) {
@@ -67,6 +78,7 @@ class FakeFirebase implements AuthBackend {
     }
     _cachedToken = null;
     _setUser(owner, credential.providerId);
+    await onUserChanged?.call();
   }
 
   @override
@@ -220,6 +232,65 @@ void main() {
     api.failWith = const RequestException('already_registered', 'x', status: 409);
     expect((await linker.linkWithGoogle()).serverSynced, isFalse);
     expect(store.step, isNull);
+
+    store.step = const PendingAccountStep.merge('old', targetUid: 'acct-9');
+    api.failWith = const UnauthorizedException('invalid_anonymous_token', 'x');
+    await linker.retryPending();
+    expect(store.step, isNull);
+  });
+
+  test('other errors keep the step: a 404 from an old server, a 403, a 401 for the caller', () async {
+    for (final error in const <ApiException>[
+      NotFoundException('not_found', 'x'),
+      ForbiddenException('registration_required', 'x'),
+      UnauthorizedException('unauthorized', 'x'),
+    ]) {
+      store.step = const PendingAccountStep.merge('g', targetUid: 'guest-1');
+      firebase.switchTo('guest-1');
+      api.failWith = error;
+      await linker.retryPending();
+      expect(store.step, isNotNull, reason: error.code);
+    }
+  });
+
+  test('a token refresh that fails right after linking still leaves the registration saved', () async {
+    firebase.failRefresh = true;
+    final result = await linker.linkWithGoogle();
+    expect(result.outcome, LinkOutcome.linked);
+    expect(result.serverSynced, isFalse);
+    expect(store.step?.targetUid, 'guest-1');
+    expect(api.calls, isEmpty);
+
+    firebase.failRefresh = false;
+    await linker.retryPending();
+    expect(api.calls.single, startsWith('registered as guest-1:reg:'));
+    expect(store.step, isNull);
+  });
+
+  test('a pending merge is sent only to the account it was for', () async {
+    store.step = const PendingAccountStep.merge('guest-1:anon:0', targetUid: 'acct-A');
+    firebase.switchTo('acct-B');
+    await linker.retryPending();
+    expect(api.calls, isEmpty);
+    expect(store.step, isNotNull);
+
+    firebase.switchTo('acct-A');
+    await linker.retryPending();
+    expect(api.calls.single, startsWith('merge(guest-1:anon:0) as acct-A:reg:'));
+  });
+
+  test('a merge saved before its sign-in finished goes to the account signed in now', () async {
+    store.step = const PendingAccountStep.merge('guest-1:anon:0');
+    firebase.switchTo('acct-C');
+    await linker.retryPending();
+    expect(api.calls.single, startsWith('merge(guest-1:anon:0) as acct-C'));
+  });
+
+  test('the user change during a merge sign-in does not send the merge twice', () async {
+    firebase.owners['google.com:g-sub-1'] = 'acct-9';
+    firebase.onUserChanged = linker.retryPending;
+    expect((await linker.linkWithGoogle()).outcome, LinkOutcome.merged);
+    expect(api.calls, hasLength(1));
   });
 
   test('a registered player cannot pull in another registered account', () async {
@@ -241,7 +312,7 @@ void main() {
   });
 
   test('a pending step waits while the user is still a guest', () async {
-    store.step = const PendingAccountStep.registered();
+    store.step = const PendingAccountStep.registered('guest-1');
     await linker.retryPending();
     expect(api.calls, isEmpty);
     expect(store.step, isNotNull);

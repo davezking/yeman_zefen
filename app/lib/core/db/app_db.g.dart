@@ -2711,6 +2711,17 @@ class $PendingAccountSyncTable extends PendingAccountSync
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _targetUidMeta = const VerificationMeta(
+    'targetUid',
+  );
+  @override
+  late final GeneratedColumn<String> targetUid = GeneratedColumn<String>(
+    'target_uid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -2723,7 +2734,13 @@ class $PendingAccountSyncTable extends PendingAccountSync
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, kind, anonymousIdToken, createdAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    kind,
+    anonymousIdToken,
+    targetUid,
+    createdAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2756,6 +2773,12 @@ class $PendingAccountSyncTable extends PendingAccountSync
         ),
       );
     }
+    if (data.containsKey('target_uid')) {
+      context.handle(
+        _targetUidMeta,
+        targetUid.isAcceptableOrUnknown(data['target_uid']!, _targetUidMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -2785,6 +2808,10 @@ class $PendingAccountSyncTable extends PendingAccountSync
         DriftSqlType.string,
         data['${effectivePrefix}anonymous_id_token'],
       ),
+      targetUid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_uid'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -2803,11 +2830,13 @@ class PendingAccountSyncData extends DataClass
   final int id;
   final String kind;
   final String? anonymousIdToken;
+  final String? targetUid;
   final int createdAt;
   const PendingAccountSyncData({
     required this.id,
     required this.kind,
     this.anonymousIdToken,
+    this.targetUid,
     required this.createdAt,
   });
   @override
@@ -2817,6 +2846,9 @@ class PendingAccountSyncData extends DataClass
     map['kind'] = Variable<String>(kind);
     if (!nullToAbsent || anonymousIdToken != null) {
       map['anonymous_id_token'] = Variable<String>(anonymousIdToken);
+    }
+    if (!nullToAbsent || targetUid != null) {
+      map['target_uid'] = Variable<String>(targetUid);
     }
     map['created_at'] = Variable<int>(createdAt);
     return map;
@@ -2829,6 +2861,9 @@ class PendingAccountSyncData extends DataClass
       anonymousIdToken: anonymousIdToken == null && nullToAbsent
           ? const Value.absent()
           : Value(anonymousIdToken),
+      targetUid: targetUid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetUid),
       createdAt: Value(createdAt),
     );
   }
@@ -2842,6 +2877,7 @@ class PendingAccountSyncData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       kind: serializer.fromJson<String>(json['kind']),
       anonymousIdToken: serializer.fromJson<String?>(json['anonymousIdToken']),
+      targetUid: serializer.fromJson<String?>(json['targetUid']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
     );
   }
@@ -2852,6 +2888,7 @@ class PendingAccountSyncData extends DataClass
       'id': serializer.toJson<int>(id),
       'kind': serializer.toJson<String>(kind),
       'anonymousIdToken': serializer.toJson<String?>(anonymousIdToken),
+      'targetUid': serializer.toJson<String?>(targetUid),
       'createdAt': serializer.toJson<int>(createdAt),
     };
   }
@@ -2860,6 +2897,7 @@ class PendingAccountSyncData extends DataClass
     int? id,
     String? kind,
     Value<String?> anonymousIdToken = const Value.absent(),
+    Value<String?> targetUid = const Value.absent(),
     int? createdAt,
   }) => PendingAccountSyncData(
     id: id ?? this.id,
@@ -2867,6 +2905,7 @@ class PendingAccountSyncData extends DataClass
     anonymousIdToken: anonymousIdToken.present
         ? anonymousIdToken.value
         : this.anonymousIdToken,
+    targetUid: targetUid.present ? targetUid.value : this.targetUid,
     createdAt: createdAt ?? this.createdAt,
   );
   PendingAccountSyncData copyWithCompanion(PendingAccountSyncCompanion data) {
@@ -2876,6 +2915,7 @@ class PendingAccountSyncData extends DataClass
       anonymousIdToken: data.anonymousIdToken.present
           ? data.anonymousIdToken.value
           : this.anonymousIdToken,
+      targetUid: data.targetUid.present ? data.targetUid.value : this.targetUid,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -2886,13 +2926,15 @@ class PendingAccountSyncData extends DataClass
           ..write('id: $id, ')
           ..write('kind: $kind, ')
           ..write('anonymousIdToken: $anonymousIdToken, ')
+          ..write('targetUid: $targetUid, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, kind, anonymousIdToken, createdAt);
+  int get hashCode =>
+      Object.hash(id, kind, anonymousIdToken, targetUid, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2900,6 +2942,7 @@ class PendingAccountSyncData extends DataClass
           other.id == this.id &&
           other.kind == this.kind &&
           other.anonymousIdToken == this.anonymousIdToken &&
+          other.targetUid == this.targetUid &&
           other.createdAt == this.createdAt);
 }
 
@@ -2908,17 +2951,20 @@ class PendingAccountSyncCompanion
   final Value<int> id;
   final Value<String> kind;
   final Value<String?> anonymousIdToken;
+  final Value<String?> targetUid;
   final Value<int> createdAt;
   const PendingAccountSyncCompanion({
     this.id = const Value.absent(),
     this.kind = const Value.absent(),
     this.anonymousIdToken = const Value.absent(),
+    this.targetUid = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   PendingAccountSyncCompanion.insert({
     this.id = const Value.absent(),
     required String kind,
     this.anonymousIdToken = const Value.absent(),
+    this.targetUid = const Value.absent(),
     required int createdAt,
   }) : kind = Value(kind),
        createdAt = Value(createdAt);
@@ -2926,12 +2972,14 @@ class PendingAccountSyncCompanion
     Expression<int>? id,
     Expression<String>? kind,
     Expression<String>? anonymousIdToken,
+    Expression<String>? targetUid,
     Expression<int>? createdAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (kind != null) 'kind': kind,
       if (anonymousIdToken != null) 'anonymous_id_token': anonymousIdToken,
+      if (targetUid != null) 'target_uid': targetUid,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -2940,12 +2988,14 @@ class PendingAccountSyncCompanion
     Value<int>? id,
     Value<String>? kind,
     Value<String?>? anonymousIdToken,
+    Value<String?>? targetUid,
     Value<int>? createdAt,
   }) {
     return PendingAccountSyncCompanion(
       id: id ?? this.id,
       kind: kind ?? this.kind,
       anonymousIdToken: anonymousIdToken ?? this.anonymousIdToken,
+      targetUid: targetUid ?? this.targetUid,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -2962,6 +3012,9 @@ class PendingAccountSyncCompanion
     if (anonymousIdToken.present) {
       map['anonymous_id_token'] = Variable<String>(anonymousIdToken.value);
     }
+    if (targetUid.present) {
+      map['target_uid'] = Variable<String>(targetUid.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -2974,6 +3027,7 @@ class PendingAccountSyncCompanion
           ..write('id: $id, ')
           ..write('kind: $kind, ')
           ..write('anonymousIdToken: $anonymousIdToken, ')
+          ..write('targetUid: $targetUid, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4515,6 +4569,7 @@ typedef $$PendingAccountSyncTableCreateCompanionBuilder =
       Value<int> id,
       required String kind,
       Value<String?> anonymousIdToken,
+      Value<String?> targetUid,
       required int createdAt,
     });
 typedef $$PendingAccountSyncTableUpdateCompanionBuilder =
@@ -4522,6 +4577,7 @@ typedef $$PendingAccountSyncTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> kind,
       Value<String?> anonymousIdToken,
+      Value<String?> targetUid,
       Value<int> createdAt,
     });
 
@@ -4546,6 +4602,11 @@ class $$PendingAccountSyncTableFilterComposer
 
   ColumnFilters<String> get anonymousIdToken => $composableBuilder(
     column: $table.anonymousIdToken,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetUid => $composableBuilder(
+    column: $table.targetUid,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4579,6 +4640,11 @@ class $$PendingAccountSyncTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get targetUid => $composableBuilder(
+    column: $table.targetUid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -4604,6 +4670,9 @@ class $$PendingAccountSyncTableAnnotationComposer
     column: $table.anonymousIdToken,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get targetUid =>
+      $composableBuilder(column: $table.targetUid, builder: (column) => column);
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -4652,11 +4721,13 @@ class $$PendingAccountSyncTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> kind = const Value.absent(),
                 Value<String?> anonymousIdToken = const Value.absent(),
+                Value<String?> targetUid = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
               }) => PendingAccountSyncCompanion(
                 id: id,
                 kind: kind,
                 anonymousIdToken: anonymousIdToken,
+                targetUid: targetUid,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -4664,11 +4735,13 @@ class $$PendingAccountSyncTableTableManager
                 Value<int> id = const Value.absent(),
                 required String kind,
                 Value<String?> anonymousIdToken = const Value.absent(),
+                Value<String?> targetUid = const Value.absent(),
                 required int createdAt,
               }) => PendingAccountSyncCompanion.insert(
                 id: id,
                 kind: kind,
                 anonymousIdToken: anonymousIdToken,
+                targetUid: targetUid,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

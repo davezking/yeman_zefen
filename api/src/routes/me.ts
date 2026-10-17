@@ -122,16 +122,16 @@ function rawProfile(r: RawUser) {
   };
 }
 
+/** Marks `uid` registered and rebuilds its leaderboard rows: 3 statements, one batch. Safe to repeat. */
+async function registerAndBackfill(DB: D1Database, uid: string, country: string | null) {
+  const [registered] = await DB.batch([DB.prepare(REGISTER_SQL).bind(uid, country, Date.now()), ...backfillStatements(DB, uid)]);
+  return rawProfile((registered!.results as RawUser[])[0]!);
+}
+
 // After linking a provider to a guest (the uid is kept): flip the row to registered and rebuild
-// the player's leaderboard rows from their sessions. Safe to repeat. 3 statements, one batch.
+// the player's leaderboard rows from their sessions.
 me.post("/registered", requireUser({ allowAnonymous: false }), async (c) => {
-  const user = c.get("user")!;
-  const DB = c.env.DB;
-  const [registered] = await DB.batch([
-    DB.prepare(REGISTER_SQL).bind(user.uid, requestCountry(c.req.raw), Date.now()),
-    ...backfillStatements(DB, user.uid),
-  ]);
-  return c.json(rawProfile((registered!.results as RawUser[])[0]!));
+  return c.json(await registerAndBackfill(c.env.DB, c.get("user")!.uid, requestCountry(c.req.raw)));
 });
 
 const mergeBody = z.object({ anonymousIdToken: z.string().min(1).max(8192) }).strict();
@@ -168,12 +168,8 @@ me.post("/merge", requireUser({ allowAnonymous: false }), async (c) => {
 
   const DB = c.env.DB;
   const country = requestCountry(c.req.raw);
-  const now = Date.now();
-  if (guest.uid === user.uid) {
-    // Linking kept the uid; there is nothing to move.
-    const [registered] = await DB.batch([DB.prepare(REGISTER_SQL).bind(user.uid, country, now), ...backfillStatements(DB, user.uid)]);
-    return c.json({ ...rawProfile((registered!.results as RawUser[])[0]!), mergedSessions: 0 });
-  }
+  // Linking kept the uid; there is nothing to move.
+  if (guest.uid === user.uid) return c.json({ ...(await registerAndBackfill(DB, user.uid, country)), mergedSessions: 0 });
 
   const guestRow = await DB.prepare("SELECT is_anonymous FROM users WHERE id = ?1").bind(guest.uid).first<{ is_anonymous: number }>();
   // The guest uid has since registered (linked a provider of its own): its history is its own.
@@ -182,7 +178,7 @@ me.post("/merge", requireUser({ allowAnonymous: false }), async (c) => {
   }
 
   const results = await DB.batch([
-    DB.prepare(REGISTER_SQL).bind(user.uid, country, now),
+    DB.prepare(REGISTER_SQL).bind(user.uid, country, Date.now()),
     // A shadow-banned guest stays banned in the account it joins, or merging would launder it.
     DB.prepare(
       `UPDATE users SET shadow_banned = 1 WHERE id = ?2

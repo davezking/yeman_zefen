@@ -536,14 +536,13 @@ describe("D1 cost", () => {
     return counter;
   }
 
-  it("a typical session writes at most 6 rows", async () => {
-    // 10 rounds in an era: the user touch, 4 leaderboard upserts, the session row.
+  it("a typical session costs 3 write statements", async () => {
+    // 10 rounds in an era: the user touch, one leaderboard upsert (4 rows), the session row.
     const now = Date.now();
     const rounds = Array.from({ length: 10 }, (_, i) => (i % 2 ? artistRound(i % 5) : songRound(i % 5)));
     const counter = await cost("u-cost", honest({ generationId: ERA, rounds, clientStartedAt: now - 120_000 }));
-    expect(counter.writes).toBeLessThanOrEqual(6);
-    expect(counter.writes).toBe(6);
-    expect(counter.queries).toBe(8); // plus the two reads
+    expect(counter.writes).toBe(3);
+    expect(counter.queries).toBe(5); // plus the two reads
     expect(await board("u-cost")).toHaveLength(4);
   });
 

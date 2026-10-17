@@ -3,7 +3,7 @@
 //
 // The rows are replaced, not added to, so running it again changes nothing. It counts the same
 // sessions POST /v1/sessions does: unflagged, score > 0, and only while the player is registered
-// and not shadow-banned. A session's week is the ISO week of `received_at` (the server clock), as
+// and not shadow-banned (a banned player's rows are left as they are). A session's week is the ISO week of `received_at` (the server clock), as
 // it is in sessions.ts, so a rebuilt row equals the incrementally built one.
 import { ALL_TIME } from "./period";
 
@@ -17,8 +17,13 @@ export function isoWeekSql(msColumn: string): string {
   return `printf('%s-W%02d', strftime('%Y', ${thursday}), (CAST(strftime('%j', ${thursday}) AS INTEGER) - 1) / 7 + 1)`;
 }
 
+// Only a player whose rows the insert below would rebuild loses them: a shadow-banned player keeps
+// the rows they had (the board already hides them), so lifting the ban restores their points.
 /** Deletes the player's rows. ?1 = user id. */
-export const BACKFILL_DELETE_SQL = "DELETE FROM leaderboard_entries WHERE user_id = ?1";
+export const BACKFILL_DELETE_SQL = `
+  DELETE FROM leaderboard_entries
+   WHERE user_id = ?1
+     AND EXISTS (SELECT 1 FROM users WHERE id = ?1 AND is_anonymous = 0 AND shadow_banned = 0 AND deleted_at IS NULL)`;
 
 // Each counted session lands in up to four rows: (all, 0), (all, era), (its week, 0), (its week, era).
 // json_each supplies the two periods and the two generation choices without a compound SELECT.

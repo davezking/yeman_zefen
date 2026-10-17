@@ -179,11 +179,20 @@ describe("POST /v1/me/registered", () => {
     expect(row).toEqual({ updated_at: w2 });
   });
 
-  it("gives a shadow-banned player no rows", async () => {
+  it("gives a shadow-banned player no new rows and keeps the ones they had", async () => {
     await storeRow("u-ban", { score: 100, receivedAt: Date.now() });
     await env.DB.prepare("UPDATE users SET shadow_banned = 1 WHERE id = 'u-ban'").run();
     expect((await registered("u-ban")).status).toBe(200);
     expect(await board("u-ban")).toEqual([]);
+
+    // Points from before a ban survive a rebuild, so lifting the ban restores them.
+    await env.DB.prepare("UPDATE users SET shadow_banned = 0 WHERE id = 'u-ban'").run();
+    await registered("u-ban");
+    const before = await board("u-ban");
+    expect(before.find((r) => r.period === "all")!.points).toBe(100);
+    await env.DB.prepare("UPDATE users SET shadow_banned = 1 WHERE id = 'u-ban'").run();
+    await registered("u-ban");
+    expect(await board("u-ban")).toEqual(before);
   });
 
   it("refuses a guest token", async () => {

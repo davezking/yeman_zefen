@@ -108,12 +108,14 @@ class HttpAccountApi implements AccountApi {
       client.postJson('/v1/me/merge', body: {'anonymousIdToken': anonymousIdToken});
 }
 
-/// A server step still to send. [anonymousIdToken] is set for a merge.
+/// A server step still to send. [anonymousIdToken] is set for a merge. [targetUid] is the account
+/// it is for; null only for a merge saved before its sign-in finished.
 class PendingAccountStep {
-  const PendingAccountStep.registered() : anonymousIdToken = null;
-  const PendingAccountStep.merge(String this.anonymousIdToken);
+  const PendingAccountStep.registered(String this.targetUid) : anonymousIdToken = null;
+  const PendingAccountStep.merge(String this.anonymousIdToken, {this.targetUid});
 
   final String? anonymousIdToken;
+  final String? targetUid;
   bool get isMerge => anonymousIdToken != null;
 }
 
@@ -133,7 +135,9 @@ class DbPendingAccountStore implements PendingAccountStore {
     final row = await db.select(db.pendingAccountSync).getSingleOrNull();
     if (row == null) return null;
     final token = row.anonymousIdToken;
-    return row.kind == 'merge' && token != null ? PendingAccountStep.merge(token) : const PendingAccountStep.registered();
+    final target = row.targetUid;
+    if (row.kind == 'merge' && token != null) return PendingAccountStep.merge(token, targetUid: target);
+    return target == null ? null : PendingAccountStep.registered(target);
   }
 
   @override
@@ -141,6 +145,7 @@ class DbPendingAccountStore implements PendingAccountStore {
     PendingAccountSyncCompanion.insert(
       kind: step.isMerge ? 'merge' : 'registered',
       anonymousIdToken: Value(step.anonymousIdToken),
+      targetUid: Value(step.targetUid),
       createdAt: DateTime.now().toUtc().millisecondsSinceEpoch,
     ),
   );
@@ -190,31 +195,45 @@ class AccountLinker {
 
   Future<void>? _retrying;
 
-  Future<LinkResult> linkWithGoogle() async {
+  /// Links and sign-ins in progress. While one runs it sends its own server step, so a retry
+  /// (set off by the user change it causes) must not send it a second time.
+  int _active = 0;
+
+  Future<LinkResult> linkWithGoogle() => _run(() async {
     final credential = await credentials.google();
     return credential == null ? const LinkResult(LinkOutcome.cancelled) : _link(credential);
-  }
+  });
 
-  Future<LinkResult> linkWithApple() async {
+  Future<LinkResult> linkWithApple() => _run(() async {
     final credential = await credentials.apple();
     return credential == null ? const LinkResult(LinkOutcome.cancelled) : _link(credential);
-  }
+  });
 
   /// A new email account for this guest. An email that already has an account signs in to it
   /// (with this password) and merges the guest's history.
   Future<LinkResult> linkWithEmail(String email, String password) =>
-      _link(EmailAuthProvider.credential(email: email.trim(), password: password));
+      _run(() => _link(EmailAuthProvider.credential(email: email.trim(), password: password)));
 
   /// A returning player signing in with email. A guest's history on this phone is merged in.
   Future<LinkResult> signInWithEmail(String email, String password) =>
-      _signInTo(EmailAuthProvider.credential(email: email.trim(), password: password));
+      _run(() => _signInTo(EmailAuthProvider.credential(email: email.trim(), password: password)));
 
   Future<void> sendPasswordReset(String email) => backend.sendPasswordResetEmail(email.trim());
 
+  Future<LinkResult> _run(Future<LinkResult> Function() body) async {
+    _active++;
+    try {
+      return await body();
+    } finally {
+      _active--;
+    }
+  }
+
   Future<LinkResult> _link(AuthCredential credential) async {
     final before = backend.current;
+    final uid = before.uid;
     // No user at all yet (first launch offline): there is no guest history to keep.
-    if (!before.hasUid) return _signInTo(credential);
+    if (uid == null) return _signInTo(credential);
     try {
       await backend.linkWithCredential(credential);
     } on CredentialInUseException catch (e) {
@@ -222,9 +241,16 @@ class AccountLinker {
       if (!before.isAnonymous) throw const AuthFailure('credential-already-in-use');
       return _signInTo(e.credential);
     }
-    // The cached token still says "anonymous"; the server must see the linked provider.
-    await backend.idToken(forceRefresh: true);
-    return LinkResult(LinkOutcome.linked, serverSynced: await _send(const PendingAccountStep.registered()));
+    // Saved before anything else can fail, so a lost connection here still registers later.
+    final step = PendingAccountStep.registered(uid);
+    await store.write(step);
+    try {
+      // The cached token still says "anonymous"; the server must see the linked provider.
+      await backend.idToken(forceRefresh: true);
+    } catch (_) {
+      return const LinkResult(LinkOutcome.linked, serverSynced: false);
+    }
+    return LinkResult(LinkOutcome.linked, serverSynced: await _send(step));
   }
 
   Future<LinkResult> _signInTo(AuthCredential credential) async {
@@ -241,14 +267,15 @@ class AccountLinker {
       rethrow;
     }
     if (guestToken == null) return const LinkResult(LinkOutcome.signedIn);
-    return LinkResult(LinkOutcome.merged, serverSynced: await _send(PendingAccountStep.merge(guestToken)));
+    final step = PendingAccountStep.merge(guestToken, targetUid: backend.current.uid);
+    return LinkResult(LinkOutcome.merged, serverSynced: await _send(step));
   }
 
-  /// Sends [step], keeping it for a retry if the server could not be reached.
+  /// Sends [step]. It stays saved unless it went through or the server refused it for good.
   Future<bool> _send(PendingAccountStep step) async {
     await store.write(step);
+    final token = step.anonymousIdToken;
     try {
-      final token = step.anonymousIdToken;
       if (token != null) {
         await api.merge(token);
       } else {
@@ -256,29 +283,48 @@ class AccountLinker {
       }
       await store.clear();
       return true;
-    } on NetworkException {
-      return false;
-    } on ServerException {
-      return false;
-    } on RateLimitedException {
-      return false;
-    } on ApiException {
-      // 401 (the guest token is over 30 days old), 403, 409 (the guest has registered on its own):
-      // retrying cannot help.
-      await store.clear();
+    } on ApiException catch (e) {
+      if (token != null && _mergeRefused(e)) await store.clear();
+      // Anything else (offline, 5xx, a 404 from a server not yet deployed, a token that has not
+      // caught up yet) is retried on the next start or user change.
       return false;
     }
   }
 
+  /// The merge can never succeed: the guest token is too old or invalid (401 with that code), or
+  /// the guest uid has registered on its own (409). A 401 for the caller's own token is not this.
+  static bool _mergeRefused(ApiException e) =>
+      e.status == 409 || (e.status == 401 && e.code == 'invalid_anonymous_token');
+
   /// Sends a server step left over from an earlier link. Called on start and when the user changes.
-  Future<void> retryPending() => _retrying ??= _retry().whenComplete(() => _retrying = null);
+  Future<void> retryPending() {
+    if (_active > 0) return Future.value();
+    return _retrying ??= _retry().whenComplete(() => _retrying = null);
+  }
 
   Future<void> _retry() async {
-    final step = await store.read();
+    var step = await store.read();
     if (step == null) return;
+    final current = backend.current;
     // Only a registered user can send either step; a guest who has not finished linking waits.
-    if (!backend.current.hasUid || backend.current.isAnonymous) return;
-    if (!step.isMerge) await backend.idToken(forceRefresh: true);
+    if (!current.hasUid || current.isAnonymous) return;
+    final target = step.targetUid;
+    if (target == null) {
+      // The app stopped between saving a merge and its sign-in finishing: the account signed in
+      // now is the one that sign-in reached.
+      step = PendingAccountStep.merge(step.anonymousIdToken!, targetUid: current.uid);
+    } else if (target != current.uid) {
+      // Another account is signed in. The step waits for its own account rather than merging the
+      // guest into the wrong one.
+      return;
+    }
+    if (!step.isMerge) {
+      try {
+        await backend.idToken(forceRefresh: true);
+      } catch (_) {
+        return;
+      }
+    }
     await _send(step);
   }
 }
