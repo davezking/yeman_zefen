@@ -41,6 +41,13 @@ void main() {
     expect(await store.completedSessionCount(), 2);
   });
 
+  test('a session saved twice is counted once', () async {
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 1);
+    await store.saveCompleted(payload: payloadOf(id: 'a'), score: 10, nowMs: 2);
+
+    expect(await store.completedSessionCount(), 1);
+  });
+
   test('dispose closes the saved stream', () async {
     final other = SessionStore(db);
     final done = expectLater(other.saved, emitsDone);

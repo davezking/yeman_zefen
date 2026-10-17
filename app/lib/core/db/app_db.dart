@@ -129,16 +129,6 @@ class PendingAccountSync extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Small app settings that are not counters or config, by name. The register prompt keeps its
-/// dismissal time here (`register_prompt_dismissed_at`, epoch ms, UTC).
-class LocalValues extends Table {
-  TextColumn get key => text()();
-  TextColumn get value => text()();
-
-  @override
-  Set<Column> get primaryKey => {key};
-}
-
 @DriftDatabase(
   tables: [
     InstalledPacks,
@@ -149,14 +139,13 @@ class LocalValues extends Table {
     RecentSessions,
     RemoteConfigCache,
     PendingAccountSync,
-    LocalValues,
   ],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -180,7 +169,6 @@ class AppDb extends _$AppDb {
           }
           if (from < 5) await m.createTable(remoteConfigCache);
           if (from < 6) await m.createTable(pendingAccountSync);
-          if (from < 7) await m.createTable(localValues);
         },
       );
 }

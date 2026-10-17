@@ -11,7 +11,8 @@ import '../game/data/session_store.dart';
 ///
 /// A guest is asked after the results screen of session N (`registerPromptAfterSessions`), and
 /// again at a results screen once the cooldown after a dismissal has passed. Tapping "see my rank"
-/// asks too, but only past the cooldown. A registered player is never asked.
+/// is the guest asking, so it opens the sheet whatever the count or cooldown. A registered player
+/// is never asked.
 class RegisterPromptController {
   RegisterPromptController({
     required this.sessions,
@@ -33,44 +34,44 @@ class RegisterPromptController {
   /// Epoch ms, UTC. A parameter so tests can move the clock.
   final int Function() nowMs;
 
+  /// The last dismissal, epoch ms, in `local_counters` (as the profile sync keeps its times).
   static const dismissedAtKey = 'register_prompt_dismissed_at';
 
   /// Call on the results screen after a session is saved. True when the sheet should open.
   Future<bool> shouldPromptAfterResults() async {
+    if (!_isGuest) return false;
     final completed = await sessions.completedSessionCount();
     if (completed < config().registerPromptAfterSessions) return false;
     return _cooldownPassed();
   }
 
-  /// Call when a guest taps "see my rank". True when the sheet should open.
-  Future<bool> shouldPromptFromLeaderboard() => _cooldownPassed();
+  /// Call when the player taps "see my rank". True for a guest: there is no rank to show yet.
+  bool shouldPromptFromLeaderboard() => _isGuest;
 
   /// The player closed the sheet without registering. Starts the cooldown.
-  Future<void> dismiss() {
-    return db
-        .into(db.localValues)
-        .insertOnConflictUpdate(
-          LocalValuesCompanion.insert(key: dismissedAtKey, value: '${nowMs()}'),
-        );
+  Future<void> dismiss() => db.customStatement(
+    'INSERT INTO local_counters (name, count) VALUES (?, ?) '
+    'ON CONFLICT(name) DO UPDATE SET count = excluded.count',
+    [dismissedAtKey, nowMs()],
+  );
+
+  /// A guest with an account. A signed-out device has no account to link to yet, so it is not asked.
+  bool get _isGuest {
+    final who = auth();
+    return who.hasUid && who.isAnonymous;
   }
 
-  /// A guest with an account, and no dismissal in the cooldown. A signed-out device has no account
-  /// to link to yet, so it is not asked.
+  /// No dismissal, or the last one is a cooldown old. A dismissal in the future (the clock was
+  /// wrong then) counts as old, so a fixed clock does not hide the prompt for that long.
   Future<bool> _cooldownPassed() async {
-    final who = auth();
-    if (!who.hasUid || !who.isAnonymous) return false;
-    final dismissed = await _dismissedAtMs();
-    if (dismissed == null) return true;
+    final row = await (db.select(
+      db.localCounters,
+    )..where((t) => t.name.equals(dismissedAtKey))).getSingleOrNull();
+    if (row == null) return true;
+    final now = nowMs();
     final cooldownMs =
         config().registerPromptCooldownDays * Duration.millisecondsPerDay;
-    return nowMs() - dismissed >= cooldownMs;
-  }
-
-  Future<int?> _dismissedAtMs() async {
-    final row = await (db.select(
-      db.localValues,
-    )..where((t) => t.key.equals(dismissedAtKey))).getSingleOrNull();
-    return row == null ? null : int.tryParse(row.value);
+    return row.count > now || now - row.count >= cooldownMs;
   }
 }
 

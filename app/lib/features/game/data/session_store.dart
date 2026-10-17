@@ -89,6 +89,13 @@ class SessionStore {
             ),
             mode: InsertMode.insertOrIgnore,
           );
+      // Counted only when the row above went in, so saving the same session again counts it once.
+      // `changes()` is the insert's: nothing writes in between.
+      await db.customStatement(
+        'INSERT INTO local_counters (name, count) SELECT ?, 1 WHERE changes() > 0 '
+        'ON CONFLICT(name) DO UPDATE SET count = count + 1',
+        [completedSessionsCounter],
+      );
 
       final previous = await bestScore(payload.mode, payload.generationId);
       // A first session that scored nothing is not a best worth showing.
@@ -103,12 +110,6 @@ class SessionStore {
               ),
             );
       }
-
-      await db.customStatement(
-        'INSERT INTO local_counters (name, count) VALUES (?, 1) '
-        'ON CONFLICT(name) DO UPDATE SET count = count + 1',
-        [completedSessionsCounter],
-      );
 
       await db.into(db.recentSessions).insertOnConflictUpdate(
             RecentSessionsCompanion.insert(

@@ -148,23 +148,4 @@ void main() {
     await db.into(db.pendingAccountSync).insert(PendingAccountSyncCompanion.insert(kind: 'merge', createdAt: 1));
     expect((await db.select(db.pendingAccountSync).getSingle()).id, 1);
   });
-
-  test('upgrading from schema 6 keeps rows and adds the local values table', () async {
-    final db = AppDb(
-      NativeDatabase.memory(
-        setup: (raw) {
-          raw.execute('CREATE TABLE pending_account_sync (id INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL, '
-              'anonymous_id_token TEXT, target_uid TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (id))');
-          raw.execute("INSERT INTO pending_account_sync (id, kind, created_at) VALUES (1, 'merge', 1)");
-          raw.execute('PRAGMA user_version = 6');
-        },
-      ),
-    );
-    addTearDown(db.close);
-
-    expect(await db.select(db.pendingAccountSync).get(), hasLength(1));
-    expect(await db.select(db.localValues).get(), isEmpty);
-    await db.into(db.localValues).insert(LocalValuesCompanion.insert(key: 'k', value: 'v'));
-    expect((await db.select(db.localValues).getSingle()).value, 'v');
-  });
 }

@@ -77,9 +77,10 @@ void main() {
     );
 
     test('counts every saved session, even after its upload is done', () async {
-      await finishSessions(2);
+      await finishSessions(5);
+      await db.delete(db.pendingSessions).go();
 
-      expect(await sessions.completedSessionCount(), 2);
+      expect(await controller.shouldPromptAfterResults(), isTrue);
     });
   });
 
@@ -113,6 +114,18 @@ void main() {
       expect(await controller.shouldPromptAfterResults(), isFalse);
     });
 
+    test(
+      'a dismissal dated in the future (a wrong clock then) does not hide it',
+      () async {
+        await finishSessions(5);
+        now += 365 * _day;
+        await controller.dismiss();
+        now -= 365 * _day;
+
+        expect(await controller.shouldPromptAfterResults(), isTrue);
+      },
+    );
+
     test('a changed cooldown applies at once', () async {
       await finishSessions(5);
       await controller.dismiss();
@@ -127,17 +140,18 @@ void main() {
   });
 
   group('from the leaderboard', () {
-    test('a guest is asked at once, without any sessions', () async {
-      expect(await controller.shouldPromptFromLeaderboard(), isTrue);
+    test('a guest is asked at once, without any sessions', () {
+      expect(controller.shouldPromptFromLeaderboard(), isTrue);
     });
 
-    test('a dismissal in the cooldown hides it there too', () async {
-      await controller.dismiss();
+    test(
+      'a guest who taps "see my rank" is asked even in the cooldown',
+      () async {
+        await controller.dismiss();
 
-      expect(await controller.shouldPromptFromLeaderboard(), isFalse);
-      now += 7 * _day;
-      expect(await controller.shouldPromptFromLeaderboard(), isTrue);
-    });
+        expect(controller.shouldPromptFromLeaderboard(), isTrue);
+      },
+    );
   });
 
   group('who is asked', () {
@@ -150,7 +164,7 @@ void main() {
       await finishSessions(5);
 
       expect(await controller.shouldPromptAfterResults(), isFalse);
-      expect(await controller.shouldPromptFromLeaderboard(), isFalse);
+      expect(controller.shouldPromptFromLeaderboard(), isFalse);
     });
 
     test('a device with no account yet is not asked', () async {
@@ -158,7 +172,7 @@ void main() {
       await finishSessions(5);
 
       expect(await controller.shouldPromptAfterResults(), isFalse);
-      expect(await controller.shouldPromptFromLeaderboard(), isFalse);
+      expect(controller.shouldPromptFromLeaderboard(), isFalse);
     });
 
     test('a guest who has just registered is no longer asked', () async {
