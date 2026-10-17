@@ -9,20 +9,25 @@ const DAY_MS = 86_400_000;
 
 const day = z.string().refine((s) => dayBounds(s) !== null, "must be a real calendar day, YYYY-MM-DD");
 
+function checkRange(q: { from: string; to: string }, ctx: z.RefinementCtx): void {
+  if (dayBounds(q.from) === null || dayBounds(q.to) === null) return;
+  if (q.from > q.to) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "must not be before from" });
+  } else if (days(q.from, q.to) > MAX_REPORT_DAYS) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: `the range is at most ${MAX_REPORT_DAYS} days` });
+  }
+}
+
+/** A from/to day range, both included; shared with the analytics endpoint. */
+export const rangeQuery = z.object({ from: day, to: day }).superRefine(checkRange);
+
 export const reportQuery = z
   .object({
     from: day,
     to: day,
     format: z.enum(["json", "csv"]).default("json"),
   })
-  .superRefine((q, ctx) => {
-    if (dayBounds(q.from) === null || dayBounds(q.to) === null) return;
-    if (q.from > q.to) {
-      ctx.addIssue({ code: "custom", path: ["to"], message: "must not be before from" });
-    } else if (days(q.from, q.to) > MAX_REPORT_DAYS) {
-      ctx.addIssue({ code: "custom", path: ["to"], message: `the range is at most ${MAX_REPORT_DAYS} days` });
-    }
-  });
+  .superRefine(checkRange);
 
 /** Days from `from` to `to`, both included. */
 function days(from: string, to: string): number {

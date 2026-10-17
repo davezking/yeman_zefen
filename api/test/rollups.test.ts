@@ -218,7 +218,7 @@ describe("runScheduled", () => {
     expect(done).toHaveLength(MAX_DAYS_PER_RUN);
     expect(counter.queries).toBeLessThanOrEqual(45);
     // The day left over is picked up by the next night's run.
-    expect(await missingDates(env, NOW)).toHaveLength(1);
+    expect(await missingDates(env, NOW)).toHaveLength(7 - MAX_DAYS_PER_RUN);
   });
 
   it("keeps going when one day fails, then throws", async () => {
@@ -229,11 +229,11 @@ describe("runScheduled", () => {
         bind: (...v: unknown[]) => ({ v, inner: real.prepare(sql).bind(...v), all: () => real.prepare(sql).bind(...v).all() }),
       }),
       batch: (stmts: { v: unknown[]; inner: D1PreparedStatement }[]) =>
-        stmts[0]!.v[0] === "2026-10-13" ? Promise.reject(new Error("boom")) : real.batch(stmts.map((x) => x.inner)),
+        stmts[0]!.v[0] === "2026-10-12" ? Promise.reject(new Error("boom")) : real.batch(stmts.map((x) => x.inner)),
     } as unknown as D1Database;
-    await expect(runScheduled({ DB: flaky }, NOW)).rejects.toThrow(/2026-10-13/);
-    // The 13th is still missing; the 14th was cut by the per-run cap, not by the failure.
-    expect(await missingDates(env, NOW)).toEqual(["2026-10-13", "2026-10-14"]);
+    await expect(runScheduled({ DB: flaky }, NOW)).rejects.toThrow(/2026-10-12/);
+    // The 12th is still missing; the 13th and 14th were cut by the per-run cap, not by the failure.
+    expect(await missingDates(env, NOW)).toEqual(["2026-10-12", "2026-10-13", "2026-10-14"]);
     await runScheduled(env, NOW);
     expect(await missingDates(env, NOW)).toEqual([]);
   });

@@ -7,8 +7,8 @@ import type { Bindings } from "../env";
 const DAY_MS = 86_400_000;
 /** How far back a run looks for days that were never rolled up. */
 export const BACKFILL_DAYS = 7;
-/** D1 statements in rollUpDay's batch: 3 deletes + royalty + ads + 2 analytics. */
-const STATEMENTS_PER_DAY = 7;
+/** D1 statements in rollUpDay's batch: 3 deletes + royalty + ads + 2 analytics + retention. */
+const STATEMENTS_PER_DAY = 8;
 /** Days one run rolls up at most, derived so that a run (plus its 1 read) stays under the Free plan's 50 queries. */
 export const MAX_DAYS_PER_RUN = Math.floor((45 - 1) / STATEMENTS_PER_DAY);
 /** Country stored for sessions Cloudflare could not place. */
@@ -40,7 +40,14 @@ export function dayBounds(date: string): { start: number; end: number } | null {
 // ?1 date, ?2 start (inclusive), ?3 end (exclusive).
 const SESSIONS_IN_DAY = "received_at >= ?2 AND received_at < ?3";
 
-const DELETE_SQL = ["royalty_daily", "ad_events_daily", "analytics_daily"].map((t) => `DELETE FROM ${t} WHERE date = ?1`);
+/** Retention counts are keyed by cohort date and written by a LATER day's run, so a day's own re-run must keep them. */
+export const RETENTION_METRICS = ["retention_d1", "retention_d7", "retention_d30"] as const;
+
+const DELETE_SQL = [
+  "DELETE FROM royalty_daily WHERE date = ?1",
+  "DELETE FROM ad_events_daily WHERE date = ?1",
+  `DELETE FROM analytics_daily WHERE date = ?1 AND metric NOT IN (${RETENTION_METRICS.map((m) => `'${m}'`).join(", ")})`,
+];
 
 // Every track in track_ids_json is one play, right or wrong, flagged or not (FR-22). A play of an ID
 // that is not in tracks is left out (royalty_daily.track_id is a foreign key, and one bad ID must not
@@ -94,9 +101,26 @@ const BREAKDOWN_SQL = `
   FROM game_sessions WHERE ${SESSIONS_IN_DAY}
   GROUP BY COALESCE(country, '${UNKNOWN_COUNTRY}')`;
 
+// Retention (FR-23): of the users created on cohort day C (new_users' definition), how many played on
+// C+1, C+7 and C+30. Day ?1 is the "played on" day, so it writes the rows of the three cohorts
+// behind it: retention_d1 for ?1-1, retention_d7 for ?1-7, retention_d30 for ?1-30. The value is a
+// COUNT of users, not a percentage: the share is retained / new_users, and counts add up across a
+// week of cohorts. A row exists once its day has been rolled up (no row = not known yet, not zero).
+const RETENTION_SQL = `
+  WITH h(n, metric) AS (VALUES (1, 'retention_d1'), (7, 'retention_d7'), (30, 'retention_d30'))
+  INSERT OR REPLACE INTO analytics_daily (date, metric, dimension, value)
+  SELECT date(?1, '-' || n || ' days'), metric, '',
+         (SELECT COUNT(*) FROM users u
+           WHERE u.id <> 'deleted'
+             AND u.created_at >= CAST(strftime('%s', date(?1, '-' || n || ' days')) AS INTEGER) * 1000
+             AND u.created_at < (CAST(strftime('%s', date(?1, '-' || n || ' days')) AS INTEGER) + 86400) * 1000
+             AND EXISTS (SELECT 1 FROM game_sessions s WHERE s.user_id = u.id AND ${SESSIONS_IN_DAY.replaceAll("received_at", "s.received_at")}))
+    FROM h`;
+
 /**
- * Roll up one UTC day, replacing whatever the three tables held for it. Seven statements in one
- * batch, however many sessions the day had. Throws on a bad date.
+ * Roll up one UTC day, replacing whatever the three tables held for it (retention rows, which belong
+ * to earlier cohorts, are written alongside). Eight statements in one batch, however many sessions
+ * the day had. Throws on a bad date.
  */
 export async function rollUpDay(env: Pick<Bindings, "DB">, date: string): Promise<RollupSummary> {
   const bounds = dayBounds(date);
@@ -108,6 +132,7 @@ export async function rollUpDay(env: Pick<Bindings, "DB">, date: string): Promis
     bind(ADS_SQL),
     bind(TOTALS_SQL),
     bind(BREAKDOWN_SQL),
+    bind(RETENTION_SQL),
   ]);
   const changes = (i: number) => results[i]!.meta.changes ?? 0;
   const total = (name: string) => (results[5]!.results as { metric: string; value: number }[]).find((r) => r.metric === name)!.value;
