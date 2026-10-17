@@ -1,7 +1,7 @@
 // Date ranges for the royalty report. Days are UTC `YYYY-MM-DD`, the same days the nightly
 // roll-up and the API use, so "last month" here is the month the Worker would count.
 
-/** The API's limit on one report (api/src/lib/royaltyReport.ts). */
+/** The API's limit on one range, for reports and analytics (api/src/lib/dayRange.ts). */
 export const MAX_REPORT_DAYS = 366;
 const DAY_MS = 86_400_000;
 
@@ -39,7 +39,7 @@ export function rangeError(from: string, to: string): string | null {
   if (!isDay(from) || !isDay(to)) return "Pick a start and an end day.";
   if (from > to) return "The end day is before the start day.";
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
-  if (days > MAX_REPORT_DAYS) return `A report covers at most ${MAX_REPORT_DAYS} days.`;
+  if (days > MAX_REPORT_DAYS) return `A range covers at most ${MAX_REPORT_DAYS} days.`;
   return null;
 }
 

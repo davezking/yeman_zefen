@@ -1,5 +1,6 @@
 import "@fontsource/noto-sans-ethiopic/400.css";
 import "@fontsource/noto-sans-ethiopic/700.css";
+import "@mantine/charts/styles.css";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/dates/styles.css";

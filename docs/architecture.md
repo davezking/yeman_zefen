@@ -151,7 +151,7 @@ erDiagram
 - `leaderboard_entries` (period `all | 2026-W42`, generation_id with 0 = all, user_id, points, updated_at). PK (period, generation_id, user_id). Index (period, generation_id, points DESC).
 - `royalty_daily` (date, track_id, plays). PK (date, track_id).
 - `ad_events_daily` (date, country, format, event, count)
-- `analytics_daily` (date, metric, dimension, value). Covers DAU, new users, sessions, rounds, plays by country.
+- `analytics_daily` (date, metric, dimension, value). Covers DAU, new users, sessions, rounds, plays by country, and `retention_d1`/`retention_d7`/`retention_d30`: a COUNT of the cohort day's new users who played 1, 7 or 30 days later, keyed by the cohort date and written by the later day's run (so a day's own re-run keeps them). The share is the count over that day's `new_users`; no row means not known yet.
 - `admin_users` (email, role `admin | editor`, created_at)
 - `ingest_jobs` (id, kind `scrape | cut | recut`, status `queued | running | succeeded | failed`, params_json, gh_run_url, started_at, finished_at, summary_json)
 

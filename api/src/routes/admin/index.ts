@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../env";
 import { requireAdmin, requireService } from "../../lib/accessAuth";
+import { analyticsRoutes } from "./analytics";
 import { catalog } from "./catalog";
 import { ingestRoutes } from "./ingest";
 import { jobRoutes } from "./jobs";
@@ -24,6 +25,7 @@ human.route("/", taxonomy);
 human.route("/", reviewRoutes);
 human.route("/", rollupRoutes);
 human.route("/", reportRoutes);
+human.route("/", analyticsRoutes);
 
 // Service-token routes for GitHub Actions ingestion. requireService guards these.
 const ingest = new Hono<AppEnv>();
