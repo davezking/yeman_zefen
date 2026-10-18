@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./layout/AppShell";
 import { JobsPage } from "./pages/JobsPage";
+import { ModerationPage } from "./pages/ModerationPage";
+import { ModerationUserPage } from "./pages/ModerationUserPage";
 import { PacksPage } from "./pages/PacksPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
@@ -22,8 +24,10 @@ export function App() {
         <Route path="jobs" element={<JobsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="moderation" element={<ModerationPage />} />
+        <Route path="moderation/users/:id" element={<ModerationUserPage />} />
         {navItems
-          .filter((item) => !["/tracks", "/review", "/packs", "/jobs", "/reports", "/analytics"].includes(item.path))
+          .filter((item) => !["/tracks", "/review", "/packs", "/jobs", "/reports", "/analytics", "/moderation"].includes(item.path))
           .map((item) => (
             <Route key={item.path} path={item.path.slice(1)} element={<PlaceholderPage title={item.label} />} />
           ))}

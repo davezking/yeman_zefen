@@ -1,6 +1,6 @@
 // The review queue: list and count review items, and close them. A track's own open items also come back in
 // GET /admin/tracks/:id. Ingest only raises items about tracks, so the queue is the track items.
-import { and, asc, eq, gt, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, gt, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
@@ -104,11 +104,12 @@ function close(status: "resolved" | "dismissed") {
     const [item] = await d
       .update(reviewItems)
       .set({ status, resolvedBy: admin?.email ?? null, resolvedAt: Date.now() })
-      .where(and(eq(reviewItems.id, id), eq(reviewItems.status, "open")))
+      // Anomaly flags are closed from the moderation page, which asks for a note and logs it.
+      .where(and(eq(reviewItems.id, id), eq(reviewItems.status, "open"), ne(reviewItems.reason, "score_anomaly")))
       .returning();
     if (!item) {
       const existing = await d.select().from(reviewItems).where(eq(reviewItems.id, id)).get();
-      if (!existing) throw new ApiError(404, "not_found", `Review item ${id} not found`);
+      if (!existing || existing.reason === "score_anomaly") throw new ApiError(404, "not_found", `Review item ${id} not found`);
       throw new ApiError(409, "already_closed", `Review item ${id} is already ${existing.status}`);
     }
     return c.json({ item });
