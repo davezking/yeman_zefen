@@ -168,7 +168,7 @@ describe("POST /admin/users/:id/shadow-ban", () => {
     await board("u1", "all", 0, 800);
     const res = await post("/admin/users/u1/shadow-ban", { banned: true, note: `  ${NOTE}  ` });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ userId: "u1", shadowBanned: true, changed: true });
+    expect(await res.json()).toEqual({ userId: "u1", shadowBanned: true, changed: true, flagResolved: false });
     expect((await env.DB.prepare("SELECT shadow_banned AS b FROM users WHERE id = 'u1'").first<{ b: number }>())!.b).toBe(1);
     expect(await points("u1")).toEqual([{ period: "all", gen: 0, points: 800 }]);
     expect(await logRows()).toEqual([
@@ -194,21 +194,62 @@ describe("POST /admin/users/:id/shadow-ban", () => {
     expect(await logRows()).toHaveLength(1);
   });
 
-  it("resolves the anomaly flag it answers, and only that player's open flag", async () => {
+  const flagState = async (id: number) =>
+    (await env.DB.prepare("SELECT status, resolved_by AS by FROM review_items WHERE id = ?1").bind(id).first<{ status: string; by: string | null }>())!;
+
+  it("resolves the anomaly flag it answers and logs the ban and the resolution", async () => {
+    await user("u1");
+    const id = await flag("u1");
+    const res = await post("/admin/users/u1/shadow-ban", { banned: true, note: NOTE, reviewItemId: id });
+    expect(await res.json()).toEqual({ userId: "u1", shadowBanned: true, changed: true, flagResolved: true });
+    expect(await flagState(id)).toEqual({ status: "resolved", by: "admin@yz.test" });
+    expect(await logRows()).toEqual([
+      { admin_email: "admin@yz.test", action: "shadow_ban", user_id: "u1", session_id: null, review_item_id: null, note: NOTE },
+      { admin_email: "admin@yz.test", action: "resolve_flag", user_id: "u1", session_id: null, review_item_id: id, note: NOTE },
+    ]);
+  });
+
+  it("logs the flag it resolves even when the player was already banned", async () => {
+    await user("u1", { banned: true });
+    const id = await flag("u1");
+    const res = await post("/admin/users/u1/shadow-ban", { banned: true, note: "confirmed bot", reviewItemId: id });
+    expect(await res.json()).toEqual({ userId: "u1", shadowBanned: true, changed: false, flagResolved: true });
+    expect((await flagState(id)).status).toBe("resolved");
+    expect(await logRows()).toEqual([
+      { admin_email: "admin@yz.test", action: "resolve_flag", user_id: "u1", session_id: null, review_item_id: id, note: "confirmed bot" },
+    ]);
+  });
+
+  it("refuses a flag that is not this player's open anomaly flag, and does nothing", async () => {
     await user("u1");
     await user("u2");
-    const mine = await flag("u1");
     const theirs = await flag("u2");
-    const res = await post("/admin/users/u1/shadow-ban", { banned: true, note: NOTE, reviewItemId: theirs });
-    expect(res.status).toBe(200);
-    const status = async (id: number) => (await env.DB.prepare("SELECT status, resolved_by AS by FROM review_items WHERE id = ?1").bind(id).first<{ status: string; by: string | null }>())!;
-    expect((await status(theirs)).status).toBe("open");
-    expect((await status(mine)).status).toBe("open");
+    const closed = await flag("u1");
+    await env.DB.prepare("UPDATE review_items SET status = 'dismissed' WHERE id = ?1").bind(closed).run();
+    const track = (await env.DB.prepare(
+      `INSERT INTO review_items (entity_type, entity_id, reason, status) VALUES ('track', 1, 'era_unknown', 'open') RETURNING id`,
+    ).first<{ id: number }>())!.id;
 
-    await post("/admin/users/u1/shadow-ban", { banned: false, note: "undo" });
-    await post("/admin/users/u1/shadow-ban", { banned: true, note: NOTE, reviewItemId: mine });
-    expect(await status(mine)).toEqual({ status: "resolved", by: "admin@yz.test" });
-    expect((await logRows()).at(-1)).toMatchObject({ action: "shadow_ban", review_item_id: mine });
+    const code = async (reviewItemId: number) => {
+      const res = await post("/admin/users/u1/shadow-ban", { banned: true, note: NOTE, reviewItemId });
+      return [res.status, ((await res.json()) as { error?: { code: string } }).error?.code];
+    };
+    expect(await code(theirs)).toEqual([404, "not_found"]);
+    expect(await code(track)).toEqual([404, "not_found"]);
+    expect(await code(9999)).toEqual([404, "not_found"]);
+    expect(await code(closed)).toEqual([409, "already_closed"]);
+    expect((await flagState(theirs)).status).toBe("open");
+    expect((await env.DB.prepare("SELECT shadow_banned AS b FROM users WHERE id = 'u1'").first<{ b: number }>())!.b).toBe(0);
+    expect(await logRows()).toEqual([]);
+  });
+
+  it("only a ban can resolve a flag", async () => {
+    await user("u1", { banned: true });
+    const id = await flag("u1");
+    const res = await post("/admin/users/u1/shadow-ban", { banned: false, note: NOTE, reviewItemId: id });
+    expect(res.status).toBe(400);
+    expect((await flagState(id)).status).toBe("open");
+    expect(await logRows()).toEqual([]);
   });
 
   it("requires a note, and rejects unknown fields and bad values", async () => {
@@ -294,12 +335,16 @@ describe("POST /admin/sessions/:id/void", () => {
     expect(await logRows()).toHaveLength(1);
   });
 
-  it("never takes a row below zero", async () => {
+  it("never takes a row below zero, and reports what it actually took", async () => {
     await user("u1");
     await board("u1", "all", 0, 30);
+    await board("u1", WEEK, 0, 10);
     await session({ id: "s1", userId: "u1", score: 100 });
-    await post("/admin/sessions/s1/void", { note: NOTE });
-    expect((await points("u1")).map((r) => r.points)).toEqual([0]);
+    const res = await post("/admin/sessions/s1/void", { note: NOTE });
+    expect(await res.json()).toEqual({ sessionId: "s1", voided: true, pointsRemoved: 30 });
+    expect((await points("u1")).map((r) => r.points)).toEqual([0, 0]);
+    const details = await env.DB.prepare("SELECT details_json AS d FROM moderation_log").first<{ d: string }>();
+    expect(JSON.parse(details!.d)).toEqual({ score: 100, pointsRemoved: 30 });
   });
 
   it("takes nothing back for a session that was flagged when played, but still closes it", async () => {
@@ -348,6 +393,16 @@ describe("dismissing", () => {
     ]);
   });
 
+  it("refuses a voided session in the insert itself, so a void racing a dismissal still wins", async () => {
+    await user("u1");
+    await session({ id: "s1", userId: "u1", flagged: true });
+    // The route does not read the void first: the insert's own guard refuses it, which leaves no gap to race.
+    await post("/admin/sessions/s1/void", { note: NOTE });
+    const res = await post("/admin/sessions/s1/dismiss", { note: "late" });
+    expect(res.status).toBe(409);
+    expect((await logRows()).map((r) => r.action)).toEqual(["void_session"]);
+  });
+
   it("refuses a session that is not flagged or was voided, and an unknown one", async () => {
     await user("u1");
     await session({ id: "clean", userId: "u1" });
@@ -389,6 +444,13 @@ describe("dismissing", () => {
     ).first<{ id: number }>();
     expect((await post(`/admin/moderation/flags/${track!.id}/dismiss`, { note: NOTE })).status).toBe(404);
     expect(await logRows()).toEqual([]);
+  });
+
+  it("the track review routes still close artist items", async () => {
+    const item = await env.DB.prepare(
+      `INSERT INTO review_items (entity_type, entity_id, reason, status) VALUES ('artist', 1, 'possible_duplicate', 'open') RETURNING id`,
+    ).first<{ id: number }>();
+    expect((await api(`/admin/review-items/${item!.id}/dismiss`, { method: "POST" })).status).toBe(200);
   });
 
   it("the track review routes cannot close an anomaly flag without a note and a log entry", async () => {

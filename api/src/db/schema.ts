@@ -29,7 +29,7 @@ export const REVIEW_REASONS = [
 ] as const;
 export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 export const ADMIN_ROLES = ["admin", "editor"] as const;
-export const MODERATION_ACTIONS = ["shadow_ban", "shadow_unban", "void_session", "dismiss_session", "dismiss_flag"] as const;
+export const MODERATION_ACTIONS = ["shadow_ban", "shadow_unban", "void_session", "dismiss_session", "dismiss_flag", "resolve_flag"] as const;
 export const INGEST_KINDS = ["scrape", "cut", "recut"] as const;
 export const INGEST_STATUSES = ["queued", "running", "succeeded", "failed"] as const;
 

@@ -8,7 +8,7 @@ CREATE TABLE `moderation_log` (
 	`review_item_id` integer,
 	`note` text NOT NULL,
 	`details_json` text,
-	CONSTRAINT "moderation_log_action_check" CHECK(action IN ('shadow_ban', 'shadow_unban', 'void_session', 'dismiss_session', 'dismiss_flag'))
+	CONSTRAINT "moderation_log_action_check" CHECK(action IN ('shadow_ban', 'shadow_unban', 'void_session', 'dismiss_session', 'dismiss_flag', 'resolve_flag'))
 );
 --> statement-breakpoint
 CREATE INDEX `moderation_log_user_at_idx` ON `moderation_log` (`user_id`,`at`);--> statement-breakpoint

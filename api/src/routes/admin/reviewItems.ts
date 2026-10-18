@@ -7,7 +7,7 @@ import { db } from "../../db/client";
 import { artists, OUT_OF_CATALOG, REVIEW_REASONS, REVIEW_STATUSES, reviewItems, tracks } from "../../db/schema";
 import type { AppEnv } from "../../env";
 import { ApiError } from "../../lib/errors";
-import { idParam, parse } from "../../lib/validate";
+import { idParam, parse, parseStoredJson } from "../../lib/validate";
 
 export const REVIEW_PAGE_SIZE = 50;
 
@@ -58,21 +58,11 @@ export function reviewListQuery(d: ReturnType<typeof db>, f: ReviewListFilters) 
     .limit(REVIEW_PAGE_SIZE + 1);
 }
 
-/** `details_json` is free-form text written by the scraper and the cutter; hand it on parsed, or null if it is not JSON. */
-function parseDetails(json: string | null): unknown {
-  if (json === null) return null;
-  try {
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
 reviewRoutes.get("/review-items", async (c) => {
   const filters = parse(listQuerySchema, c.req.query(), "query");
   const rows = await reviewListQuery(db(c.env), filters);
   const page = rows.slice(0, REVIEW_PAGE_SIZE);
-  const items = page.map(({ detailsJson, ...item }) => ({ ...item, details: parseDetails(detailsJson) }));
+  const items = page.map(({ detailsJson, ...item }) => ({ ...item, details: parseStoredJson(detailsJson) }));
   const nextCursor = rows.length > REVIEW_PAGE_SIZE ? String(page[page.length - 1]!.id) : null;
   return c.json({ items, nextCursor });
 });
@@ -104,12 +94,12 @@ function close(status: "resolved" | "dismissed") {
     const [item] = await d
       .update(reviewItems)
       .set({ status, resolvedBy: admin?.email ?? null, resolvedAt: Date.now() })
-      // Anomaly flags are closed from the moderation page, which asks for a note and logs it.
-      .where(and(eq(reviewItems.id, id), eq(reviewItems.status, "open"), ne(reviewItems.reason, "score_anomaly")))
+      // Items about players (anomaly flags) are closed from the moderation page, which asks for a note and logs it.
+      .where(and(eq(reviewItems.id, id), eq(reviewItems.status, "open"), ne(reviewItems.entityType, "user")))
       .returning();
     if (!item) {
       const existing = await d.select().from(reviewItems).where(eq(reviewItems.id, id)).get();
-      if (!existing || existing.reason === "score_anomaly") throw new ApiError(404, "not_found", `Review item ${id} not found`);
+      if (!existing || existing.entityType === "user") throw new ApiError(404, "not_found", `Review item ${id} not found`);
       throw new ApiError(409, "already_closed", `Review item ${id} is already ${existing.status}`);
     }
     return c.json({ item });

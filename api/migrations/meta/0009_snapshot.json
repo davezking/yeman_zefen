@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "50317fe1-ad47-40cc-b634-ce57f9963537",
+  "id": "fb10fcd3-3ea5-4e9a-8e13-8469581e9898",
   "prevId": "728d4ad5-e31a-44db-bb00-a4bf59e46397",
   "tables": {
     "ad_events_daily": {
@@ -902,7 +902,7 @@
       "checkConstraints": {
         "moderation_log_action_check": {
           "name": "moderation_log_action_check",
-          "value": "action IN ('shadow_ban', 'shadow_unban', 'void_session', 'dismiss_session', 'dismiss_flag')"
+          "value": "action IN ('shadow_ban', 'shadow_unban', 'void_session', 'dismiss_session', 'dismiss_flag', 'resolve_flag')"
         }
       }
     },

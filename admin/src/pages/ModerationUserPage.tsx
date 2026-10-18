@@ -14,6 +14,7 @@ const ACTION_TEXT: Record<string, string> = {
   void_session: "Voided a session",
   dismiss_session: "Dismissed a session",
   dismiss_flag: "Dismissed a flag",
+  resolve_flag: "Resolved a flag by banning",
 };
 
 export function ModerationUserPage() {
