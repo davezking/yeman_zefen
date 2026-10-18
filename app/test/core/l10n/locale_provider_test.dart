@@ -1,6 +1,5 @@
-import 'dart:ui';
-
 import 'package:drift/native.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
@@ -29,7 +28,7 @@ class _Store implements LocaleStore {
 ProviderContainer _container({required Locale device, LocaleStore? store}) {
   final container = ProviderContainer(
     overrides: [
-      deviceLocaleProvider.overrideWithValue(device),
+      deviceLocaleProvider.overrideWithBuild((ref, _) => device),
       localeStoreProvider.overrideWithValue(store ?? _Store()),
     ],
   );
@@ -58,7 +57,7 @@ void main() {
       final seen = <Locale>[];
       container.listen(localeProvider, (_, next) => seen.add(next));
 
-      await container.read(localeProvider.notifier).choose(amharic);
+      await container.read(localeChoiceProvider.notifier).choose(amharic);
 
       expect(container.read(localeProvider), amharic);
       expect(seen, [amharic]);
@@ -67,17 +66,17 @@ void main() {
 
     test('keeps the choice over the device language', () async {
       final container = _container(device: const Locale('en'));
-      await container.read(localeProvider.notifier).choose(amharic);
-      await container.read(localeProvider.notifier).choose(english);
+      await container.read(localeChoiceProvider.notifier).choose(amharic);
+      await container.read(localeChoiceProvider.notifier).choose(english);
       expect(container.read(localeProvider), english);
     });
 
     test('a region or an unsupported language is stored as one of the two languages', () async {
       final store = _Store();
       final container = _container(device: const Locale('en'), store: store);
-      await container.read(localeProvider.notifier).choose(const Locale('am', 'ET'));
+      await container.read(localeChoiceProvider.notifier).choose(const Locale('am', 'ET'));
       expect(container.read(localeProvider), amharic);
-      await container.read(localeProvider.notifier).choose(const Locale('fr'));
+      await container.read(localeChoiceProvider.notifier).choose(const Locale('fr'));
       expect(container.read(localeProvider), english);
       expect(store.saved, english);
     });
@@ -85,7 +84,7 @@ void main() {
     test('still switches when the choice cannot be saved', () async {
       final store = _Store()..failWith = StateError('disk full');
       final container = _container(device: const Locale('en'), store: store);
-      await container.read(localeProvider.notifier).choose(amharic);
+      await container.read(localeChoiceProvider.notifier).choose(amharic);
       expect(container.read(localeProvider), amharic);
     });
   });
@@ -122,7 +121,7 @@ void main() {
       Future<Locale> launch() async {
         final container = ProviderContainer(
           overrides: [
-            deviceLocaleProvider.overrideWithValue(const Locale('en')),
+            deviceLocaleProvider.overrideWithBuild((ref, _) => const Locale('en')),
             localeStoreProvider.overrideWithValue(DbLocaleStore(db)),
           ],
         );
@@ -134,14 +133,41 @@ void main() {
       expect(await launch(), english);
       final first = ProviderContainer(
         overrides: [
-          deviceLocaleProvider.overrideWithValue(const Locale('en')),
+          deviceLocaleProvider.overrideWithBuild((ref, _) => const Locale('en')),
           localeStoreProvider.overrideWithValue(DbLocaleStore(db)),
         ],
       );
       addTearDown(first.dispose);
-      await first.read(localeProvider.notifier).choose(amharic);
+      await first.read(localeChoiceProvider.notifier).choose(amharic);
 
       expect(await launch(), amharic);
+    });
+  });
+
+  group('a change of the device language', () {
+    testWidgets('is followed while the player has not chosen', (tester) async {
+      tester.platformDispatcher.localeTestValue = const Locale('en', 'US');
+      addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+      final container = ProviderContainer(overrides: [localeStoreProvider.overrideWithValue(_Store())]);
+      addTearDown(container.dispose);
+      expect(container.read(localeProvider), english);
+
+      tester.platformDispatcher.localeTestValue = const Locale('am', 'ET');
+      await tester.pump();
+      expect(container.read(localeProvider), amharic);
+    });
+
+    testWidgets('does not undo the player\'s choice', (tester) async {
+      tester.platformDispatcher.localeTestValue = const Locale('en', 'US');
+      addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+      final container = ProviderContainer(overrides: [localeStoreProvider.overrideWithValue(_Store())]);
+      addTearDown(container.dispose);
+      await container.read(localeChoiceProvider.notifier).choose(english);
+
+      tester.platformDispatcher.localeTestValue = const Locale('am', 'ET');
+      await tester.pump();
+      expect(container.read(deviceLocaleProvider), const Locale('am', 'ET'));
+      expect(container.read(localeProvider), english);
     });
   });
 

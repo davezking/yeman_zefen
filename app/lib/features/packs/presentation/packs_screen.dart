@@ -1,8 +1,11 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/display_name.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../game/presentation/session_texts.dart';
 import '../data/packs_api.dart';
 import '../data/packs_providers.dart';
 import '../domain/pack_install_progress.dart';
@@ -83,7 +86,9 @@ class _PackTileState extends ConsumerState<_PackTile> {
     setState(() => _working = true);
     try {
       await ref.read(packServiceProvider).install(widget.pack);
-    } catch (e) {
+    } catch (e, st) {
+      // The player sees the general message; the reason goes to the log.
+      developer.log('pack install failed', name: 'packs', error: e, stackTrace: st);
       messenger.showSnackBar(SnackBar(content: Text(failed)));
     } finally {
       if (mounted) setState(() => _working = false);
@@ -108,7 +113,7 @@ class _PackTileState extends ConsumerState<_PackTile> {
             : l10n.packsDownload;
 
     return ListTile(
-      title: Text(DisplayName.of(pack.nameAm, pack.nameEn).of(locale)),
+      title: Text(l10n.nameOf(DisplayName.of(pack.nameAm, pack.nameEn), locale)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

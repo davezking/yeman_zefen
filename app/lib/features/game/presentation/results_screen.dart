@@ -50,7 +50,11 @@ class ResultsScreen extends ConsumerWidget {
           Text(
             l10n.homeQuickPlaySettings(
               l10n.eraLabel(config.generationId),
-              config.mode == GameMode.middle ? l10n.homeQuickPlayModeMiddle : l10n.homeQuickPlayModeIntro,
+              switch (config.mode) {
+                GameMode.intro => l10n.homeQuickPlayModeIntro,
+                GameMode.middle => l10n.homeQuickPlayModeMiddle,
+                GameMode.generation => l10n.homeQuickPlayModeEra,
+              },
               switch (config.difficulty) {
                 Difficulty.easy => l10n.difficultyEasyShort,
                 Difficulty.medium => l10n.difficultyMediumShort,

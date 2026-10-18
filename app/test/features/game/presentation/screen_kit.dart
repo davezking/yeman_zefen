@@ -155,7 +155,7 @@ Future<Harness> pumpScreens(
   final router = buildRouter(initialLocation: location);
   final container = ProviderContainer(
     overrides: [
-      deviceLocaleProvider.overrideWithValue(device),
+      deviceLocaleProvider.overrideWithBuild((ref, _) => device),
       localeStoreProvider.overrideWithValue(MemoryLocaleStore()),
       sessionControllerProvider.overrideWith(() => RecordingSessionController(state)),
       installedErasProvider.overrideWith((ref) async => eras),

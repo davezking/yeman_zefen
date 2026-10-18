@@ -24,7 +24,7 @@ class LanguageToggle extends ConsumerWidget {
           ButtonSegment(value: english, label: Text(l10n.onboardLangEnglish)),
         ],
         selected: {localeForDevice(current)},
-        onSelectionChanged: (s) => ref.read(localeProvider.notifier).choose(s.first),
+        onSelectionChanged: (s) => ref.read(localeChoiceProvider.notifier).choose(s.first),
       ),
     );
   }

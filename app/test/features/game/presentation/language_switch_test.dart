@@ -49,7 +49,7 @@ void main() {
       await tester.pump();
       expect(find.text('New game'), findsOneWidget);
 
-      await h.container.read(localeProvider.notifier).choose(amharic);
+      await h.container.read(localeChoiceProvider.notifier).choose(amharic);
       await tester.pumpAndSettle();
 
       expect(find.text('አዲስ ጨዋታ'), findsOneWidget);
@@ -64,7 +64,7 @@ void main() {
       expect(find.text('Song One'), findsOneWidget);
       expect(find.text('Which song is this?'), findsOneWidget);
 
-      await h.container.read(localeProvider.notifier).choose(amharic);
+      await h.container.read(localeChoiceProvider.notifier).choose(amharic);
       await tester.pump();
 
       expect(find.text('ዘፈን አንድ'), findsOneWidget, reason: 'Fidel when the catalog has it');
@@ -78,7 +78,7 @@ void main() {
       final h = await pumpScreens(tester, location: '/results', state: finishedState());
       expect(find.text('Song 1'), findsOneWidget);
 
-      await h.container.read(localeProvider.notifier).choose(amharic);
+      await h.container.read(localeChoiceProvider.notifier).choose(amharic);
       await tester.pump();
 
       expect(find.text('ዘፈን'), findsOneWidget);
@@ -94,7 +94,7 @@ void main() {
       );
       expect(find.text('ዘፈን አንድ'), findsOneWidget);
 
-      await h.container.read(localeProvider.notifier).choose(english);
+      await h.container.read(localeChoiceProvider.notifier).choose(english);
       await tester.pump();
       expect(find.text('Song One'), findsOneWidget);
     });
@@ -108,7 +108,7 @@ void main() {
     );
     expect(find.text('Unknown'), findsWidgets);
 
-    await h.container.read(localeProvider.notifier).choose(amharic);
+    await h.container.read(localeChoiceProvider.notifier).choose(amharic);
     await tester.pump();
     expect(find.text('ያልታወቀ'), findsWidgets);
   });
