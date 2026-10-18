@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/l10n/locale_provider.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
-import 'package:yeman_zefen/l10n/app_localizations_am.dart';
 
 import 'screen_kit.dart';
 

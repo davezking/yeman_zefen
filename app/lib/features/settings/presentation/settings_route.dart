@@ -10,7 +10,6 @@ import '../../../core/l10n/locale_provider.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
 import '../../game/application/play_setup.dart';
-import '../../packs/data/packs_providers.dart';
 import '../application/settings_providers.dart';
 import 'settings_screen.dart';
 

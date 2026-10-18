@@ -7,7 +7,6 @@ import '../../../core/net/network_kind.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
-import '../../packs/data/packs_providers.dart';
 import '../../settings/application/settings_providers.dart';
 import '../application/play_setup.dart';
 import '../application/session_controller.dart';
