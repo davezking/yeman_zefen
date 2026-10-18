@@ -6,6 +6,9 @@ import 'package:yeman_zefen/app.dart';
 import 'package:yeman_zefen/core/auth/auth_service.dart';
 import 'package:yeman_zefen/core/config/remote_config.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/core/l10n/display_name.dart';
+import 'package:yeman_zefen/core/l10n/locale_provider.dart';
+import 'package:yeman_zefen/core/theme/app_theme.dart';
 import 'package:yeman_zefen/features/account/register_prompt_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
@@ -15,6 +18,19 @@ import 'package:yeman_zefen/features/packs/data/packs_api.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
 import 'package:yeman_zefen/features/packs/domain/pack_install_progress.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
+
+/// A locale store that keeps the choice in memory.
+class MemoryLocaleStore implements LocaleStore {
+  MemoryLocaleStore([this.saved]);
+
+  Locale? saved;
+
+  @override
+  Future<Locale?> read() async => saved;
+
+  @override
+  Future<void> write(Locale locale) async => saved = locale;
+}
 
 /// Stands in for the session controller. It starts in [initial], records what
 /// the screens ask of it, and lets a test move it to another state.
@@ -72,10 +88,10 @@ RoundView roundView({
     total: total,
     kind: kind,
     options: const [
-      AnswerOption(id: 11, label: 'ዘፈን አንድ\nSong One'),
-      AnswerOption(id: 12, label: 'Song Two'),
-      AnswerOption(id: 13, label: 'Song Three'),
-      AnswerOption(id: 14, label: 'Song Four'),
+      AnswerOption(id: 11, name: DisplayName(am: 'ዘፈን አንድ', latin: 'Song One')),
+      AnswerOption(id: 12, name: DisplayName(latin: 'Song Two')),
+      AnswerOption(id: 13, name: DisplayName(latin: 'Song Three')),
+      AnswerOption(id: 14, name: DisplayName(latin: 'Song Four')),
     ],
     windowMs: 10000,
     remainingMs: remainingMs,
@@ -132,10 +148,15 @@ Future<Harness> pumpScreens(
   Set<int> eras = const {1, 2, 3, 4, 5},
   FakePackService? packService,
   Stream<PackInstallProgress> Function(String slug)? progress,
+  Locale device = const Locale('en'),
+  double textScale = 1.0,
+  bool themed = false,
 }) async {
   final router = buildRouter(initialLocation: location);
   final container = ProviderContainer(
     overrides: [
+      deviceLocaleProvider.overrideWithValue(device),
+      localeStoreProvider.overrideWithValue(MemoryLocaleStore()),
       sessionControllerProvider.overrideWith(() => RecordingSessionController(state)),
       installedErasProvider.overrideWith((ref) async => eras),
       bestScoreProvider.overrideWith((ref, key) => (bestScore ?? (_, _) async => null)(key.$1, key.$2)),
@@ -163,13 +184,71 @@ Future<Harness> pumpScreens(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(
-        routerConfig: router,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
+      // The language follows the locale provider, as in the real app.
+      child: Consumer(
+        builder: (context, ref, _) => MaterialApp.router(
+          locale: ref.watch(localeProvider),
+          routerConfig: router,
+          // As in app.dart: the app theme (fonts and line heights) follows the language, and the
+          // player's text size scales everything.
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: themed ? Theme(data: buildAppTheme(Localizations.localeOf(context)), child: child!) : child!,
+          ),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     ),
   );
   await tester.pump();
   return Harness(tester, router, container);
+}
+
+SessionState finishedState({
+  bool unnamed = false,
+  int total = 412,
+  int? bestBefore,
+  bool isNewBest = false,
+  int skipped = 0,
+  bool flagged = false,
+  String? saveError,
+  SessionConfig sessionConfig = config,
+}) {
+  return SessionState(
+    phase: SessionPhase.finished,
+    config: sessionConfig,
+    summary: SessionSummary(
+      config: sessionConfig,
+      totalScore: total,
+      rounds: unnamed
+          ? const [
+              RoundSummary(
+                number: 1, kind: QuestionKind.song, correctName: DisplayName(), chosenName: DisplayName(),
+                correct: true, points: 206, valid: true, responseMs: 2500,
+              ),
+            ]
+          : const [
+        RoundSummary(
+          number: 1, kind: QuestionKind.song,
+          correctName: DisplayName(am: 'ዘፈን', latin: 'Song 1'), chosenName: DisplayName(am: 'ዘፈን', latin: 'Song 1'),
+          correct: true, points: 206, valid: true, responseMs: 2500,
+        ),
+        RoundSummary(
+          number: 2, kind: QuestionKind.song,
+          correctName: DisplayName(latin: 'Song 2'), chosenName: DisplayName(latin: 'Song 9'),
+          correct: false, points: 0, valid: true, responseMs: 3100,
+        ),
+        RoundSummary(
+          number: 4, kind: QuestionKind.artist, correctName: DisplayName(latin: 'Artist 3'), chosenName: null,
+          correct: false, points: 0, valid: true, responseMs: 10000,
+        ),
+      ],
+      skipped: skipped,
+      flagged: flagged,
+      bestBefore: bestBefore,
+      isNewBest: isNewBest,
+      saveError: saveError,
+    ),
+  );
 }

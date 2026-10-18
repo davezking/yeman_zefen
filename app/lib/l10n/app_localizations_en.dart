@@ -841,4 +841,159 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateRequiredButton => 'Update app';
+
+  @override
+  String get nameUnknown => 'Unknown';
+
+  @override
+  String get startTitle => 'New game';
+
+  @override
+  String get startWhatPlays => 'What plays';
+
+  @override
+  String get startQuestions => 'Questions';
+
+  @override
+  String get startQuestionsMixed => 'Mixed';
+
+  @override
+  String bestScore(int score) {
+    return 'Best score: $score';
+  }
+
+  @override
+  String get startBestNone => 'No best score yet for this mode and era.';
+
+  @override
+  String get roundGetReady => 'Get ready';
+
+  @override
+  String get roundNoGame => 'No game is running.';
+
+  @override
+  String get roundStartGame => 'Start a game';
+
+  @override
+  String get roundPausedBody =>
+      'Paused. The clip plays again when you resume. The time you already used still counts.';
+
+  @override
+  String get roundResume => 'Resume';
+
+  @override
+  String get roundCouldNotStart => 'The game could not start.';
+
+  @override
+  String get feedbackTooFast => 'Too fast to count. 0 points';
+
+  @override
+  String feedbackCorrectPoints(int points) {
+    return 'Correct! +$points';
+  }
+
+  @override
+  String get resultsNone => 'No finished game to show.';
+
+  @override
+  String resultsSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count rounds were skipped because a clip could not be played.',
+      one: '1 round was skipped because a clip could not be played.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get resultsFlagged => 'Some answers were too fast to count.';
+
+  @override
+  String resultsSaveError(String detail) {
+    return 'This game could not be saved on the phone: $detail';
+  }
+
+  @override
+  String resultsYouChose(String name) {
+    return 'You chose $name';
+  }
+
+  @override
+  String get sessionErrorNoSongs =>
+      'There are no songs on this phone yet. Download a pack first.';
+
+  @override
+  String get sessionErrorTooFewSongs =>
+      'There aren\'t enough songs to make a round. Download another pack.';
+
+  @override
+  String get sessionErrorTooFewArtists =>
+      'There aren\'t enough different artists for artist questions. Choose Song questions or download another pack.';
+
+  @override
+  String sessionErrorNoSongsInEra(String era) {
+    return 'There are no songs for $era. Choose another era.';
+  }
+
+  @override
+  String sessionErrorClipsFailed(int count) {
+    return 'None of the $count clips could be played. Download the pack again and try once more.';
+  }
+
+  @override
+  String sessionErrorUnexpected(String detail) {
+    return 'Something went wrong: $detail';
+  }
+
+  @override
+  String get commonRefresh => 'Refresh';
+
+  @override
+  String get packsLoadError =>
+      'Couldn\'t load the packs. Check your connection.';
+
+  @override
+  String get packsNone => 'No packs are published yet.';
+
+  @override
+  String packsMeta(int count, String size, int version) {
+    return '$count songs · $size MB · v$version';
+  }
+
+  @override
+  String packsMetaInstalled(
+    int count,
+    String size,
+    int version,
+    int installed,
+  ) {
+    return '$count songs · $size MB · v$version (installed v$installed)';
+  }
+
+  @override
+  String get packsInstalling => 'Installing';
+
+  @override
+  String get packsUpdateButton => 'Update';
+
+  @override
+  String get packsStateWaiting => 'Waiting';
+
+  @override
+  String get packsStateDownloading => 'Downloading';
+
+  @override
+  String get packsStateChecking => 'Checking';
+
+  @override
+  String get packsStateInstalled => 'Installed';
+
+  @override
+  String get packsStateFailed => 'Failed';
+
+  @override
+  String packsFilesProgress(String state, int done, int total) {
+    return '$state $done/$total files';
+  }
 }

@@ -238,5 +238,161 @@
   "loadingGeneric": "በመጫን ላይ…",
   "updateRequiredTitle": "ዝማኔ ያስፈልጋል",
   "updateRequiredBody": "ይህ የመተግበሪያ ስሪት ጊዜው አልፎበታል። መጫወቱን ለመቀጠል እባክዎ ያዘምኑ።",
-  "updateRequiredButton": "መተግበሪያውን አዘምን"
+  "updateRequiredButton": "መተግበሪያውን አዘምን",
+  "nameUnknown": "ያልታወቀ",
+  "@nameUnknown": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Shown when the catalog has no title or artist name in either script"
+  },
+  "startTitle": "አዲስ ጨዋታ",
+  "@startTitle": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Title of the screen where a game is set up"
+  },
+  "startWhatPlays": "ምን ይጫወታል",
+  "@startWhatPlays": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Heading above the Intro / Middle choice"
+  },
+  "startQuestions": "ጥያቄዎች",
+  "@startQuestions": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Heading above the Song / Artist / Mixed choice"
+  },
+  "startQuestionsMixed": "ድብልቅ",
+  "@startQuestionsMixed": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Question choice: song and artist questions mixed"
+  },
+  "bestScore": "ምርጥ ውጤት፦ {score}",
+  "@bestScore": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. The player's best score so far"
+  },
+  "startBestNone": "ለዚህ ጨዋታ እና ዘመን እስካሁን ምርጥ ውጤት የለም።",
+  "@startBestNone": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Shown when there is no best score for the chosen mode and era"
+  },
+  "roundGetReady": "ይዘጋጁ",
+  "@roundGetReady": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Round screen title before the first round starts"
+  },
+  "roundNoGame": "ምንም ጨዋታ እየተካሄደ አይደለም።",
+  "@roundNoGame": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Round screen when opened with no game"
+  },
+  "roundStartGame": "ጨዋታ ይጀምሩ",
+  "@roundStartGame": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Button on the no-game message"
+  },
+  "roundPausedBody": "ቆሟል። ሲቀጥሉ ቅንጭቡ እንደገና ይጫወታል። የተጠቀሙበት ጊዜ አሁንም ይቆጠራል።",
+  "@roundPausedBody": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Shown when a call or another app interrupted the round"
+  },
+  "roundResume": "ይቀጥሉ",
+  "@roundResume": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Button that resumes an interrupted round"
+  },
+  "roundCouldNotStart": "ጨዋታው መጀመር አልቻለም።",
+  "@roundCouldNotStart": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Fallback message when a game fails to start"
+  },
+  "feedbackTooFast": "በጣም ፈጣን ስለሆነ አልተቆጠረም። 0 ነጥብ",
+  "@feedbackTooFast": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Feedback when an answer came too fast to be a person"
+  },
+  "feedbackCorrectPoints": "ትክክል! +{points}",
+  "@feedbackCorrectPoints": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Feedback heading for a right answer, with the points earned"
+  },
+  "resultsNone": "የሚታይ የተጠናቀቀ ጨዋታ የለም።",
+  "@resultsNone": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Results screen opened with no finished game"
+  },
+  "resultsSkipped": "{count, plural, =1{1 ዙር ቅንጭቡ መጫወት ስላልቻለ ተዘሏል።} other{{count} ዙሮች ቅንጭቦቹ መጫወት ስላልቻሉ ተዘለዋል።}}",
+  "@resultsSkipped": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Results note: rounds left out because their clip was missing or would not play"
+  },
+  "resultsFlagged": "አንዳንድ መልሶች በጣም ፈጣን ስለነበሩ አልተቆጠሩም።",
+  "@resultsFlagged": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Results note when a response was too fast to be a person"
+  },
+  "resultsSaveError": "ይህ ጨዋታ በስልኩ ላይ ሊቀመጥ አልቻለም፦ {detail}",
+  "@resultsSaveError": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Results note when saving the game on the device failed; detail is the technical reason"
+  },
+  "resultsYouChose": "የመረጡት {name}",
+  "@resultsYouChose": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Results row for a wrong answer; name is the song or singer picked"
+  },
+  "sessionErrorNoSongs": "እስካሁን በዚህ ስልክ ላይ ምንም ዘፈን የለም። መጀመሪያ ጥቅል ያውርዱ።",
+  "@sessionErrorNoSongs": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game cannot start because no songs are installed"
+  },
+  "sessionErrorTooFewSongs": "ዙር ለመሥራት በቂ ዘፈኖች የሉም። ሌላ ጥቅል ያውርዱ።",
+  "@sessionErrorTooFewSongs": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game cannot start: too few songs"
+  },
+  "sessionErrorTooFewArtists": "ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ሌላ ጥቅል ያውርዱ።",
+  "@sessionErrorTooFewArtists": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game cannot start: too few different artists for artist questions"
+  },
+  "sessionErrorNoSongsInEra": "ለ{era} ምንም ዘፈን የለም። ሌላ ዘመን ይምረጡ።",
+  "@sessionErrorNoSongsInEra": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game cannot start: the chosen era has no songs; era is the era's name"
+  },
+  "sessionErrorClipsFailed": "ከ{count} ቅንጭቦች አንዱም መጫወት አልቻለም። ጥቅሉን እንደገና ያውርዱና ደግመው ይሞክሩ።",
+  "@sessionErrorClipsFailed": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game ended because no clip would play"
+  },
+  "sessionErrorUnexpected": "የሆነ ችግር ተፈጥሯል፦ {detail}",
+  "@sessionErrorUnexpected": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. A game failed for an unexpected reason; detail is the technical message"
+  },
+  "commonRefresh": "ያድሱ",
+  "@commonRefresh": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Tooltip of a refresh button"
+  },
+  "packsLoadError": "ጥቅሎቹን መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ።",
+  "@packsLoadError": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. The list of packs could not be loaded"
+  },
+  "packsNone": "እስካሁን የታተመ ጥቅል የለም።",
+  "@packsNone": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. The pack list is empty"
+  },
+  "packsMeta": "{count} ዘፈኖች · {size} ሜባ · v{version}",
+  "@packsMeta": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack row details"
+  },
+  "packsMetaInstalled": "{count} ዘፈኖች · {size} ሜባ · v{version} (የተጫነው v{installed})",
+  "@packsMetaInstalled": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack row details when an older version is on the phone"
+  },
+  "packsInstalling": "በመጫን ላይ",
+  "@packsInstalling": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Label of a pack button while it installs"
+  },
+  "packsUpdateButton": "ያዘምኑ",
+  "@packsUpdateButton": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Button that updates an installed pack"
+  },
+  "packsStateWaiting": "በመጠባበቅ ላይ",
+  "@packsStateWaiting": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install state: queued"
+  },
+  "packsStateDownloading": "በማውረድ ላይ",
+  "@packsStateDownloading": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install state: downloading"
+  },
+  "packsStateChecking": "በማረጋገጥ ላይ",
+  "@packsStateChecking": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install state: verifying checksums"
+  },
+  "packsStateInstalled": "ተጭኗል",
+  "@packsStateInstalled": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install state: done"
+  },
+  "packsStateFailed": "አልተሳካም",
+  "@packsStateFailed": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install state: failed"
+  },
+  "packsFilesProgress": "{state} {done}/{total} ፋይሎች",
+  "@packsFilesProgress": {
+    "description": "REVIEW: new Amharic string for the native-speaker pass. Pack install progress line; state is one of the packsState words"
+  }
 }

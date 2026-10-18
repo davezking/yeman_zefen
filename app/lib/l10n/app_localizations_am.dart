@@ -830,4 +830,157 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get updateRequiredButton => 'መተግበሪያውን አዘምን';
+
+  @override
+  String get nameUnknown => 'ያልታወቀ';
+
+  @override
+  String get startTitle => 'አዲስ ጨዋታ';
+
+  @override
+  String get startWhatPlays => 'ምን ይጫወታል';
+
+  @override
+  String get startQuestions => 'ጥያቄዎች';
+
+  @override
+  String get startQuestionsMixed => 'ድብልቅ';
+
+  @override
+  String bestScore(int score) {
+    return 'ምርጥ ውጤት፦ $score';
+  }
+
+  @override
+  String get startBestNone => 'ለዚህ ጨዋታ እና ዘመን እስካሁን ምርጥ ውጤት የለም።';
+
+  @override
+  String get roundGetReady => 'ይዘጋጁ';
+
+  @override
+  String get roundNoGame => 'ምንም ጨዋታ እየተካሄደ አይደለም።';
+
+  @override
+  String get roundStartGame => 'ጨዋታ ይጀምሩ';
+
+  @override
+  String get roundPausedBody =>
+      'ቆሟል። ሲቀጥሉ ቅንጭቡ እንደገና ይጫወታል። የተጠቀሙበት ጊዜ አሁንም ይቆጠራል።';
+
+  @override
+  String get roundResume => 'ይቀጥሉ';
+
+  @override
+  String get roundCouldNotStart => 'ጨዋታው መጀመር አልቻለም።';
+
+  @override
+  String get feedbackTooFast => 'በጣም ፈጣን ስለሆነ አልተቆጠረም። 0 ነጥብ';
+
+  @override
+  String feedbackCorrectPoints(int points) {
+    return 'ትክክል! +$points';
+  }
+
+  @override
+  String get resultsNone => 'የሚታይ የተጠናቀቀ ጨዋታ የለም።';
+
+  @override
+  String resultsSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ዙሮች ቅንጭቦቹ መጫወት ስላልቻሉ ተዘለዋል።',
+      one: '1 ዙር ቅንጭቡ መጫወት ስላልቻለ ተዘሏል።',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get resultsFlagged => 'አንዳንድ መልሶች በጣም ፈጣን ስለነበሩ አልተቆጠሩም።';
+
+  @override
+  String resultsSaveError(String detail) {
+    return 'ይህ ጨዋታ በስልኩ ላይ ሊቀመጥ አልቻለም፦ $detail';
+  }
+
+  @override
+  String resultsYouChose(String name) {
+    return 'የመረጡት $name';
+  }
+
+  @override
+  String get sessionErrorNoSongs =>
+      'እስካሁን በዚህ ስልክ ላይ ምንም ዘፈን የለም። መጀመሪያ ጥቅል ያውርዱ።';
+
+  @override
+  String get sessionErrorTooFewSongs => 'ዙር ለመሥራት በቂ ዘፈኖች የሉም። ሌላ ጥቅል ያውርዱ።';
+
+  @override
+  String get sessionErrorTooFewArtists =>
+      'ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ሌላ ጥቅል ያውርዱ።';
+
+  @override
+  String sessionErrorNoSongsInEra(String era) {
+    return 'ለ$era ምንም ዘፈን የለም። ሌላ ዘመን ይምረጡ።';
+  }
+
+  @override
+  String sessionErrorClipsFailed(int count) {
+    return 'ከ$count ቅንጭቦች አንዱም መጫወት አልቻለም። ጥቅሉን እንደገና ያውርዱና ደግመው ይሞክሩ።';
+  }
+
+  @override
+  String sessionErrorUnexpected(String detail) {
+    return 'የሆነ ችግር ተፈጥሯል፦ $detail';
+  }
+
+  @override
+  String get commonRefresh => 'ያድሱ';
+
+  @override
+  String get packsLoadError => 'ጥቅሎቹን መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ።';
+
+  @override
+  String get packsNone => 'እስካሁን የታተመ ጥቅል የለም።';
+
+  @override
+  String packsMeta(int count, String size, int version) {
+    return '$count ዘፈኖች · $size ሜባ · v$version';
+  }
+
+  @override
+  String packsMetaInstalled(
+    int count,
+    String size,
+    int version,
+    int installed,
+  ) {
+    return '$count ዘፈኖች · $size ሜባ · v$version (የተጫነው v$installed)';
+  }
+
+  @override
+  String get packsInstalling => 'በመጫን ላይ';
+
+  @override
+  String get packsUpdateButton => 'ያዘምኑ';
+
+  @override
+  String get packsStateWaiting => 'በመጠባበቅ ላይ';
+
+  @override
+  String get packsStateDownloading => 'በማውረድ ላይ';
+
+  @override
+  String get packsStateChecking => 'በማረጋገጥ ላይ';
+
+  @override
+  String get packsStateInstalled => 'ተጭኗል';
+
+  @override
+  String get packsStateFailed => 'አልተሳካም';
+
+  @override
+  String packsFilesProgress(String state, int done, int total) {
+    return '$state $done/$total ፋይሎች';
+  }
 }

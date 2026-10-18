@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../application/session_controller.dart';
 import '../application/session_state.dart';
 import '../domain/session_config.dart';
+import 'session_texts.dart';
 
 /// One round: the clip plays, a bar counts down the answer window, and four
 /// options appear. Plain widgets: the designed version replaces this in Phase 4.
@@ -39,14 +41,17 @@ class _RoundScreenState extends ConsumerState<RoundScreen> with WidgetsBindingOb
   Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
     final leave = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Leave this game?'),
-        content: const Text('Your score for this game will not be saved.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep playing')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Leave')),
-        ],
-      ),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.roundLeaveTitle),
+          content: Text(l10n.roundLeaveBody),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.roundLeaveCancel)),
+            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.roundLeaveConfirm)),
+          ],
+        );
+      },
     );
     if (leave == true && context.mounted) {
       ref.read(sessionControllerProvider.notifier).leave();
@@ -61,6 +66,7 @@ class _RoundScreenState extends ConsumerState<RoundScreen> with WidgetsBindingOb
         context.go('/results');
       }
     });
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(sessionControllerProvider);
     final round = state.round;
     final over = state.phase == SessionPhase.failed || state.phase == SessionPhase.idle;
@@ -72,21 +78,21 @@ class _RoundScreenState extends ConsumerState<RoundScreen> with WidgetsBindingOb
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(round == null ? 'Get ready' : 'Round ${round.number} of ${round.total}'),
+          title: Text(round == null ? l10n.roundGetReady : l10n.roundCounter(round.number, round.total)),
           leading: IconButton(
-            tooltip: 'Leave',
+            tooltip: l10n.roundLeave,
             icon: const Icon(Icons.close),
             onPressed: () => over ? context.go('/start') : _confirmLeave(context, ref),
           ),
         ),
         body: switch (state.phase) {
           SessionPhase.failed => _Message(
-              text: state.error ?? 'The game could not start.',
-              action: FilledButton(onPressed: () => context.go('/start'), child: const Text('Back')),
+              text: state.error == null ? l10n.roundCouldNotStart : l10n.sessionErrorText(state.error!),
+              action: FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.navBack)),
             ),
           SessionPhase.idle => _Message(
-              text: 'No game is running.',
-              action: FilledButton(onPressed: () => context.go('/start'), child: const Text('Start a game')),
+              text: l10n.roundNoGame,
+              action: FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.roundStartGame)),
             ),
           SessionPhase.preparing || SessionPhase.finished => const Center(child: CircularProgressIndicator()),
           SessionPhase.playing => round == null
@@ -127,6 +133,7 @@ class _RoundBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final answering = round.phase == RoundPhase.answering;
     final showOptions = answering || round.phase == RoundPhase.feedback;
 
@@ -136,7 +143,7 @@ class _RoundBody extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            round.kind == QuestionKind.artist ? 'Who sings this?' : 'Which song is this?',
+            round.kind == QuestionKind.artist ? l10n.roundQuestionArtist : l10n.roundQuestionSong,
             style: Theme.of(context).textTheme.titleLarge,
             textAlign: TextAlign.center,
           ),
@@ -157,10 +164,10 @@ class _RoundBody extends ConsumerWidget {
           if (round.phase == RoundPhase.interrupted)
             Expanded(
               child: _Message(
-                text: 'Paused. The clip plays again when you resume. The time you already used still counts.',
+                text: l10n.roundPausedBody,
                 action: FilledButton(
                   onPressed: ref.read(sessionControllerProvider.notifier).resume,
-                  child: const Text('Resume'),
+                  child: Text(l10n.roundResume),
                 ),
               ),
             ),
@@ -199,6 +206,7 @@ class _OptionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final feedback = round.phase == RoundPhase.feedback;
     final isCorrect = feedback && option.id == round.correctId;
     final isWrongChoice = feedback && option.id == round.chosenId && option.id != round.correctId;
@@ -212,7 +220,7 @@ class _OptionButton extends StatelessWidget {
       onPressed: onPressed,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(option.label, textAlign: TextAlign.center),
+        child: Text(l10n.nameOf(option.name, Localizations.localeOf(context)), textAlign: TextAlign.center),
       ),
     );
   }
@@ -225,15 +233,16 @@ class _Feedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final String text;
     if (round.timedOut) {
-      text = "Time's up";
+      text = l10n.feedbackTimeout;
     } else if (!round.valid) {
-      text = 'Too fast to count. 0 points';
+      text = l10n.feedbackTooFast;
     } else if (round.isCorrect) {
-      text = 'Correct! +${round.points}';
+      text = l10n.feedbackCorrectPoints(round.points ?? 0);
     } else {
-      text = 'Wrong. 0 points';
+      text = l10n.feedbackWrong;
     }
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

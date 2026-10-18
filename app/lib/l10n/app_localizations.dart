@@ -1531,6 +1531,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update app'**
   String get updateRequiredButton;
+
+  /// Shown when the catalog has no title or artist name in either script
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get nameUnknown;
+
+  /// Title of the screen where a game is set up
+  ///
+  /// In en, this message translates to:
+  /// **'New game'**
+  String get startTitle;
+
+  /// Heading above the Intro / Middle choice
+  ///
+  /// In en, this message translates to:
+  /// **'What plays'**
+  String get startWhatPlays;
+
+  /// Heading above the Song / Artist / Mixed choice
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get startQuestions;
+
+  /// Question choice: song and artist questions mixed
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed'**
+  String get startQuestionsMixed;
+
+  /// The player's best score so far
+  ///
+  /// In en, this message translates to:
+  /// **'Best score: {score}'**
+  String bestScore(int score);
+
+  /// Shown when there is no best score for the chosen mode and era
+  ///
+  /// In en, this message translates to:
+  /// **'No best score yet for this mode and era.'**
+  String get startBestNone;
+
+  /// Round screen title before the first round starts
+  ///
+  /// In en, this message translates to:
+  /// **'Get ready'**
+  String get roundGetReady;
+
+  /// Round screen when opened with no game
+  ///
+  /// In en, this message translates to:
+  /// **'No game is running.'**
+  String get roundNoGame;
+
+  /// Button on the no-game message
+  ///
+  /// In en, this message translates to:
+  /// **'Start a game'**
+  String get roundStartGame;
+
+  /// Shown when a call or another app interrupted the round
+  ///
+  /// In en, this message translates to:
+  /// **'Paused. The clip plays again when you resume. The time you already used still counts.'**
+  String get roundPausedBody;
+
+  /// Button that resumes an interrupted round
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get roundResume;
+
+  /// Fallback message when a game fails to start
+  ///
+  /// In en, this message translates to:
+  /// **'The game could not start.'**
+  String get roundCouldNotStart;
+
+  /// Feedback when an answer came too fast to be a person
+  ///
+  /// In en, this message translates to:
+  /// **'Too fast to count. 0 points'**
+  String get feedbackTooFast;
+
+  /// Feedback heading for a right answer, with the points earned
+  ///
+  /// In en, this message translates to:
+  /// **'Correct! +{points}'**
+  String feedbackCorrectPoints(int points);
+
+  /// Results screen opened with no finished game
+  ///
+  /// In en, this message translates to:
+  /// **'No finished game to show.'**
+  String get resultsNone;
+
+  /// Results note: rounds left out because their clip was missing or would not play
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 round was skipped because a clip could not be played.} other{{count} rounds were skipped because a clip could not be played.}}'**
+  String resultsSkipped(int count);
+
+  /// Results note when a response was too fast to be a person
+  ///
+  /// In en, this message translates to:
+  /// **'Some answers were too fast to count.'**
+  String get resultsFlagged;
+
+  /// Results note when saving the game on the device failed; detail is the technical reason
+  ///
+  /// In en, this message translates to:
+  /// **'This game could not be saved on the phone: {detail}'**
+  String resultsSaveError(String detail);
+
+  /// Results row for a wrong answer; name is the song or singer picked
+  ///
+  /// In en, this message translates to:
+  /// **'You chose {name}'**
+  String resultsYouChose(String name);
+
+  /// A game cannot start because no songs are installed
+  ///
+  /// In en, this message translates to:
+  /// **'There are no songs on this phone yet. Download a pack first.'**
+  String get sessionErrorNoSongs;
+
+  /// A game cannot start: too few songs
+  ///
+  /// In en, this message translates to:
+  /// **'There aren\'t enough songs to make a round. Download another pack.'**
+  String get sessionErrorTooFewSongs;
+
+  /// A game cannot start: too few different artists for artist questions
+  ///
+  /// In en, this message translates to:
+  /// **'There aren\'t enough different artists for artist questions. Choose Song questions or download another pack.'**
+  String get sessionErrorTooFewArtists;
+
+  /// A game cannot start: the chosen era has no songs; era is the era's name
+  ///
+  /// In en, this message translates to:
+  /// **'There are no songs for {era}. Choose another era.'**
+  String sessionErrorNoSongsInEra(String era);
+
+  /// A game ended because no clip would play
+  ///
+  /// In en, this message translates to:
+  /// **'None of the {count} clips could be played. Download the pack again and try once more.'**
+  String sessionErrorClipsFailed(int count);
+
+  /// A game failed for an unexpected reason; detail is the technical message
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong: {detail}'**
+  String sessionErrorUnexpected(String detail);
+
+  /// Tooltip of a refresh button
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get commonRefresh;
+
+  /// The list of packs could not be loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the packs. Check your connection.'**
+  String get packsLoadError;
+
+  /// The pack list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No packs are published yet.'**
+  String get packsNone;
+
+  /// Pack row details
+  ///
+  /// In en, this message translates to:
+  /// **'{count} songs · {size} MB · v{version}'**
+  String packsMeta(int count, String size, int version);
+
+  /// Pack row details when an older version is on the phone
+  ///
+  /// In en, this message translates to:
+  /// **'{count} songs · {size} MB · v{version} (installed v{installed})'**
+  String packsMetaInstalled(int count, String size, int version, int installed);
+
+  /// Label of a pack button while it installs
+  ///
+  /// In en, this message translates to:
+  /// **'Installing'**
+  String get packsInstalling;
+
+  /// Button that updates an installed pack
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get packsUpdateButton;
+
+  /// Pack install state: queued
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get packsStateWaiting;
+
+  /// Pack install state: downloading
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get packsStateDownloading;
+
+  /// Pack install state: verifying checksums
+  ///
+  /// In en, this message translates to:
+  /// **'Checking'**
+  String get packsStateChecking;
+
+  /// Pack install state: done
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get packsStateInstalled;
+
+  /// Pack install state: failed
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get packsStateFailed;
+
+  /// Pack install progress line; state is one of the packsState words
+  ///
+  /// In en, this message translates to:
+  /// **'{state} {done}/{total} files'**
+  String packsFilesProgress(String state, int done, int total);
 }
 
 class _AppLocalizationsDelegate

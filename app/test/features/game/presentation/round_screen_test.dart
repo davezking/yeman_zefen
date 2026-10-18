@@ -22,9 +22,9 @@ void main() {
     final h = await pumpScreens(
       tester,
       location: '/play',
-      state: const SessionState(phase: SessionPhase.failed, config: config, error: 'No songs are installed yet. Install a pack first.'),
+      state: const SessionState(phase: SessionPhase.failed, config: config, error: SessionError(SessionProblem.noSongs)),
     );
-    expect(find.text('No songs are installed yet. Install a pack first.'), findsOneWidget);
+    expect(find.text('There are no songs on this phone yet. Download a pack first.'), findsOneWidget);
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
@@ -35,7 +35,7 @@ void main() {
     await pumpScreens(tester, location: '/play', state: playing(roundView(phase: RoundPhase.loading)));
     expect(find.byKey(const Key('option-11')), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Round 3 of 10'), findsOneWidget);
+    expect(find.text('3 / 10'), findsOneWidget);
   });
 
   testWidgets('shows 4 options and a countdown once the audio is playing', (tester) async {
@@ -45,7 +45,7 @@ void main() {
     for (final id in [11, 12, 13, 14]) {
       expect(find.byKey(Key('option-$id')), findsOneWidget);
     }
-    expect(find.text('ዘፈን አንድ\nSong One'), findsOneWidget);
+    expect(find.text('Song One'), findsOneWidget);
     expect(find.byKey(const Key('countdown')), findsOneWidget);
     expect(find.byKey(const Key('feedback')), findsNothing);
   });
@@ -104,7 +104,7 @@ void main() {
         state: playing(roundView(phase: RoundPhase.feedback, chosenId: 13, correctId: 12, points: 0)),
       );
 
-      expect(find.text('Wrong. 0 points'), findsOneWidget);
+      expect(find.text('Not this one'), findsOneWidget);
       expect(background(tester, 13), Colors.red);
       expect(background(tester, 12), Colors.green);
     });
@@ -214,7 +214,7 @@ void main() {
     testWidgets('leaving asks first and keeps playing if the player says no', (tester) async {
       final h = await pumpScreens(tester, location: '/play', state: playing(roundView()));
 
-      await tester.tap(find.byTooltip('Leave'));
+      await tester.tap(find.byTooltip('Leave game'));
       await tester.pumpAndSettle();
       expect(find.text('Leave this game?'), findsOneWidget);
 
@@ -227,7 +227,7 @@ void main() {
     testWidgets('leaving stops the session and goes to the start screen', (tester) async {
       final h = await pumpScreens(tester, location: '/play', state: playing(roundView()));
 
-      await tester.tap(find.byTooltip('Leave'));
+      await tester.tap(find.byTooltip('Leave game'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Leave'));
       await tester.pumpAndSettle();
@@ -250,10 +250,10 @@ void main() {
       final h = await pumpScreens(
         tester,
         location: '/play',
-        state: const SessionState(phase: SessionPhase.failed, config: config, error: 'x'),
+        state: const SessionState(phase: SessionPhase.failed, config: config, error: SessionError(SessionProblem.unexpected, detail: 'x')),
       );
 
-      await tester.tap(find.byTooltip('Leave'));
+      await tester.tap(find.byTooltip('Leave game'));
       await tester.pumpAndSettle();
 
       expect(find.text('Leave this game?'), findsNothing);

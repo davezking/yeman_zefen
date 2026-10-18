@@ -8,7 +8,7 @@ void main() {
   testWidgets('starts with a medium mixed intro game in all eras', (tester) async {
     final h = await pumpScreens(tester, location: '/start');
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Start · 10 rounds'));
     await tester.pumpAndSettle();
 
     final started = h.session.startedWith!;
@@ -31,7 +31,7 @@ void main() {
     await tester.tap(find.text("The '90s").last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Start · 10 rounds'));
     await tester.pumpAndSettle();
 
     final started = h.session.startedWith!;
@@ -80,7 +80,7 @@ void main() {
     await tester.tap(find.text('All eras').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Start · 10 rounds'));
     await tester.pumpAndSettle();
     expect(h.session.startedWith!.generationId, 0);
   });

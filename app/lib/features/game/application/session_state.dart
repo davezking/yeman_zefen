@@ -1,3 +1,4 @@
+import '../../../core/l10n/display_name.dart';
 import '../domain/session_config.dart';
 
 enum SessionPhase { idle, preparing, playing, finished, failed }
@@ -17,9 +18,11 @@ enum RoundPhase {
 }
 
 class AnswerOption {
-  const AnswerOption({required this.id, required this.label});
+  const AnswerOption({required this.id, required this.name});
   final int id;
-  final String label;
+
+  /// The song or artist, in both scripts. The screen picks one for the UI language.
+  final DisplayName name;
 }
 
 /// The round on screen.
@@ -75,8 +78,8 @@ class RoundSummary {
   const RoundSummary({
     required this.number,
     required this.kind,
-    required this.correctLabel,
-    required this.chosenLabel,
+    required this.correctName,
+    required this.chosenName,
     required this.correct,
     required this.points,
     required this.valid,
@@ -85,10 +88,10 @@ class RoundSummary {
 
   final int number;
   final QuestionKind kind;
-  final String correctLabel;
+  final DisplayName correctName;
 
   /// Null when the window ran out.
-  final String? chosenLabel;
+  final DisplayName? chosenName;
   final bool correct;
   final int points;
   final bool valid;
@@ -125,6 +128,32 @@ class SessionSummary {
   final String? saveError;
 }
 
+/// Why a session could not start or finish. The screen words it in the UI language.
+enum SessionProblem {
+  /// No songs are on the phone at all.
+  noSongs,
+  tooFewSongs,
+  tooFewArtists,
+
+  /// No songs for the picked era ([SessionError.generationId]).
+  noSongsInEra,
+
+  /// None of the session's [SessionError.count] clips could be played.
+  clipsFailed,
+
+  /// Anything else; [SessionError.detail] is the technical message.
+  unexpected,
+}
+
+class SessionError {
+  const SessionError(this.problem, {this.generationId, this.count, this.detail});
+
+  final SessionProblem problem;
+  final int? generationId;
+  final int? count;
+  final String? detail;
+}
+
 class SessionState {
   const SessionState({
     this.phase = SessionPhase.idle,
@@ -138,7 +167,7 @@ class SessionState {
   final SessionConfig? config;
   final RoundView? round;
   final SessionSummary? summary;
-  final String? error;
+  final SessionError? error;
 
   static const idle = SessionState();
 }
