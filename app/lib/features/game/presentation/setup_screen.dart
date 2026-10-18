@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../labels.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/labels.dart';
+import '../../../prototype/models.dart';
 
 /// Era, genre and difficulty: the last step before a game starts.
 ///
@@ -28,6 +28,7 @@ class SetupScreen extends StatelessWidget {
     this.disabledEras = const {},
     this.tooFewSongs = false,
     this.totalRounds = 10,
+    this.showGenres = true,
   });
 
   final GameMode mode;
@@ -46,6 +47,9 @@ class SetupScreen extends StatelessWidget {
   /// The chosen era and genre together have too few songs.
   final bool tooFewSongs;
   final int totalRounds;
+
+  /// Genre chips. The app hides them until the round engine can filter by genre.
+  final bool showGenres;
 
   @override
   Widget build(BuildContext context) {
@@ -100,25 +104,27 @@ class SetupScreen extends StatelessWidget {
                 ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: SpacingTokens.n4),
-            child: Semantics(
-              header: true,
-              child: Text(l10n.genreTitle, style: heading),
+          if (showGenres) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: SpacingTokens.n4),
+              child: Semantics(
+                header: true,
+                child: Text(l10n.genreTitle, style: heading),
+              ),
             ),
-          ),
-          Wrap(
-            spacing: SpacingTokens.n8,
-            runSpacing: SpacingTokens.n8,
-            children: [
-              for (final g in Genre.values)
-                AppChoiceChip(
-                  label: l10n.genreLabel(g),
-                  selected: g == genre,
-                  onTap: () => onGenre(g),
-                ),
-            ],
-          ),
+            Wrap(
+              spacing: SpacingTokens.n8,
+              runSpacing: SpacingTokens.n8,
+              children: [
+                for (final g in Genre.values)
+                  AppChoiceChip(
+                    label: l10n.genreLabel(g),
+                    selected: g == genre,
+                    onTap: () => onGenre(g),
+                  ),
+              ],
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.only(top: SpacingTokens.n4),
             child: Semantics(

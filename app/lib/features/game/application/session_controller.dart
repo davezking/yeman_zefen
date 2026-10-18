@@ -38,13 +38,6 @@ final bestScoreProvider = FutureProvider.autoDispose.family<int?, (GameMode, int
   return ref.watch(sessionStoreProvider).bestScore(key.$1, key.$2);
 });
 
-/// The eras that have songs in the catalog, for the start screen's era list.
-final installedErasProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
-  final base = await ref.watch(supportDirectoryProvider.future);
-  final library = await loadGameLibrary(ref.watch(appDbProvider), base);
-  return library.eras;
-});
-
 class _Cancelled implements Exception {
   const _Cancelled();
 }

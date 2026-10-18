@@ -120,7 +120,7 @@ void main() {
         }
 
         testWidgets('home', (tester) => pump(tester, '/'));
-        testWidgets('setup', (tester) => pump(tester, '/start'));
+        testWidgets('setup', (tester) => pump(tester, '/setup'));
 
         testWidgets('round: song question, long titles', (tester) async {
           await pump(tester, '/play', state: _round(RoundPhase.answering));

@@ -29,11 +29,16 @@ void main() {
           .listSync()
           .whereType<File>()
           .where((f) => f.path.endsWith('.dart')),
+      File('lib/features/game/presentation/home_screen.dart'),
+      File('lib/features/game/presentation/mode_select_screen.dart'),
+      File('lib/features/game/presentation/setup_screen.dart'),
+      File('lib/features/settings/presentation/settings_screen.dart'),
       File('lib/features/account/ui/sign_in_sheet.dart'),
       File('lib/features/leaderboard/ui/leaderboard_screen.dart'),
     ];
 
     test('there are screens to scan', () => expect(files.length, 11));
+
 
     for (final file in files) {
       final name = file.uri.pathSegments.last;

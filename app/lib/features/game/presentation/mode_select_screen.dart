@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../labels.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/labels.dart';
+import '../../../prototype/models.dart';
 
 /// Mode select: how do you want to play? Three large cards (Intro, Middle,
 /// Which Era?) and, for the first two, whether to guess the song or the artist.
@@ -20,7 +20,11 @@ class ModeSelectScreen extends StatelessWidget {
     required this.onGuessChanged,
     required this.onBack,
     required this.onNext,
+    this.modes = GameMode.values,
   });
+
+  /// The modes offered as cards. The app offers only the modes its round engine can play.
+  final List<GameMode> modes;
 
   final GameMode mode;
   final GuessTarget guess;
@@ -54,7 +58,7 @@ class ModeSelectScreen extends StatelessWidget {
           ],
         ),
         body: [
-          for (final m in GameMode.values)
+          for (final m in modes)
             ModeCard(
               title: l10n.modeName(m),
               description: l10n.modeDescription(m),

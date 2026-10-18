@@ -55,7 +55,7 @@ class _RoundScreenState extends ConsumerState<RoundScreen> with WidgetsBindingOb
     );
     if (leave == true && context.mounted) {
       ref.read(sessionControllerProvider.notifier).leave();
-      context.go('/start');
+      context.go('/setup');
     }
   }
 
@@ -82,17 +82,17 @@ class _RoundScreenState extends ConsumerState<RoundScreen> with WidgetsBindingOb
           leading: IconButton(
             tooltip: l10n.roundLeave,
             icon: const Icon(Icons.close),
-            onPressed: () => over ? context.go('/start') : _confirmLeave(context, ref),
+            onPressed: () => over ? context.go('/setup') : _confirmLeave(context, ref),
           ),
         ),
         body: switch (state.phase) {
           SessionPhase.failed => _Message(
               text: state.error == null ? l10n.roundCouldNotStart : l10n.sessionErrorText(state.error!),
-              action: FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.navBack)),
+              action: FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.navBack)),
             ),
           SessionPhase.idle => _Message(
               text: l10n.roundNoGame,
-              action: FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.roundStartGame)),
+              action: FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.roundStartGame)),
             ),
           SessionPhase.preparing || SessionPhase.finished => const Center(child: CircularProgressIndicator()),
           SessionPhase.playing => round == null

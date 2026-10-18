@@ -28,7 +28,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(h.location, '/start');
+    expect(h.location, '/setup');
   });
 
   testWidgets('shows no options until the audio is playing', (tester) async {
@@ -177,7 +177,7 @@ void main() {
 
     testWidgets('is not watched after leaving the round screen', (tester) async {
       final h = await pumpScreens(tester, location: '/play', state: playing(roundView()));
-      h.router.go('/start');
+      h.router.go('/setup');
       await tester.pumpAndSettle();
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
@@ -233,7 +233,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(h.session.left, 1);
-      expect(h.location, '/start');
+      expect(h.location, '/setup');
     });
 
     testWidgets('the system back button asks first too', (tester) async {
@@ -257,7 +257,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Leave this game?'), findsNothing);
-      expect(h.location, '/start');
+      expect(h.location, '/setup');
     });
 
     testWidgets('with no game running it offers to start one', (tester) async {
@@ -266,7 +266,7 @@ void main() {
 
       await tester.tap(find.text('Start a game'));
       await tester.pumpAndSettle();
-      expect(h.location, '/start');
+      expect(h.location, '/setup');
     });
   });
 }

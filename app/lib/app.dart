@@ -9,12 +9,14 @@ import 'core/theme/app_theme.dart';
 import 'features/account/ui/register_prompt_on_results.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/debug/sessions_debug_screen.dart';
-import 'features/game/home_screen.dart';
+import 'features/game/presentation/home_route.dart';
+import 'features/game/presentation/mode_route.dart';
 import 'features/game/presentation/results_screen.dart';
 import 'features/game/presentation/round_screen.dart';
-import 'features/game/presentation/start_screen.dart';
+import 'features/game/presentation/setup_route.dart';
 import 'features/leaderboard/ui/leaderboard_page.dart';
 import 'features/packs/presentation/packs_screen.dart';
+import 'features/settings/presentation/settings_route.dart';
 import 'l10n/app_localizations.dart';
 
 /// One theme per language (only the text differs), built once.
@@ -25,9 +27,11 @@ ThemeData _themeFor(Locale locale) => _themes.putIfAbsent(locale.languageCode, (
 GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
   initialLocation: initialLocation,
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    GoRoute(path: '/', builder: (context, state) => const HomeRoute()),
+    GoRoute(path: '/mode', builder: (context, state) => const ModeRoute()),
+    GoRoute(path: '/setup', builder: (context, state) => const SetupRoute()),
+    GoRoute(path: '/settings', builder: (context, state) => const SettingsRoute()),
     GoRoute(path: '/packs', builder: (context, state) => const PacksScreen()),
-    GoRoute(path: '/start', builder: (context, state) => const StartScreen()),
     GoRoute(path: '/play', builder: (context, state) => const RoundScreen()),
     GoRoute(path: '/results', builder: (context, state) => const RegisterPromptOnResults(child: ResultsScreen())),
     GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardPage()),

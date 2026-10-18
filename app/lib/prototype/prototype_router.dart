@@ -9,13 +9,13 @@ import 'prototype_flow.dart';
 import 'prototype_model.dart';
 import 'prototype_paths.dart';
 import 'round_simulation.dart';
-import 'screens/home_screen.dart';
+import '../features/game/presentation/home_screen.dart';
 import 'screens/message_screens.dart';
-import 'screens/mode_select_screen.dart';
+import '../features/game/presentation/mode_select_screen.dart';
 import 'screens/offline_play_screen.dart';
 import 'screens/onboarding_screens.dart';
-import 'screens/settings_screen.dart';
-import 'screens/setup_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
+import '../features/game/presentation/setup_screen.dart';
 
 export 'prototype_paths.dart';
 

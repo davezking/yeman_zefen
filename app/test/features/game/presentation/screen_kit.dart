@@ -10,9 +10,14 @@ import 'package:yeman_zefen/core/l10n/display_name.dart';
 import 'package:yeman_zefen/core/l10n/locale_provider.dart';
 import 'package:yeman_zefen/core/theme/app_theme.dart';
 import 'package:yeman_zefen/features/account/register_prompt_controller.dart';
+import 'package:drift/native.dart';
+import 'package:yeman_zefen/core/net/network_kind.dart';
+import 'package:yeman_zefen/features/account/data/profile_api.dart';
+import 'package:yeman_zefen/features/game/application/play_setup.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
+import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
 import 'package:yeman_zefen/features/packs/data/pack_service.dart';
 import 'package:yeman_zefen/features/packs/data/packs_api.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
@@ -146,19 +151,36 @@ Future<Harness> pumpScreens(
   Object? packsError,
   Map<String, int> installed = const {},
   Set<int> eras = const {1, 2, 3, 4, 5},
+  AuthState auth = AuthState.signedOut,
+  NetworkKind network = NetworkKind.unmetered,
   FakePackService? packService,
   Stream<PackInstallProgress> Function(String slug)? progress,
   Locale device = const Locale('en'),
   double textScale = 1.0,
-  bool themed = false,
+  bool themed = true,
 }) async {
   final router = buildRouter(initialLocation: location);
+  final db = AppDb(NativeDatabase.memory());
+  addTearDown(db.close);
   final container = ProviderContainer(
     overrides: [
       deviceLocaleProvider.overrideWithBuild((ref, _) => device),
       localeStoreProvider.overrideWithValue(MemoryLocaleStore()),
       sessionControllerProvider.overrideWith(() => RecordingSessionController(state)),
-      installedErasProvider.overrideWith((ref) async => eras),
+      // The eras with enough songs to play (four each); the all-eras count is their total.
+      playableSongsProvider.overrideWith((ref, mode) async => PlayableSongs(
+            perEra: {
+              0: minPlayableSongsPerEra * eras.length,
+              for (final era in eras) era: minPlayableSongsPerEra,
+            },
+            onDevice: minPlayableSongsPerEra * eras.length,
+          )),
+      authStateProvider.overrideWith((ref) => Stream.value(auth)),
+      ownNameProvider.overrideWith((ref) async => null),
+      currentNetworkProvider.overrideWith((ref) async => network),
+      appDbProvider.overrideWith((ref) => db),
+      installedPacksSummaryProvider.overrideWith((ref) => Stream.value(InstalledPacksSummary(count: installed.length, bytes: 0))),
+      appVersionProvider.overrideWith((ref) async => '1.0.0'),
       bestScoreProvider.overrideWith((ref, key) => (bestScore ?? (_, _) async => null)(key.$1, key.$2)),
       packListingsProvider.overrideWith((ref) async {
         if (packsError != null) throw packsError;
