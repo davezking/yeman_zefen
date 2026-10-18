@@ -29,6 +29,7 @@ export const REVIEW_REASONS = [
 ] as const;
 export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 export const ADMIN_ROLES = ["admin", "editor"] as const;
+export const MODERATION_ACTIONS = ["shadow_ban", "shadow_unban", "void_session", "dismiss_session", "dismiss_flag", "resolve_flag"] as const;
 export const INGEST_KINDS = ["scrape", "cut", "recut"] as const;
 export const INGEST_STATUSES = ["queued", "running", "succeeded", "failed"] as const;
 
@@ -252,6 +253,8 @@ export const gameSessions = sqliteTable(
   (t) => [
     index("game_sessions_user_received_idx").on(t.userId, t.receivedAt),
     index("game_sessions_received_idx").on(t.receivedAt),
+    // The moderation queue lists flagged sessions newest first; flagged ones are rare, so the index is small.
+    index("game_sessions_flagged_idx").on(t.receivedAt).where(sql`${t.flagged} = 1`),
   ],
 );
 
@@ -335,5 +338,31 @@ export const ingestJobs = sqliteTable(
   () => [
     check("ingest_jobs_kind_check", inList("kind", INGEST_KINDS)),
     check("ingest_jobs_status_check", inList("status", INGEST_STATUSES)),
+  ],
+);
+
+/**
+ * Every moderation action, who took it and why. Append-only, and deliberately without foreign keys:
+ * the log must outlive the user, session or flag it is about.
+ */
+export const moderationLog = sqliteTable(
+  "moderation_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    at: integer("at").notNull(),
+    adminEmail: text("admin_email").notNull(),
+    action: text("action", { enum: MODERATION_ACTIONS }).notNull(),
+    /** The player the action is about (for a session, its owner). */
+    userId: text("user_id"),
+    sessionId: text("session_id"),
+    reviewItemId: integer("review_item_id"),
+    note: text("note").notNull(),
+    detailsJson: text("details_json"),
+  },
+  (t) => [
+    index("moderation_log_user_at_idx").on(t.userId, t.at),
+    // A session is voided or dismissed once. The index is what makes a repeated request a no-op.
+    uniqueIndex("moderation_log_session_uq").on(t.sessionId, t.action).where(sql`${t.action} IN ('void_session', 'dismiss_session')`),
+    check("moderation_log_action_check", inList("action", MODERATION_ACTIONS)),
   ],
 );

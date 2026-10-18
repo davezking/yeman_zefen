@@ -14,5 +14,5 @@ export const navItems: NavItem[] = [
   { label: "Jobs", path: "/jobs" },
   { label: "Reports", path: "/reports", adminOnly: true },
   { label: "Analytics", path: "/analytics" },
-  { label: "Moderation", path: "/moderation" },
+  { label: "Moderation", path: "/moderation", adminOnly: true },
 ];

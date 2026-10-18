@@ -34,6 +34,16 @@ export function parseJsonText(text: string): unknown {
   }
 }
 
+/** Parse JSON text stored in a column (`details_json`, `events_json`); null when it is null or not JSON. */
+export function parseStoredJson(json: string | null): unknown {
+  if (json === null) return null;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 /** A positive integer id, from a path or query string. */
 export const idSchema = z.coerce.number().int().positive();
 const id = idSchema;
