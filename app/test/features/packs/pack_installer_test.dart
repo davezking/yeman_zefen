@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/features/packs/data/clip_store.dart';
 import 'package:yeman_zefen/features/packs/data/pack_installer.dart';
 import 'package:yeman_zefen/features/packs/data/pack_manifest.dart';
 import 'package:yeman_zefen/features/packs/domain/pack_install_progress.dart';
@@ -59,6 +60,65 @@ void main() {
       expect(fileExists(t.middlePath!), isTrue);
     }
     expect(await installer.installedVersion('golden-era'), 1);
+  });
+
+  test('adds the tracks to the catalog and every clip to the clip store as a pack clip', () async {
+    await install();
+
+    final catalog = await db.select(db.catalogTracks).get();
+    expect(catalog.map((t) => t.id), unorderedEquals([1, 2, 3]));
+    final track = catalog.firstWhere((t) => t.id == 2);
+    expect(track.introUrl, clipUrl(2, 'intro', 1));
+    expect(track.introSha256, sha256Hex(bodyFor(clipUrl(2, 'intro', 1))));
+    expect(track.middleBytes, bodyFor(clipUrl(2, 'middle', 1)).length);
+
+    final clips = await db.select(db.clips).get();
+    expect(clips, hasLength(6));
+    expect(clips.every((c) => c.source == ClipSource.pack), isTrue);
+    final intro = clips.firstWhere((c) => c.trackId == 2 && c.kind == 'intro');
+    expect(intro.path, 'packs/golden-era/v1/2-intro.mp3');
+    expect(intro.bytes, bodyFor(clipUrl(2, 'intro', 1)).length);
+  });
+
+  test('a prefetched copy of a clip is replaced by the pack\'s, and its file removed', () async {
+    final streamPath = ClipStore.streamPath(2, ClipKind.intro);
+    File(p.join(base.path, streamPath))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([1]);
+    await db.into(db.clips).insert(
+          ClipsCompanion.insert(
+            trackId: 2,
+            kind: 'intro',
+            path: streamPath,
+            bytes: 1,
+            source: ClipSource.stream,
+            lastPlayedAt: 1,
+          ),
+        );
+
+    await install();
+
+    final row = await (db.select(db.clips)..where((c) => c.trackId.equals(2))..where((c) => c.kind.equals('intro'))).getSingle();
+    expect((row.source, row.path), (ClipSource.pack, 'packs/golden-era/v1/2-intro.mp3'));
+    expect(fileExists(streamPath), isFalse);
+  });
+
+  test('an upgrade moves the clip rows to the new version, and drops tracks it no longer has', () async {
+    await install(version: 1);
+    await install(version: 2, tracks: 2);
+
+    final clips = await db.select(db.clips).get();
+    expect(clips, hasLength(4));
+    expect(clips.every((c) => c.path.contains('/v2/')), isTrue);
+    expect(clips.map((c) => c.trackId).toSet(), {1, 2});
+  });
+
+  test('a failed install adds nothing to the catalog or the clip store', () async {
+    downloader.failing.add(clipUrl(2, 'middle', 1));
+    await expectLater(install(), throwsA(isA<PackInstallException>()));
+
+    expect(await db.select(db.catalogTracks).get(), isEmpty);
+    expect(await db.select(db.clips).get(), isEmpty);
   });
 
   test('never runs more than 4 downloads at once', () async {

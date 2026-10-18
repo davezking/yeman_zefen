@@ -910,14 +910,15 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get sessionErrorNoSongs =>
-      'እስካሁን በዚህ ስልክ ላይ ምንም ዘፈን የለም። መጀመሪያ ጥቅል ያውርዱ።';
+      'እስካሁን የሚጫወት ዘፈን የለም። ከበይነመረብ ጋር ተገናኝተው ደግመው ይሞክሩ።';
 
   @override
-  String get sessionErrorTooFewSongs => 'ዙር ለመሥራት በቂ ዘፈኖች የሉም። ሌላ ጥቅል ያውርዱ።';
+  String get sessionErrorTooFewSongs =>
+      'ዙር ለመሥራት በቂ ዘፈኖች የሉም። ከበይነመረብ ጋር ተገናኝተው ደግመው ይሞክሩ።';
 
   @override
   String get sessionErrorTooFewArtists =>
-      'ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ሌላ ጥቅል ያውርዱ።';
+      'ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ከበይነመረብ ጋር ይገናኙ።';
 
   @override
   String sessionErrorNoSongsInEra(String era) {
@@ -926,7 +927,7 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String sessionErrorClipsFailed(int count) {
-    return 'ከ$count ቅንጭቦች አንዱም መጫወት አልቻለም። ጥቅሉን እንደገና ያውርዱና ደግመው ይሞክሩ።';
+    return 'ከ$count ቅንጭቦች አንዱም መጫወት አልቻለም። ግንኙነትዎን ያረጋግጡና ደግመው ይሞክሩ።';
   }
 
   @override

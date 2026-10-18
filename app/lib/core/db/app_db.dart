@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -139,6 +140,60 @@ class AppSettings extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// Every track the app knows about, from the starter manifest, the published pack manifests
+/// and installed packs: the display fields the round engine and the screens need, and where each
+/// clip can be fetched. This is the catalog; a track's clip may or may not be on the device (see
+/// [Clips]). The clip columns are null for a track whose manifest is no longer known (a row
+/// migrated from schema 7 whose pack manifest cannot be read); such a track plays only from a clip
+/// already on the device.
+class CatalogTracks extends Table {
+  IntColumn get id => integer()();
+  TextColumn get titleAm => text().nullable()();
+  TextColumn get titleLatin => text().nullable()();
+  IntColumn get artistId => integer()();
+  TextColumn get artistAm => text().nullable()();
+  TextColumn get artistLatin => text().nullable()();
+  IntColumn get generationId => integer().nullable()();
+  IntColumn get releaseYear => integer().nullable()();
+  TextColumn get introUrl => text().nullable()();
+  TextColumn get introSha256 => text().nullable()();
+  IntColumn get introBytes => integer().nullable()();
+  TextColumn get middleUrl => text().nullable()();
+  TextColumn get middleSha256 => text().nullable()();
+  IntColumn get middleBytes => integer().nullable()();
+  IntColumn get updatedAt => integer()(); // epoch ms, UTC
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Where a clip on the device came from, which decides if it can be evicted.
+abstract final class ClipSource {
+  /// Bundled in the app build. Never evicted.
+  static const starter = 'starter';
+
+  /// Prefetched while playing. Capped, least recently played evicted first.
+  static const stream = 'stream';
+
+  /// Part of an installed offline pack. Never evicted.
+  static const pack = 'pack';
+}
+
+/// One clip file on the device: a verified file for a track's intro or middle. A row exists only
+/// once the file's SHA-256 matched the manifest. `path` is relative to the support directory,
+/// because iOS changes the absolute container path across app updates.
+class Clips extends Table {
+  IntColumn get trackId => integer()();
+  TextColumn get kind => text()(); // 'intro' | 'middle'
+  TextColumn get path => text()();
+  IntColumn get bytes => integer()();
+  TextColumn get source => text()(); // ClipSource
+  IntColumn get lastPlayedAt => integer()(); // epoch ms, UTC; the download time until first played
+
+  @override
+  Set<Column> get primaryKey => {trackId, kind};
+}
+
 @DriftDatabase(
   tables: [
     InstalledPacks,
@@ -150,13 +205,15 @@ class AppSettings extends Table {
     RemoteConfigCache,
     PendingAccountSync,
     AppSettings,
+    CatalogTracks,
+    Clips,
   ],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,8 +238,81 @@ class AppDb extends _$AppDb {
           if (from < 5) await m.createTable(remoteConfigCache);
           if (from < 6) await m.createTable(pendingAccountSync);
           if (from < 7) await m.createTable(appSettings);
+          if (from < 8) {
+            await m.createTable(catalogTracks);
+            await m.createTable(clips);
+            await _migrateLocalTracks();
+          }
         },
       );
+
+  /// Copies the tracks of installed packs into the catalog and the clip store, so packs installed
+  /// before schema 8 keep playing. The manifest each pack was installed from supplies the clip
+  /// URLs, checksums and sizes; a pack whose manifest cannot be read still migrates, with no
+  /// URLs. Rows without an artist id (from before schema 2) cannot be played and are left out.
+  Future<void> _migrateLocalTracks() async {
+    final manifests = <String, Map<int, Map<String, dynamic>>>{};
+    for (final pack in await select(installedPacks).get()) {
+      try {
+        final decoded = jsonDecode(pack.manifestJson) as Map<String, dynamic>;
+        manifests[pack.slug] = {
+          for (final t in decoded['tracks'] as List<dynamic>)
+            (t as Map<String, dynamic>)['id'] as int: t,
+        };
+      } catch (_) {
+        // The row below is migrated without URLs.
+      }
+    }
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final seen = <int>{};
+    for (final row in await select(localTracks).get()) {
+      final artistId = row.artistId;
+      if (artistId == null) continue;
+      final clipsOf = (manifests[row.packSlug]?[row.id]?['clips'] as Map<String, dynamic>?) ?? const {};
+      Map<String, dynamic>? clip(String kind) => clipsOf[kind] as Map<String, dynamic>?;
+      final intro = clip('intro');
+      final middle = clip('middle');
+      if (seen.add(row.id)) {
+        await into(catalogTracks).insert(
+          CatalogTracksCompanion.insert(
+            id: Value(row.id),
+            titleAm: Value(row.titleAm),
+            titleLatin: Value(row.titleLatin),
+            artistId: artistId,
+            artistAm: Value(row.artistAm),
+            artistLatin: Value(row.artistLatin),
+            generationId: Value(row.generationId),
+            releaseYear: Value(row.releaseYear),
+            introUrl: Value(intro?['url'] as String?),
+            introSha256: Value(intro?['sha256'] as String?),
+            introBytes: Value(intro?['bytes'] as int?),
+            middleUrl: Value(middle?['url'] as String?),
+            middleSha256: Value(middle?['sha256'] as String?),
+            middleBytes: Value(middle?['bytes'] as int?),
+            updatedAt: now,
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+      }
+      for (final (kind, path, info) in [
+        ('intro', row.introPath, intro),
+        ('middle', row.middlePath, middle),
+      ]) {
+        if (path == null) continue;
+        await into(clips).insert(
+          ClipsCompanion.insert(
+            trackId: row.id,
+            kind: kind,
+            path: path,
+            bytes: (info?['bytes'] as int?) ?? 0,
+            source: ClipSource.pack,
+            lastPlayedAt: now,
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+      }
+    }
+  }
 }
 
 /// Opens the on-device database file in the app's documents directory.

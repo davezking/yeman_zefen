@@ -1,7 +1,22 @@
-import 'package:drift/drift.dart' show Value;
+import 'dart:convert';
+
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
+
+/// The pack tables as schema 1 made them. Every real database has them; the upgrade to schema 8
+/// reads them to fill the catalog.
+const _packTableSql = [
+  'CREATE TABLE installed_packs (slug TEXT NOT NULL, version INTEGER NOT NULL, '
+      'manifest_json TEXT NOT NULL, installed_at INTEGER NOT NULL, total_bytes INTEGER NOT NULL, '
+      'PRIMARY KEY (slug))',
+  'CREATE TABLE local_tracks (pack_slug TEXT NOT NULL, id INTEGER NOT NULL, '
+      'title_am TEXT NULL, title_latin TEXT NULL, artist_am TEXT NULL, artist_latin TEXT NULL, '
+      'artist_id INTEGER NULL, generation_id INTEGER NULL, '
+      'release_year INTEGER NULL, intro_path TEXT NULL, middle_path TEXT NULL, '
+      'PRIMARY KEY (pack_slug, id))',
+];
 
 void main() {
   test('upgrading from schema 1 keeps rows, adds the artist and era columns and the new tables', () async {
@@ -90,6 +105,7 @@ void main() {
     final db = AppDb(
       NativeDatabase.memory(
         setup: (raw) {
+          _packTableSql.forEach(raw.execute);
           raw.execute('CREATE TABLE pending_sessions (id TEXT NOT NULL, payload_json TEXT NOT NULL, '
               'created_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT NULL, '
               'PRIMARY KEY (id))');
@@ -116,6 +132,7 @@ void main() {
     final db = AppDb(
       NativeDatabase.memory(
         setup: (raw) {
+          _packTableSql.forEach(raw.execute);
           raw.execute('CREATE TABLE local_counters (name TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, '
               'PRIMARY KEY (name))');
           raw.execute("INSERT INTO local_counters (name, count) VALUES ('clip_errors', 3)");
@@ -135,6 +152,7 @@ void main() {
     final db = AppDb(
       NativeDatabase.memory(
         setup: (raw) {
+          _packTableSql.forEach(raw.execute);
           raw.execute('CREATE TABLE remote_config_cache (key TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY (key))');
           raw.execute("INSERT INTO remote_config_cache (key, json) VALUES ('config', '{}')");
           raw.execute('PRAGMA user_version = 5');
@@ -153,6 +171,7 @@ void main() {
     final db = AppDb(
       NativeDatabase.memory(
         setup: (raw) {
+          _packTableSql.forEach(raw.execute);
           raw.execute('CREATE TABLE pending_account_sync (id INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL, '
               'anonymous_id_token TEXT NULL, target_uid TEXT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id))');
           raw.execute("INSERT INTO pending_account_sync (kind, created_at) VALUES ('merge', 9)");
@@ -166,5 +185,90 @@ void main() {
     expect(await db.select(db.appSettings).get(), isEmpty);
     await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: 'locale', value: 'am'));
     expect((await db.select(db.appSettings).getSingle()).value, 'am');
+  });
+
+  group('upgrading from schema 7', () {
+    String manifest(int id) => jsonEncode({
+          'schema': 1,
+          'slug': 'golden-era',
+          'version': 2,
+          'publishedAt': 1,
+          'names': {'am': 'a', 'en': 'e'},
+          'tracks': [
+            {
+              'id': id,
+              'artistId': 7,
+              'clips': {
+                'intro': {'url': 'https://cdn.test/$id-intro.mp3', 'sha256': 'a' * 64, 'bytes': 111, 'lengthMs': 10000},
+                'middle': {'url': 'https://cdn.test/$id-middle.mp3', 'sha256': 'b' * 64, 'bytes': 222, 'lengthMs': 10000},
+              },
+            },
+          ],
+          'totalBytes': 333,
+        });
+
+    AppDb oldDb(void Function(void Function(String sql) run) seed) {
+      return AppDb(
+        NativeDatabase.memory(
+          setup: (raw) {
+            _packTableSql.forEach(raw.execute);
+            raw.execute('CREATE TABLE app_settings (key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (key))');
+            seed(raw.execute);
+            raw.execute('PRAGMA user_version = 7');
+          },
+        ),
+      );
+    }
+
+    test('installed packs keep playing: their tracks move into the catalog and their clips into the clip store', () async {
+      final db = oldDb((run) {
+        run("INSERT INTO installed_packs VALUES ('golden-era', 2, '${manifest(41).replaceAll("'", "''")}', 5, 333)");
+        run("INSERT INTO local_tracks VALUES ('golden-era', 41, 'ዘፈን', 'Song', 'ድምፃዊ', 'Artist', 7, 2, 1975, "
+            "'packs/golden-era/v2/41-intro.mp3', 'packs/golden-era/v2/41-middle.mp3')");
+      });
+      addTearDown(db.close);
+
+      final track = await db.select(db.catalogTracks).getSingle();
+      expect((track.id, track.artistId, track.generationId, track.releaseYear), (41, 7, 2, 1975));
+      expect((track.titleLatin, track.artistLatin), ('Song', 'Artist'));
+      expect((track.introUrl, track.introSha256, track.introBytes), ('https://cdn.test/41-intro.mp3', 'a' * 64, 111));
+      expect((track.middleUrl, track.middleSha256, track.middleBytes), ('https://cdn.test/41-middle.mp3', 'b' * 64, 222));
+
+      final clips = await (db.select(db.clips)..orderBy([(c) => OrderingTerm.asc(c.kind)])).get();
+      expect(clips.map((c) => (c.trackId, c.kind, c.path, c.bytes, c.source)), [
+        (41, 'intro', 'packs/golden-era/v2/41-intro.mp3', 111, ClipSource.pack),
+        (41, 'middle', 'packs/golden-era/v2/41-middle.mp3', 222, ClipSource.pack),
+      ]);
+      // The pack itself is untouched.
+      expect((await db.select(db.installedPacks).getSingle()).version, 2);
+      expect(await db.select(db.localTracks).get(), hasLength(1));
+    });
+
+    test('a pack whose manifest cannot be read still migrates, with no urls', () async {
+      final db = oldDb((run) {
+        run("INSERT INTO installed_packs VALUES ('golden-era', 2, 'not json', 5, 333)");
+        run("INSERT INTO local_tracks VALUES ('golden-era', 41, NULL, 'Song', NULL, 'Artist', 7, 2, NULL, "
+            "'packs/golden-era/v2/41-intro.mp3', NULL)");
+      });
+      addTearDown(db.close);
+
+      final track = await db.select(db.catalogTracks).getSingle();
+      expect(track.id, 41);
+      expect(track.introUrl, isNull);
+      final clip = await db.select(db.clips).getSingle();
+      expect((clip.kind, clip.bytes, clip.source), ('intro', 0, ClipSource.pack));
+    });
+
+    test('a track in two packs is migrated once; rows without an artist are left out', () async {
+      final db = oldDb((run) {
+        run("INSERT INTO local_tracks VALUES ('a', 41, NULL, 'Song', NULL, 'Artist', 7, 2, NULL, 'packs/a/v1/41-intro.mp3', 'packs/a/v1/41-middle.mp3')");
+        run("INSERT INTO local_tracks VALUES ('b', 41, NULL, 'Song', NULL, 'Artist', 7, 2, NULL, 'packs/b/v1/41-intro.mp3', 'packs/b/v1/41-middle.mp3')");
+        run("INSERT INTO local_tracks VALUES ('a', 42, NULL, 'Old', NULL, NULL, NULL, NULL, NULL, 'packs/a/v1/42-intro.mp3', NULL)");
+      });
+      addTearDown(db.close);
+
+      expect((await db.select(db.catalogTracks).get()).map((t) => t.id), [41]);
+      expect(await db.select(db.clips).get(), hasLength(2));
+    });
   });
 }

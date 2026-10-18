@@ -24,7 +24,7 @@ void main() {
       location: '/play',
       state: const SessionState(phase: SessionPhase.failed, config: config, error: SessionError(SessionProblem.noSongs)),
     );
-    expect(find.text('There are no songs on this phone yet. Download a pack first.'), findsOneWidget);
+    expect(find.text('There are no songs to play yet. Connect to the internet and try again.'), findsOneWidget);
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();

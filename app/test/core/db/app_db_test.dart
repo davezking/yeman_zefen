@@ -14,8 +14,8 @@ void main() {
     await db.close();
   });
 
-  test('schema version is 7', () {
-    expect(db.schemaVersion, 7);
+  test('schema version is 8', () {
+    expect(db.schemaVersion, 8);
   });
 
   test('creates all three tables and round-trips a row in each', () async {

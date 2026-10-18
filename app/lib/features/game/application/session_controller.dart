@@ -7,6 +7,11 @@ import '../../../core/audio/clip_player.dart';
 import '../../../core/audio/clip_voice.dart';
 import '../../../core/db/app_db.dart';
 import '../../../core/l10n/display_name.dart';
+import '../../../core/net/network_kind.dart';
+import '../../packs/data/clip_prefetcher.dart';
+import '../../packs/data/clip_providers.dart';
+import '../../packs/data/clip_settings.dart';
+import '../../packs/data/clip_store.dart';
 import '../../packs/data/packs_providers.dart';
 import '../data/game_library.dart';
 import '../data/session_store.dart';
@@ -33,7 +38,7 @@ final bestScoreProvider = FutureProvider.autoDispose.family<int?, (GameMode, int
   return ref.watch(sessionStoreProvider).bestScore(key.$1, key.$2);
 });
 
-/// The eras that have installed songs, for the start screen's era list.
+/// The eras that have songs in the catalog, for the start screen's era list.
 final installedErasProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
   final base = await ref.watch(supportDirectoryProvider.future);
   final library = await loadGameLibrary(ref.watch(appDbProvider), base);
@@ -69,6 +74,15 @@ class _Abandoned extends _Outcome {
   const _Abandoned();
 }
 
+/// How a round ended when it was not played to an answer: [clipError] says the clip file was
+/// missing or would not play (counted as a clip error), otherwise no clip arrived in time and the
+/// round was skipped without penalty.
+class _RoundResult {
+  const _RoundResult(this.summary, {this.clipError = false});
+  final RoundSummary? summary;
+  final bool clipError;
+}
+
 /// Runs a session: it picks the rounds, plays each clip, times the answer, scores
 /// it, and at the end saves the session on the device.
 ///
@@ -85,6 +99,7 @@ class SessionController extends Notifier<SessionState> {
   var _runId = 0;
   var _disposed = false;
   ClipPlayer? _player;
+  ClipPrefetcher? _prefetcher;
 
   Completer<_Outcome>? _outcome;
   Completer<void>? _resume;
@@ -183,7 +198,30 @@ class SessionController extends Notifier<SessionState> {
     } catch (_) {}
   }
 
+  /// Lets running prefetches end, then trims the stream cache to its cap. Runs after every
+  /// session, finished or left, and never delays the screen.
+  void _finishPrefetch() {
+    final prefetcher = _prefetcher;
+    _prefetcher = null;
+    if (prefetcher == null) return;
+    ClipSettings? settings;
+    try {
+      settings = ref.read(clipSettingsProvider);
+    } catch (_) {
+      // The provider is being disposed: trim to the default cap.
+    }
+    unawaited(() async {
+      try {
+        final cap = await settings?.streamCacheCapBytes() ?? ClipStore.defaultStreamCacheCapBytes;
+        await prefetcher.finish(capBytes: cap);
+      } catch (_) {
+        // The cache is trimmed after the next session instead.
+      }
+    }());
+  }
+
   void _abandon() {
+    _finishPrefetch();
     _runId++;
     _backgrounded = false;
     _windowTimer?.cancel();
@@ -225,6 +263,11 @@ class SessionController extends Notifier<SessionState> {
 
     final base = await supportDirectory;
     check();
+    try {
+      // The bundled starter clips are registered before the catalog is read.
+      await ref.read(starterReadyProvider.future);
+    } catch (_) {}
+    check();
     final library = await loadGameLibrary(db, base);
     check();
     if (library.isEmpty) {
@@ -234,57 +277,79 @@ class SessionController extends Notifier<SessionState> {
     final recent = await store.recentTrackIds();
     check();
 
+    // Clips can be fetched while playing when the phone is online and the player allows mobile
+    // data (or is not on it). Otherwise only clips already on the device are asked about.
+    final network = await _networkOf(env);
+    final settings = ref.read(clipSettingsProvider);
+    final allowDownloads = network == NetworkKind.unmetered ||
+        (network == NetworkKind.cellular && await _prefetchOnMobile(settings));
+    check();
+
+    final generator = RoundGenerator(library.tracks, rng: env.rng());
     final GeneratedSession generated;
     try {
-      generated = RoundGenerator(library.tracks, rng: env.rng()).generate(config, recentSessions: recent);
+      generated = generator.generate(
+        config,
+        recentSessions: recent,
+        playable: library.playableIds(config.mode, includeFetchable: allowDownloads),
+      );
     } on RoundGenerationException catch (e) {
       fail(_explain(e, config));
       return;
     }
 
-    final offlineAtStart = await _isOffline(env);
-    check();
+    final offlineAtStart = network == NetworkKind.none;
     final recorder = SessionRecorder(id: env.newId(), config: config, startedAtMs: env.epochMs());
     _interruptedSub = player.interrupted.listen((_) => _onInterrupted());
+
+    final prefetcher = ClipPrefetcher(
+      library: library,
+      config: config,
+      rounds: generated.rounds,
+      generator: generator,
+      downloader: ref.read(clipDownloaderProvider),
+      store: ref.read(clipStoreProvider),
+      base: base,
+      fileExists: env.fileExists,
+      timer: env.timer,
+      allowDownloads: allowDownloads,
+      rng: env.rng(),
+    );
+    _prefetcher = prefetcher;
 
     final total = generated.rounds.length;
     final windowMs = _scorer.windowMs(config.mode, config.difficulty);
     final limitMs = config.difficulty.clipLengthMs;
 
-    Future<String?> clipOf(int index) async {
-      if (index >= total) return null;
-      final path = library.clipPath(generated.rounds[index].trackId, config.mode);
-      return path != null && await env.fileExists(path) ? path : null;
-    }
-
     final played = <RoundSummary>[];
     var skipped = 0;
     for (var i = 0; i < total; i++) {
-      final path = await clipOf(i);
+      prefetcher.prefetchFrom(i);
+      final result = await _playRound(
+        runId: runId,
+        index: i,
+        total: total,
+        planned: prefetcher.roundAt(i),
+        prepare: () => prefetcher.prepare(i),
+        library: library,
+        config: config,
+        recorder: recorder,
+        env: env,
+        player: player,
+        windowMs: windowMs,
+        limitMs: limitMs,
+        onPlaying: (trackId) => unawaited(prefetcher.markPlayed(trackId)),
+        nextClip: () async {
+          final path = prefetcher.readyPath(i + 1);
+          return path != null && await env.fileExists(path) ? path : null;
+        },
+      );
       check();
-      RoundSummary? summary;
-      if (path != null) {
-        summary = await _playRound(
-          runId: runId,
-          index: i,
-          total: total,
-          round: generated.rounds[i],
-          path: path,
-          library: library,
-          config: config,
-          recorder: recorder,
-          env: env,
-          player: player,
-          windowMs: windowMs,
-          limitMs: limitMs,
-          nextClip: () => clipOf(i + 1),
-        );
-      }
-      check();
+      final summary = result.summary;
       if (summary == null) {
-        // The clip is missing or will not play. The round is skipped.
+        // The clip is missing or will not play, or none arrived in time. The round is skipped.
         skipped++;
-        await store.addClipError();
+        if (result.clipError) await store.addClipError();
         check();
       } else {
         played.add(summary);
@@ -296,6 +361,7 @@ class SessionController extends Notifier<SessionState> {
     await interrupted?.cancel();
 
     if (played.isEmpty) {
+      _finishPrefetch();
       fail(SessionError(SessionProblem.clipsFailed, count: total));
       return;
     }
@@ -313,6 +379,7 @@ class SessionController extends Notifier<SessionState> {
       saveError = '$e';
     }
     check();
+    _finishPrefetch();
 
     _set(
       SessionState(
@@ -332,14 +399,18 @@ class SessionController extends Notifier<SessionState> {
     );
   }
 
-  /// Plays one round and returns how it went, or null when its clip would not
-  /// play. Replays the round, with a fresh window, after an interruption.
-  Future<RoundSummary?> _playRound({
+  /// Plays one round and returns how it went. The summary is null when its clip would not play
+  /// (a clip error) or never arrived (skipped without penalty). Replays the round, with a fresh
+  /// window, after an interruption.
+  ///
+  /// [prepare] makes the round's clip ready. It can hand back another round than [planned]: a
+  /// swap for a track whose clip is on the device, with new options.
+  Future<_RoundResult> _playRound({
     required int runId,
     required int index,
     required int total,
-    required GeneratedRound round,
-    required String path,
+    required GeneratedRound planned,
+    required Future<PreparedRound> Function() prepare,
     required GameLibrary library,
     required SessionConfig config,
     required SessionRecorder recorder,
@@ -347,6 +418,7 @@ class SessionController extends Notifier<SessionState> {
     required ClipPlayer player,
     required int windowMs,
     required int limitMs,
+    required void Function(int trackId) onPlaying,
     required Future<String?> Function() nextClip,
   }) async {
     void check() {
@@ -356,8 +428,10 @@ class SessionController extends Notifier<SessionState> {
     // Answer time used by earlier attempts of this round, before a pause.
     var usedMs = 0;
 
+    var round = planned;
+    var path = '';
     DisplayName nameOf(int id) => round.kind == QuestionKind.artist ? library.artistName(id) : library.trackName(id);
-    final options = [for (final id in round.optionIds) AnswerOption(id: id, name: nameOf(id))];
+    var options = <AnswerOption>[];
 
     RoundView view(
       RoundPhase phase,
@@ -386,6 +460,19 @@ class SessionController extends Notifier<SessionState> {
 
     void show(RoundView v) => _set(SessionState(phase: SessionPhase.playing, config: config, round: v));
 
+    // The "next song loading" state: no options yet, because a swap may change them.
+    show(view(RoundPhase.loading, 1));
+    final prepared = await prepare();
+    check();
+    switch (prepared) {
+      case RoundUnavailable(:final fileMissing):
+        return _RoundResult(null, clipError: fileMissing);
+      case RoundReady(round: final ready, path: final readyPath):
+        round = ready;
+        path = readyPath;
+        options = [for (final id in round.optionIds) AnswerOption(id: id, name: nameOf(id))];
+    }
+
     Future<void> waitForResume(int attempt) async {
       show(view(RoundPhase.interrupted, attempt));
       final resume = Completer<void>();
@@ -396,7 +483,7 @@ class SessionController extends Notifier<SessionState> {
       check();
     }
 
-    Future<RoundSummary> timedOut(int attempt) async {
+    Future<_RoundResult> timedOut(int attempt) async {
       await _stopPlayer();
       check();
       recorder.recordRound(round, chosenId: null, responseMs: windowMs);
@@ -404,7 +491,7 @@ class SessionController extends Notifier<SessionState> {
       show(view(RoundPhase.feedback, attempt, points: 0, timedOut: true));
       await _pause(env, env.feedbackDuration);
       check();
-      return RoundSummary(
+      return _RoundResult(RoundSummary(
         number: index + 1,
         kind: round.kind,
         correctName: nameOf(round.correctId),
@@ -413,7 +500,7 @@ class SessionController extends Notifier<SessionState> {
         points: 0,
         valid: true,
         responseMs: windowMs,
-      );
+      ));
     }
 
     var attempt = 0;
@@ -439,12 +526,13 @@ class SessionController extends Notifier<SessionState> {
       } catch (e) {
         if (e is _Cancelled) rethrow;
         check();
-        return null;
+        return const _RoundResult(null, clipError: true);
       }
 
       // The clock starts here: the audio is playing. After a pause it carries on
       // from the time already used.
       _roundStartedMs = env.monotonicMs() - usedMs;
+      onPlaying(round.trackId);
       unawaited(_preload(player, nextClip(), limitMs));
 
       final pending = Completer<_Outcome>();
@@ -480,7 +568,7 @@ class SessionController extends Notifier<SessionState> {
           show(view(RoundPhase.feedback, attempt, chosenId: optionId, points: score.points, valid: score.valid));
           await _pause(env, env.feedbackDuration);
           check();
-          return RoundSummary(
+          return _RoundResult(RoundSummary(
             number: index + 1,
             kind: round.kind,
             correctName: nameOf(round.correctId),
@@ -489,7 +577,7 @@ class SessionController extends Notifier<SessionState> {
             points: score.points,
             valid: score.valid,
             responseMs: responseMs,
-          );
+          ));
         case _TimedOut():
           return timedOut(attempt);
       }
@@ -521,6 +609,22 @@ class SessionController extends Notifier<SessionState> {
     await done.future;
     _feedbackWait = null;
     _feedbackTimer = null;
+  }
+
+  Future<NetworkKind> _networkOf(SessionEnvironment env) async {
+    try {
+      return await env.network();
+    } catch (_) {
+      return NetworkKind.unmetered;
+    }
+  }
+
+  Future<bool> _prefetchOnMobile(ClipSettings settings) async {
+    try {
+      return await settings.prefetchOnMobile();
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<bool> _isOffline(SessionEnvironment env) async {
