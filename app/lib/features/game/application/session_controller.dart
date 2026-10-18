@@ -6,10 +6,10 @@ import '../../../core/audio/audio_providers.dart';
 import '../../../core/audio/clip_player.dart';
 import '../../../core/audio/clip_voice.dart';
 import '../../../core/db/app_db.dart';
+import '../../../core/l10n/display_name.dart';
 import '../../packs/data/packs_providers.dart';
 import '../data/game_library.dart';
 import '../data/session_store.dart';
-import '../domain/eras.dart';
 import '../domain/generated_session.dart';
 import '../domain/round_generator.dart';
 import '../domain/scorer.dart';
@@ -128,7 +128,7 @@ class SessionController extends Notifier<SessionState> {
     } catch (e) {
       if (_alive(runId)) {
         unawaited(_stopPlayer());
-        _set(SessionState(phase: SessionPhase.failed, config: config, error: 'Something went wrong: $e'));
+        _set(SessionState(phase: SessionPhase.failed, config: config, error: SessionError(SessionProblem.unexpected, detail: '$e')));
       }
     }
   }
@@ -218,9 +218,9 @@ class SessionController extends Notifier<SessionState> {
       if (!_alive(runId)) throw const _Cancelled();
     }
 
-    void fail(String message) {
+    void fail(SessionError error) {
       unawaited(_stopPlayer());
-      _set(SessionState(phase: SessionPhase.failed, config: config, error: message));
+      _set(SessionState(phase: SessionPhase.failed, config: config, error: error));
     }
 
     final base = await supportDirectory;
@@ -228,7 +228,7 @@ class SessionController extends Notifier<SessionState> {
     final library = await loadGameLibrary(db, base);
     check();
     if (library.isEmpty) {
-      fail('No songs are installed yet. Install a pack first.');
+      fail(const SessionError(SessionProblem.noSongs));
       return;
     }
     final recent = await store.recentTrackIds();
@@ -296,7 +296,7 @@ class SessionController extends Notifier<SessionState> {
     await interrupted?.cancel();
 
     if (played.isEmpty) {
-      fail('None of the $total clips could be played. Reinstall the pack and try again.');
+      fail(SessionError(SessionProblem.clipsFailed, count: total));
       return;
     }
 
@@ -356,8 +356,8 @@ class SessionController extends Notifier<SessionState> {
     // Answer time used by earlier attempts of this round, before a pause.
     var usedMs = 0;
 
-    String labelOf(int id) => round.kind == QuestionKind.artist ? library.artistLabel(id) : library.trackLabel(id);
-    final options = [for (final id in round.optionIds) AnswerOption(id: id, label: labelOf(id))];
+    DisplayName nameOf(int id) => round.kind == QuestionKind.artist ? library.artistName(id) : library.trackName(id);
+    final options = [for (final id in round.optionIds) AnswerOption(id: id, name: nameOf(id))];
 
     RoundView view(
       RoundPhase phase,
@@ -407,8 +407,8 @@ class SessionController extends Notifier<SessionState> {
       return RoundSummary(
         number: index + 1,
         kind: round.kind,
-        correctLabel: labelOf(round.correctId),
-        chosenLabel: null,
+        correctName: nameOf(round.correctId),
+        chosenName: null,
         correct: false,
         points: 0,
         valid: true,
@@ -483,8 +483,8 @@ class SessionController extends Notifier<SessionState> {
           return RoundSummary(
             number: index + 1,
             kind: round.kind,
-            correctLabel: labelOf(round.correctId),
-            chosenLabel: labelOf(optionId),
+            correctName: nameOf(round.correctId),
+            chosenName: nameOf(optionId),
             correct: correct,
             points: score.points,
             valid: score.valid,
@@ -531,12 +531,12 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
-  String _explain(RoundGenerationException e, SessionConfig config) {
+  SessionError _explain(RoundGenerationException e, SessionConfig config) {
     return switch (e.reason) {
-      RoundGenerationReason.tooFewTracks => 'Not enough songs are installed to make a round. Install another pack.',
-      RoundGenerationReason.tooFewArtists =>
-        'Not enough different artists for artist questions. Choose Song or Mixed, or install another pack.',
-      RoundGenerationReason.noTracksInEra => 'No songs are installed for ${eraName(config.generationId)}. Choose another era.',
+      RoundGenerationReason.tooFewTracks => const SessionError(SessionProblem.tooFewSongs),
+      RoundGenerationReason.tooFewArtists => const SessionError(SessionProblem.tooFewArtists),
+      RoundGenerationReason.noTracksInEra =>
+        SessionError(SessionProblem.noSongsInEra, generationId: config.generationId),
     };
   }
 }

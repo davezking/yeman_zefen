@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/labels.dart';
 import '../application/session_controller.dart';
 import '../application/session_state.dart';
-import '../domain/eras.dart';
 import '../domain/session_config.dart';
+import 'session_texts.dart';
 
 /// The total score and each round. Plain widgets: the designed version
 /// replaces this in Phase 4.
@@ -14,18 +16,19 @@ class ResultsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final summary = ref.watch(sessionControllerProvider).summary;
 
     if (summary == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Results')),
+        appBar: AppBar(title: Text(l10n.resultsTitle)),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('No finished game to show.'),
+              Text(l10n.resultsNone),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.go('/start'), child: const Text('New game')),
+              FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.startTitle)),
             ],
           ),
         ),
@@ -34,7 +37,7 @@ class ResultsScreen extends ConsumerWidget {
 
     final config = summary.config;
     return Scaffold(
-      appBar: AppBar(title: const Text('Results'), automaticallyImplyLeading: false),
+      appBar: AppBar(title: Text(l10n.resultsTitle), automaticallyImplyLeading: false),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -45,35 +48,45 @@ class ResultsScreen extends ConsumerWidget {
             textAlign: TextAlign.center,
           ),
           Text(
-            '${config.mode == GameMode.middle ? 'Middle' : 'Intro'} · ${eraName(config.generationId)} · '
-            '${config.difficulty.name}',
+            l10n.homeQuickPlaySettings(
+              l10n.eraLabel(config.generationId),
+              switch (config.mode) {
+                GameMode.intro => l10n.homeQuickPlayModeIntro,
+                GameMode.middle => l10n.homeQuickPlayModeMiddle,
+                GameMode.generation => l10n.homeQuickPlayModeEra,
+              },
+              switch (config.difficulty) {
+                Difficulty.easy => l10n.difficultyEasyShort,
+                Difficulty.medium => l10n.difficultyMediumShort,
+                Difficulty.hard => l10n.difficultyHardShort,
+              },
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           if (summary.isNewBest)
-            const Text('New best score!', key: Key('new-best'), textAlign: TextAlign.center)
+            Text(l10n.resultsNewBest, key: const Key('new-best'), textAlign: TextAlign.center)
           else if (summary.bestBefore != null)
-            Text('Best score: ${summary.bestBefore}', key: const Key('best'), textAlign: TextAlign.center),
+            Text(l10n.bestScore(summary.bestBefore!), key: const Key('best'), textAlign: TextAlign.center),
           if (summary.skipped > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '${summary.skipped} ${summary.skipped == 1 ? 'round was' : 'rounds were'} skipped because a clip '
-                'could not be played.',
+                l10n.resultsSkipped(summary.skipped),
                 key: const Key('skipped'),
                 textAlign: TextAlign.center,
               ),
             ),
           if (summary.flagged)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('Some answers were too fast to count.', key: Key('flagged'), textAlign: TextAlign.center),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(l10n.resultsFlagged, key: const Key('flagged'), textAlign: TextAlign.center),
             ),
           if (summary.saveError != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'This game could not be saved on the device: ${summary.saveError}',
+                l10n.resultsSaveError(summary.saveError!),
                 key: const Key('save-error'),
                 textAlign: TextAlign.center,
               ),
@@ -81,9 +94,9 @@ class ResultsScreen extends ConsumerWidget {
           const Divider(height: 32),
           for (final round in summary.rounds) _RoundRow(round: round),
           const SizedBox(height: 24),
-          FilledButton(onPressed: () => context.go('/start'), child: const Text('Play again')),
+          FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.resultsPlayAgain)),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => context.go('/'), child: const Text('Home')),
+          OutlinedButton(onPressed: () => context.go('/'), child: Text(l10n.resultsHome)),
         ],
       ),
     );
@@ -97,18 +110,20 @@ class _RoundRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = round.chosenLabel == null
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context);
+    final icon = round.chosenName == null
         ? Icons.timer_off
         : (round.correct ? Icons.check_circle : Icons.cancel);
     final color = round.correct ? Colors.green : Colors.red;
     return ListTile(
       key: Key('round-${round.number}'),
       leading: Icon(icon, color: color),
-      title: Text(round.correctLabel),
+      title: Text(l10n.nameOf(round.correctName, locale)),
       subtitle: Text(
-        round.chosenLabel == null
-            ? 'Time ran out'
-            : (round.correct ? 'Correct' : 'You chose ${round.chosenLabel!.replaceAll('\n', ' · ')}'),
+        round.chosenName == null
+            ? l10n.feedbackTimeout
+            : (round.correct ? l10n.feedbackCorrect : l10n.resultsYouChose(l10n.nameOf(round.chosenName!, locale))),
       ),
       trailing: Text('${round.points}'),
     );

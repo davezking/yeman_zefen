@@ -7,6 +7,7 @@ import 'core/auth/account_linker.dart';
 import 'core/auth/auth_service.dart';
 import 'core/config/app_config.dart';
 import 'core/config/firebase_bootstrap.dart';
+import 'core/l10n/locale_provider.dart';
 import 'core/config/remote_config.dart';
 import 'core/profile/profile_sync.dart';
 import 'features/game/application/session_sync_providers.dart';
@@ -24,6 +25,8 @@ Future<void> main() async {
   container.read(profileSyncStarterProvider);
   // Finishes the server side of an account link that was cut off (offline, or the app closed).
   container.read(accountSyncStarterProvider);
+  // The saved language, so the first frame is already in it.
+  await primeLocale(container);
   // The server's tunables: the cached ones before the first frame, the server's on every start.
   await primeRemoteConfig(container);
   container.read(remoteConfigStarterProvider);

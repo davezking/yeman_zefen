@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/config/remote_config.dart';
 import 'core/config/update_required_screen.dart';
+import 'core/l10n/locale_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'features/account/ui/register_prompt_on_results.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
@@ -49,7 +50,11 @@ class App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final updateRequired = ref.watch(updateRequiredProvider);
+    final locale = ref.watch(localeProvider);
     return MaterialApp.router(
+      // The player's language (or the device's, until they choose): changing it rebuilds the
+      // whole app in the new language, with no restart.
+      locale: locale,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: _themeFor(const Locale('en')),
       // The theme depends on the language, which is only known below MaterialApp.

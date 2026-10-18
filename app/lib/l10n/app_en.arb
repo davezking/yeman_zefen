@@ -510,5 +510,237 @@
   "updateRequiredButton": "Update app",
   "@updateRequiredButton": {
     "description": "Button that opens the app store listing"
+  },
+  "nameUnknown": "Unknown",
+  "@nameUnknown": {
+    "description": "Shown when the catalog has no title or artist name in either script"
+  },
+  "startTitle": "New game",
+  "@startTitle": {
+    "description": "Title of the screen where a game is set up"
+  },
+  "startWhatPlays": "What plays",
+  "@startWhatPlays": {
+    "description": "Heading above the Intro / Middle choice"
+  },
+  "startQuestions": "Questions",
+  "@startQuestions": {
+    "description": "Heading above the Song / Artist / Mixed choice"
+  },
+  "startQuestionsMixed": "Mixed",
+  "@startQuestionsMixed": {
+    "description": "Question choice: song and artist questions mixed"
+  },
+  "bestScore": "Best score: {score}",
+  "@bestScore": {
+    "description": "The player's best score so far",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "startBestNone": "No best score yet for this mode and era.",
+  "@startBestNone": {
+    "description": "Shown when there is no best score for the chosen mode and era"
+  },
+  "roundGetReady": "Get ready",
+  "@roundGetReady": {
+    "description": "Round screen title before the first round starts"
+  },
+  "roundNoGame": "No game is running.",
+  "@roundNoGame": {
+    "description": "Round screen when opened with no game"
+  },
+  "roundStartGame": "Start a game",
+  "@roundStartGame": {
+    "description": "Button on the no-game message"
+  },
+  "roundPausedBody": "Paused. The clip plays again when you resume. The time you already used still counts.",
+  "@roundPausedBody": {
+    "description": "Shown when a call or another app interrupted the round"
+  },
+  "roundResume": "Resume",
+  "@roundResume": {
+    "description": "Button that resumes an interrupted round"
+  },
+  "roundCouldNotStart": "The game could not start.",
+  "@roundCouldNotStart": {
+    "description": "Fallback message when a game fails to start"
+  },
+  "feedbackTooFast": "Too fast to count. 0 points",
+  "@feedbackTooFast": {
+    "description": "Feedback when an answer came too fast to be a person"
+  },
+  "feedbackCorrectPoints": "Correct! +{points}",
+  "@feedbackCorrectPoints": {
+    "description": "Feedback heading for a right answer, with the points earned",
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsNone": "No finished game to show.",
+  "@resultsNone": {
+    "description": "Results screen opened with no finished game"
+  },
+  "resultsSkipped": "{count, plural, =1{1 round was skipped because a clip could not be played.} other{{count} rounds were skipped because a clip could not be played.}}",
+  "@resultsSkipped": {
+    "description": "Results note: rounds left out because their clip was missing or would not play",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsFlagged": "Some answers were too fast to count.",
+  "@resultsFlagged": {
+    "description": "Results note when a response was too fast to be a person"
+  },
+  "resultsSaveError": "This game could not be saved on the phone: {detail}",
+  "@resultsSaveError": {
+    "description": "Results note when saving the game on the device failed; detail is the technical reason",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsYouChose": "You chose {name}",
+  "@resultsYouChose": {
+    "description": "Results row for a wrong answer; name is the song or singer picked",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionErrorNoSongs": "There are no songs on this phone yet. Download a pack first.",
+  "@sessionErrorNoSongs": {
+    "description": "A game cannot start because no songs are installed"
+  },
+  "sessionErrorTooFewSongs": "There aren't enough songs to make a round. Download another pack.",
+  "@sessionErrorTooFewSongs": {
+    "description": "A game cannot start: too few songs"
+  },
+  "sessionErrorTooFewArtists": "There aren't enough different artists for artist questions. Choose Song questions or download another pack.",
+  "@sessionErrorTooFewArtists": {
+    "description": "A game cannot start: too few different artists for artist questions"
+  },
+  "sessionErrorNoSongsInEra": "There are no songs for {era}. Choose another era.",
+  "@sessionErrorNoSongsInEra": {
+    "description": "A game cannot start: the chosen era has no songs; era is the era's name",
+    "placeholders": {
+      "era": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionErrorClipsFailed": "None of the {count} clips could be played. Download the pack again and try once more.",
+  "@sessionErrorClipsFailed": {
+    "description": "A game ended because no clip would play",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionErrorUnexpected": "Something went wrong: {detail}",
+  "@sessionErrorUnexpected": {
+    "description": "A game failed for an unexpected reason; detail is the technical message",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "commonRefresh": "Refresh",
+  "@commonRefresh": {
+    "description": "Tooltip of a refresh button"
+  },
+  "packsLoadError": "Couldn't load the packs. Check your connection.",
+  "@packsLoadError": {
+    "description": "The list of packs could not be loaded"
+  },
+  "packsNone": "No packs are published yet.",
+  "@packsNone": {
+    "description": "The pack list is empty"
+  },
+  "packsMeta": "{count} songs · {size} MB · v{version}",
+  "@packsMeta": {
+    "description": "Pack row details",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "packsMetaInstalled": "{count} songs · {size} MB · v{version} (installed v{installed})",
+  "@packsMetaInstalled": {
+    "description": "Pack row details when an older version is on the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "version": {
+        "type": "int"
+      },
+      "installed": {
+        "type": "int"
+      }
+    }
+  },
+  "packsInstalling": "Installing",
+  "@packsInstalling": {
+    "description": "Label of a pack button while it installs"
+  },
+  "packsUpdateButton": "Update",
+  "@packsUpdateButton": {
+    "description": "Button that updates an installed pack"
+  },
+  "packsStateWaiting": "Waiting",
+  "@packsStateWaiting": {
+    "description": "Pack install state: queued"
+  },
+  "packsStateDownloading": "Downloading",
+  "@packsStateDownloading": {
+    "description": "Pack install state: downloading"
+  },
+  "packsStateChecking": "Checking",
+  "@packsStateChecking": {
+    "description": "Pack install state: verifying checksums"
+  },
+  "packsStateInstalled": "Installed",
+  "@packsStateInstalled": {
+    "description": "Pack install state: done"
+  },
+  "packsStateFailed": "Failed",
+  "@packsStateFailed": {
+    "description": "Pack install state: failed"
+  },
+  "packsFilesProgress": "{state} {done}/{total} files",
+  "@packsFilesProgress": {
+    "description": "Pack install progress line; state is one of the packsState words",
+    "placeholders": {
+      "state": {
+        "type": "String"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
   }
 }

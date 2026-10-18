@@ -40,8 +40,8 @@ void main() {
   testWidgets('lists each pack with its songs, size and version', (tester) async {
     await pumpScreens(tester, location: '/packs', packs: [golden, modern]);
 
-    expect(find.textContaining('ወርቃማ ዘመን'), findsOneWidget);
-    expect(find.textContaining('Golden era'), findsOneWidget);
+    expect(find.text('Golden era'), findsOneWidget, reason: 'English shows the Latin name only');
+    expect(find.textContaining('ወርቃማ ዘመን'), findsNothing);
     expect(find.text('120 songs · 19.0 MB · v3'), findsOneWidget);
     expect(find.text('40 songs · 6.0 MB · v1'), findsOneWidget);
   });
@@ -57,8 +57,8 @@ void main() {
     );
 
     expect(find.text('Update'), findsOneWidget, reason: 'golden era: installed 2, listed 3');
-    expect(find.text('Installed'), findsOneWidget, reason: 'modern: up to date');
-    expect(find.text('Install'), findsOneWidget, reason: 'the 80s pack: not installed');
+    expect(find.text('Downloaded'), findsOneWidget, reason: 'modern: up to date');
+    expect(find.text('Download'), findsOneWidget, reason: 'the 80s pack: not installed');
     expect(find.textContaining('installed v2'), findsOneWidget);
     expect(buttonIn(tester, 'Modern').onPressed, isNull, reason: 'an up to date pack cannot be installed again');
   });
@@ -67,7 +67,7 @@ void main() {
     final service = FakePackService();
     await pumpScreens(tester, location: '/packs', packs: [golden], packService: service);
 
-    await tester.tap(find.text('Install'));
+    await tester.tap(find.text('Download'));
     await tester.pump();
 
     expect(service.installs.map((p) => p.slug), ['golden-era']);
@@ -87,7 +87,7 @@ void main() {
     // Not awaited: the done event needs the widget tester's clock, so awaiting it would hang.
     addTearDown(() => unawaited(progress.close()));
 
-    await tester.tap(find.text('Install'));
+    await tester.tap(find.text('Download'));
     await tester.pump();
     progress.add(const PackInstallProgress(
       slug: 'golden-era', state: PackInstallState.downloading,
@@ -123,21 +123,20 @@ void main() {
     final service = FakePackService()..onInstall = (_) async => throw const PackInstallException('checksum mismatch');
     await pumpScreens(tester, location: '/packs', packs: [golden], packService: service);
 
-    await tester.tap(find.text('Install'));
+    await tester.tap(find.text('Download'));
     await tester.pump();
     await tester.pump();
 
-    expect(find.textContaining('Install failed'), findsOneWidget);
-    expect(find.textContaining('checksum mismatch'), findsOneWidget);
+    expect(find.text('Download failed. Check your connection and try again.'), findsOneWidget);
     expect(buttonIn(tester, 'Golden era').onPressed, isNotNull);
-    expect(find.text('Install'), findsOneWidget);
+    expect(find.text('Download'), findsOneWidget);
   });
 
   testWidgets('says when the list cannot be loaded and offers to try again', (tester) async {
     await pumpScreens(tester, location: '/packs', packsError: const PacksApiException('GET /v1/packs returned 503'));
     await tester.pump();
 
-    expect(find.textContaining('Could not load the packs'), findsOneWidget);
+    expect(find.textContaining("Couldn't load the packs"), findsOneWidget);
     expect(find.textContaining('503'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
   });
@@ -148,3 +147,4 @@ void main() {
     expect(find.text('No packs are published yet.'), findsOneWidget);
   });
 }
+

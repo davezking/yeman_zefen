@@ -148,4 +148,23 @@ void main() {
     await db.into(db.pendingAccountSync).insert(PendingAccountSyncCompanion.insert(kind: 'merge', createdAt: 1));
     expect((await db.select(db.pendingAccountSync).getSingle()).id, 1);
   });
+
+  test('upgrading from schema 6 keeps rows and adds the settings table', () async {
+    final db = AppDb(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('CREATE TABLE pending_account_sync (id INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL, '
+              'anonymous_id_token TEXT NULL, target_uid TEXT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id))');
+          raw.execute("INSERT INTO pending_account_sync (kind, created_at) VALUES ('merge', 9)");
+          raw.execute('PRAGMA user_version = 6');
+        },
+      ),
+    );
+    addTearDown(db.close);
+
+    expect((await db.select(db.pendingAccountSync).getSingle()).kind, 'merge');
+    expect(await db.select(db.appSettings).get(), isEmpty);
+    await db.into(db.appSettings).insert(AppSettingsCompanion.insert(key: 'locale', value: 'am'));
+    expect((await db.select(db.appSettings).getSingle()).value, 'am');
+  });
 }

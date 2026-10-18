@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/features/game/home_screen.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
 
-Widget _wrap(Locale locale) => MaterialApp(
+Widget _wrap(Locale locale) => ProviderScope(
+      child: MaterialApp(
       locale: locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -14,7 +16,7 @@ Widget _wrap(Locale locale) => MaterialApp(
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: const HomeScreen(),
-    );
+    ));
 
 void main() {
   testWidgets('shows the Amharic app name', (tester) async {

@@ -13,6 +13,7 @@ Every user-facing string in the app, keyed for the Flutter ARB files (`app_en.ar
 - **Units**: `s` / `ሰከንድ`, `MB` / `ሜባ`, `pts` / `ነጥብ`, with a space before the unit.
 - **Song and artist names** come from the catalog, not this file: tracks have `title_am` and `title_latin`, artists have `name_am` and `name_en`. Show the Amharic field in Amharic and the Latin/English field in English, falling back to the other if one is missing. Never transliterate at runtime.
 - **No emoji.** Icons are drawn, not typed.
+- **Production-only strings** (service errors, pack states, session problems) are not in the copy deck. Their Amharic text in `app/lib/l10n/app_am.arb` was written by Claude and its `@key` description starts with `REVIEW`, so the native-speaker pass can find them with `grep -c REVIEW app/lib/l10n/app_am.arb`. Remove the `REVIEW` marker once a speaker has approved the text.
 - **Brand terms** stay in Latin script inside Amharic: Google, Apple, Google Play, App Store.
 
 ## Changes since the Step 1 copy deck

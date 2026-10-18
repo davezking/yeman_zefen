@@ -129,6 +129,16 @@ class PendingAccountSync extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Choices the player made in the app, by name: one row per setting. `locale` holds the UI
+/// language (`am` or `en`); a missing row means "follow the device".
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     InstalledPacks,
@@ -139,13 +149,14 @@ class PendingAccountSync extends Table {
     RecentSessions,
     RemoteConfigCache,
     PendingAccountSync,
+    AppSettings,
   ],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -169,6 +180,7 @@ class AppDb extends _$AppDb {
           }
           if (from < 5) await m.createTable(remoteConfigCache);
           if (from < 6) await m.createTable(pendingAccountSync);
+          if (from < 7) await m.createTable(appSettings);
         },
       );
 }

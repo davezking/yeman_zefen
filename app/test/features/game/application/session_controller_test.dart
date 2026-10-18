@@ -122,8 +122,8 @@ void main() {
       final summary = kit.state.summary!;
       expect(summary.rounds.first.correct, isFalse);
       expect(summary.rounds.first.points, 0);
-      expect(summary.rounds.first.correctLabel, startsWith('ዘፈን'));
-      expect(summary.rounds.first.chosenLabel, isNot(summary.rounds.first.correctLabel));
+      expect(summary.rounds.first.correctName.am, startsWith('ዘፈን'));
+      expect(summary.rounds.first.chosenName, isNot(summary.rounds.first.correctName));
       expect(summary.totalScore, 206);
     });
 
@@ -160,7 +160,7 @@ void main() {
       final round = await kit.untilRound(1, RoundPhase.answering);
 
       expect(round.kind, QuestionKind.artist);
-      expect(round.options.every((o) => o.label.contains('Artist')), isTrue);
+      expect(round.options.every((o) => o.name.latin!.contains('Artist')), isTrue);
       expect(round.options.map((o) => o.id).toSet(), hasLength(4));
       expect(round.options.map((o) => o.id), contains(kit.correctOption()));
     });
@@ -242,7 +242,7 @@ void main() {
       final rounds = await savedRounds('session-1');
       expect(rounds.first['chosenId'], isNull);
       expect(rounds.first['responseMs'], 10000);
-      expect(kit.state.summary!.rounds.first.chosenLabel, isNull);
+      expect(kit.state.summary!.rounds.first.chosenName, isNull);
     });
   });
 
@@ -332,7 +332,8 @@ void main() {
       kit.start(song);
       await kit.untilPhase(SessionPhase.failed);
 
-      expect(kit.state.error, contains('None of the 10 clips'));
+      expect(kit.state.error?.problem, SessionProblem.clipsFailed);
+      expect(kit.state.error?.count, 10);
       expect(await kit.db.select(kit.db.pendingSessions).get(), isEmpty);
       expect(await kit.db.select(kit.db.localBests).get(), isEmpty);
       expect(await SessionStore(kit.db).clipErrorCount(), 10);
@@ -345,7 +346,8 @@ void main() {
       kit.start(short);
       await kit.untilPhase(SessionPhase.failed);
 
-      expect(kit.state.error, contains('None of the 2 clips'));
+      expect(kit.state.error?.problem, SessionProblem.clipsFailed);
+      expect(kit.state.error?.count, 2);
       expect(await kit.db.select(kit.db.pendingSessions).get(), isEmpty);
       expect(await SessionStore(kit.db).clipErrorCount(), 2);
     });
@@ -357,7 +359,7 @@ void main() {
       addTearDown(empty.dispose);
       empty.start(song);
       await empty.untilPhase(SessionPhase.failed);
-      expect(empty.state.error, contains('No songs are installed'));
+      expect(empty.state.error?.problem, SessionProblem.noSongs);
     });
 
     test('too few songs for 4 options', () async {
@@ -365,13 +367,14 @@ void main() {
       addTearDown(few.dispose);
       few.start(song);
       await few.untilPhase(SessionPhase.failed);
-      expect(few.state.error, contains('Not enough songs'));
+      expect(few.state.error?.problem, SessionProblem.tooFewSongs);
     });
 
     test('the era has no songs', () async {
       kit.start(const SessionConfig(mode: GameMode.intro, difficulty: Difficulty.easy, generationId: 5));
       await kit.untilPhase(SessionPhase.failed);
-      expect(kit.state.error, contains('Modern'));
+      expect(kit.state.error?.problem, SessionProblem.noSongsInEra);
+      expect(kit.state.error?.generationId, 5);
     });
   });
 

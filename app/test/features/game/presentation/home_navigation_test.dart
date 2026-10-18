@@ -10,9 +10,9 @@ void main() {
     expect(h.location, '/start');
   });
 
-  testWidgets('Song packs opens the packs screen', (tester) async {
+  testWidgets('Offline play opens the packs screen', (tester) async {
     final h = await pumpScreens(tester);
-    await tester.tap(find.text('Song packs'));
+    await tester.tap(find.text('Offline play'));
     await tester.pump();
     expect(h.location, '/packs');
   });

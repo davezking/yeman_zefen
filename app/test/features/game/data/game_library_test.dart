@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/core/l10n/display_name.dart';
 import 'package:yeman_zefen/features/game/data/game_library.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 
@@ -71,29 +72,29 @@ void main() {
     });
   });
 
-  group('labels', () {
-    test('show Amharic with the Latin spelling under it', () {
+  group('names', () {
+    test('keep both scripts, for the screen to pick from', () {
       final lib = GameLibrary.fromRows([row()], base);
-      expect(lib.trackLabel(1), 'ዘፈን\nSong');
-      expect(lib.artistLabel(7), 'ድምፃዊ\nArtist');
+      expect(lib.trackName(1), const DisplayName(am: 'ዘፈን', latin: 'Song'));
+      expect(lib.artistName(7), const DisplayName(am: 'ድምፃዊ', latin: 'Artist'));
     });
 
-    test('show one line when only one spelling exists or both are the same', () {
+    test('keep only the script the catalog has', () {
       final lib = GameLibrary.fromRows([
         row(id: 1, titleAm: null, titleLatin: 'Only Latin'),
         row(id: 2, titleAm: 'ብቻ', titleLatin: null),
-        row(id: 3, titleAm: 'Same', titleLatin: 'Same'),
+        row(id: 3, titleAm: ' ', titleLatin: 'Blank Fidel'),
       ], base);
-      expect(lib.trackLabel(1), 'Only Latin');
-      expect(lib.trackLabel(2), 'ብቻ');
-      expect(lib.trackLabel(3), 'Same');
+      expect(lib.trackName(1), const DisplayName(latin: 'Only Latin'));
+      expect(lib.trackName(2), const DisplayName(am: 'ብቻ'));
+      expect(lib.trackName(3), const DisplayName(latin: 'Blank Fidel'));
     });
 
-    test('fall back to the id when a track has no name', () {
+    test('are empty when a track has no name, for the screen to say "Unknown"', () {
       final lib = GameLibrary.fromRows([row(titleAm: null, titleLatin: null, artistAm: null, artistLatin: null)], base);
-      expect(lib.trackLabel(1), 'Track 1');
-      expect(lib.artistLabel(7), 'Artist 7');
-      expect(lib.trackLabel(99), 'Track 99');
+      expect(lib.trackName(1).isEmpty, isTrue);
+      expect(lib.artistName(7).isEmpty, isTrue);
+      expect(lib.trackName(99).isEmpty, isTrue);
     });
 
     test('an artist takes the name from the first track that has one', () {
@@ -101,7 +102,7 @@ void main() {
         row(id: 1, artistAm: null, artistLatin: null),
         row(id: 2, artistAm: 'ስም', artistLatin: 'Name'),
       ], base);
-      expect(lib.artistLabel(7), 'ስም\nName');
+      expect(lib.artistName(7), const DisplayName(am: 'ስም', latin: 'Name'));
     });
   });
 

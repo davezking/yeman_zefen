@@ -1,6 +1,11 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/display_name.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../game/presentation/session_texts.dart';
 import '../data/packs_api.dart';
 import '../data/packs_providers.dart';
 import '../domain/pack_install_progress.dart';
@@ -13,15 +18,16 @@ class PacksScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final listings = ref.watch(packListingsProvider);
     final installed = ref.watch(installedVersionsProvider).asData?.value ?? const <String, int>{};
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Song packs'),
+        title: Text(l10n.packsTitle),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: l10n.commonRefresh,
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(packListingsProvider),
           ),
@@ -35,20 +41,20 @@ class PacksScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Could not load the packs. Check your connection.', textAlign: TextAlign.center),
+                Text(l10n.packsLoadError, textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 Text('$e', key: const Key('packs-error'), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => ref.invalidate(packListingsProvider),
-                  child: const Text('Try again'),
+                  child: Text(l10n.errorRetry),
                 ),
               ],
             ),
           ),
         ),
         data: (packs) => packs.isEmpty
-            ? const Center(child: Text('No packs are published yet.'))
+            ? Center(child: Text(l10n.packsNone))
             : ListView.separated(
                 itemCount: packs.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
@@ -76,11 +82,14 @@ class _PackTileState extends ConsumerState<_PackTile> {
 
   Future<void> _install() async {
     final messenger = ScaffoldMessenger.of(context);
+    final failed = AppLocalizations.of(context).errorDownload;
     setState(() => _working = true);
     try {
       await ref.read(packServiceProvider).install(widget.pack);
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Install failed: $e')));
+    } catch (e, st) {
+      // The player sees the general message; the reason goes to the log.
+      developer.log('pack install failed', name: 'packs', error: e, stackTrace: st);
+      messenger.showSnackBar(SnackBar(content: Text(failed)));
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -88,6 +97,8 @@ class _PackTileState extends ConsumerState<_PackTile> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context);
     final pack = widget.pack;
     final installed = widget.installedVersion;
     final hasUpdate = isUpdateAvailable(installedVersion: installed, listedVersion: pack.version);
@@ -96,19 +107,20 @@ class _PackTileState extends ConsumerState<_PackTile> {
     final installing = _working && progress != null && !progress.isTerminal;
 
     final label = upToDate
-        ? 'Installed'
+        ? l10n.packsDownloaded
         : hasUpdate
-            ? 'Update'
-            : 'Install';
+            ? l10n.packsUpdateButton
+            : l10n.packsDownload;
 
     return ListTile(
-      title: Text(pack.nameAm == pack.nameEn ? pack.nameEn : '${pack.nameAm}\n${pack.nameEn}'),
+      title: Text(l10n.nameOf(DisplayName.of(pack.nameAm, pack.nameEn), locale)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${pack.trackCount} songs · ${_megabytes(pack.totalBytes)} · v${pack.version}'
-            '${installed == null ? '' : ' (installed v$installed)'}',
+            installed == null
+                ? l10n.packsMeta(pack.trackCount, _megabytes(pack.totalBytes), pack.version)
+                : l10n.packsMetaInstalled(pack.trackCount, _megabytes(pack.totalBytes), pack.version, installed),
           ),
           if (installing) ...[
             const SizedBox(height: 6),
@@ -117,28 +129,28 @@ class _PackTileState extends ConsumerState<_PackTile> {
               value: progress.bytesTotal == 0 ? null : progress.bytesDone / progress.bytesTotal,
             ),
             const SizedBox(height: 4),
-            Text(_describe(progress), key: const Key('install-status')),
+            Text(_describe(l10n, progress), key: const Key('install-status')),
           ],
         ],
       ),
       isThreeLine: installing,
       trailing: FilledButton(
         onPressed: upToDate || _working ? null : _install,
-        child: Text(_working ? 'Installing' : label),
+        child: Text(_working ? l10n.packsInstalling : label),
       ),
     );
   }
 
-  static String _megabytes(int bytes) => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  static String _megabytes(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
-  static String _describe(PackInstallProgress p) {
+  static String _describe(AppLocalizations l10n, PackInstallProgress p) {
     final state = switch (p.state) {
-      PackInstallState.queued => 'Waiting',
-      PackInstallState.downloading => 'Downloading',
-      PackInstallState.verifying => 'Checking',
-      PackInstallState.installed => 'Installed',
-      PackInstallState.failed => 'Failed',
+      PackInstallState.queued => l10n.packsStateWaiting,
+      PackInstallState.downloading => l10n.packsStateDownloading,
+      PackInstallState.verifying => l10n.packsStateChecking,
+      PackInstallState.installed => l10n.packsStateInstalled,
+      PackInstallState.failed => l10n.packsStateFailed,
     };
-    return '$state ${p.filesDone}/${p.filesTotal} files';
+    return l10n.packsFilesProgress(state, p.filesDone, p.filesTotal);
   }
 }
