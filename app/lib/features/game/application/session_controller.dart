@@ -171,7 +171,24 @@ class SessionController extends Notifier<SessionState> {
   /// where it stopped.
   void resume() {
     final pending = _resume;
-    if (pending != null && !pending.isCompleted) pending.complete();
+    if (pending != null && !pending.isCompleted) {
+      pending.complete();
+    } else {
+      // Paused between rounds (the leave question was open, or the app was away): the next clip
+      // simply plays when it is ready.
+      _backgrounded = false;
+    }
+  }
+
+  /// A tap on the wrong-answer screen: moves on now instead of after its full time. A right
+  /// answer's short pause cannot be skipped.
+  void skipFeedback() {
+    final round = state.round;
+    if (round == null || round.phase != RoundPhase.feedback || round.isCorrect) return;
+    final wait = _feedbackWait;
+    if (wait == null || wait.isCompleted) return;
+    _feedbackTimer?.cancel();
+    wait.complete();
   }
 
   /// Leaves the session without saving it.
@@ -331,6 +348,7 @@ class SessionController extends Notifier<SessionState> {
         total: total,
         planned: prefetcher.roundAt(i),
         prepare: () => prefetcher.prepare(i),
+        scoreBefore: played.fold<int>(0, (sum, r) => sum + r.points),
         library: library,
         config: config,
         recorder: recorder,
@@ -411,6 +429,7 @@ class SessionController extends Notifier<SessionState> {
     required int total,
     required GeneratedRound planned,
     required Future<PreparedRound> Function() prepare,
+    required int scoreBefore,
     required GameLibrary library,
     required SessionConfig config,
     required SessionRecorder recorder,
@@ -432,6 +451,12 @@ class SessionController extends Notifier<SessionState> {
     var path = '';
     DisplayName nameOf(int id) => round.kind == QuestionKind.artist ? library.artistName(id) : library.trackName(id);
     var options = <AnswerOption>[];
+    var trackName = const DisplayName();
+    var artistName = const DisplayName();
+    var clipPlaying = false;
+    var speedBonus = 0;
+    int? feedbackStartedAtMs;
+    var feedbackMs = 0;
 
     RoundView view(
       RoundPhase phase,
@@ -442,6 +467,14 @@ class SessionController extends Notifier<SessionState> {
       bool valid = true,
     }) {
       return RoundView(
+        score: scoreBefore + (phase == RoundPhase.feedback ? points ?? 0 : 0),
+        speedBonus: speedBonus,
+        trackName: trackName,
+        artistName: artistName,
+        clipPlaying: clipPlaying && phase == RoundPhase.answering,
+        answerClockStartMs: phase == RoundPhase.answering ? _roundStartedMs : null,
+        feedbackStartedAtMs: phase == RoundPhase.feedback ? feedbackStartedAtMs : null,
+        feedbackMs: phase == RoundPhase.feedback ? feedbackMs : 0,
         number: index + 1,
         total: total,
         kind: round.kind,
@@ -471,6 +504,9 @@ class SessionController extends Notifier<SessionState> {
         round = ready;
         path = readyPath;
         options = [for (final id in round.optionIds) AnswerOption(id: id, name: nameOf(id))];
+        trackName = library.trackName(round.trackId);
+        final artistId = library.tracks.where((t) => t.id == round.trackId).firstOrNull?.artistId;
+        artistName = artistId == null ? const DisplayName() : library.artistName(artistId);
     }
 
     Future<void> waitForResume(int attempt) async {
@@ -488,8 +524,12 @@ class SessionController extends Notifier<SessionState> {
       check();
       recorder.recordRound(round, chosenId: null, responseMs: windowMs);
       usedMs = windowMs;
+      clipPlaying = false;
+      speedBonus = 0;
+      feedbackStartedAtMs = env.monotonicMs();
+      feedbackMs = env.wrongFeedbackDuration.inMilliseconds;
       show(view(RoundPhase.feedback, attempt, points: 0, timedOut: true));
-      await _pause(env, env.feedbackDuration);
+      await _pause(env, env.wrongFeedbackDuration);
       check();
       return _RoundResult(RoundSummary(
         number: index + 1,
@@ -540,9 +580,18 @@ class SessionController extends Notifier<SessionState> {
       _windowTimer = env.timer(Duration(milliseconds: windowMs - usedMs), () {
         if (!pending.isCompleted) pending.complete(const _TimedOut());
       });
+      clipPlaying = true;
       show(view(RoundPhase.answering, attempt));
+      // The reels stop when the clip ends, which can be before the answer window does.
+      final completedSub = player.completed.listen((_) {
+        if (!_alive(runId) || pending.isCompleted) return;
+        clipPlaying = false;
+        show(view(RoundPhase.answering, attempt));
+      });
 
       final outcome = await pending.future;
+      unawaited(completedSub.cancel());
+      clipPlaying = false;
       _windowTimer?.cancel();
       _windowTimer = null;
       _outcome = null;
@@ -565,8 +614,14 @@ class SessionController extends Notifier<SessionState> {
             responseMs: responseMs,
           );
           recorder.recordRound(round, chosenId: optionId, responseMs: responseMs);
+          // The bar stays where the answer stopped it.
+          usedMs = responseMs;
+          final feedbackDuration = correct ? env.feedbackDuration : env.wrongFeedbackDuration;
+          speedBonus = score.points > 0 ? score.bonus : 0;
+          feedbackStartedAtMs = env.monotonicMs();
+          feedbackMs = feedbackDuration.inMilliseconds;
           show(view(RoundPhase.feedback, attempt, chosenId: optionId, points: score.points, valid: score.valid));
-          await _pause(env, env.feedbackDuration);
+          await _pause(env, feedbackDuration);
           check();
           return _RoundResult(RoundSummary(
             number: index + 1,

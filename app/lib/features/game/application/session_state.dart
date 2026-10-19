@@ -41,6 +41,14 @@ class RoundView {
     this.points,
     this.timedOut = false,
     this.valid = true,
+    this.score = 0,
+    this.speedBonus = 0,
+    this.trackName = const DisplayName(),
+    this.artistName = const DisplayName(),
+    this.clipPlaying = false,
+    this.answerClockStartMs,
+    this.feedbackStartedAtMs,
+    this.feedbackMs = 0,
   }) : remainingMs = remainingMs ?? windowMs;
 
   /// 1-based position in the session. A skipped round still uses up its number.
@@ -69,6 +77,29 @@ class RoundView {
 
   /// False when the answer was too fast to be a person (under 200 ms).
   final bool valid;
+
+  /// The running score, including this round once it is answered.
+  final int score;
+
+  /// The part of [points] that came from answering fast. Filled in during feedback.
+  final int speedBonus;
+
+  /// The round's song and its singer, for "It was Song · Artist". Empty while loading.
+  final DisplayName trackName;
+  final DisplayName artistName;
+
+  /// The clip is audibly playing now: true from the start of the answer window until the clip
+  /// ends, which can be before the window does.
+  final bool clipPlaying;
+
+  /// While answering: the monotonic time at which this round's answer clock started, moved back by
+  /// the time used before a pause, so `now - answerClockStartMs` is the time used so far.
+  final int? answerClockStartMs;
+
+  /// During feedback: when it began (monotonic ms) and how long it lasts. A right answer moves on
+  /// by itself; a wrong one or a time-out can be skipped by a tap.
+  final int? feedbackStartedAtMs;
+  final int feedbackMs;
 
   bool get isCorrect => chosenId != null && chosenId == correctId;
 }

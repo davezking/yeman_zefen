@@ -136,7 +136,7 @@ class SessionKit {
 
   /// Tracks 1..[tracks] are in the catalog. Those in [onDevice] (default: all) have both clips on
   /// the device, as `pack` clips; the others can only be fetched.
-  static Future<SessionKit> create({int tracks = 30, Set<int>? onDevice}) async {
+  static Future<SessionKit> create({int tracks = 30, Set<int>? onDevice, Duration? wrongFeedback}) async {
     final kit = SessionKit._();
     kit.downloader = KitDownloader(kit);
     kit.dir = Directory.systemTemp.createTempSync('session_kit');
@@ -172,6 +172,7 @@ class SessionKit {
             networkProbe: () async => kit.network ?? (kit.offline ? NetworkKind.none : NetworkKind.unmetered),
             rng: () => Random(kit.seed),
             feedbackDuration: feedback,
+            wrongFeedbackDuration: wrongFeedback ?? feedback,
           ),
         ),
       ],
@@ -271,7 +272,7 @@ class SessionKit {
     return state.round!.options.firstWhere((o) => o.id != correct).id;
   }
 
-  /// Ends the feedback pause of the round on screen.
+  /// Ends the feedback pause of the round on screen (the short one, unless [wrongFeedback] was set).
   void endFeedback() {
     timers.lastWhere((t) => t.isActive && t.duration == feedback).fire();
   }

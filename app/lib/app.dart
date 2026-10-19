@@ -12,7 +12,7 @@ import 'features/game/debug/sessions_debug_screen.dart';
 import 'features/game/presentation/home_route.dart';
 import 'features/game/presentation/mode_route.dart';
 import 'features/game/presentation/results_screen.dart';
-import 'features/game/presentation/round_screen.dart';
+import 'features/game/presentation/round_route.dart';
 import 'features/game/presentation/setup_route.dart';
 import 'features/leaderboard/ui/leaderboard_page.dart';
 import 'features/packs/presentation/offline_play_route.dart';
@@ -32,7 +32,7 @@ GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
     GoRoute(path: '/setup', builder: (context, state) => const SetupRoute()),
     GoRoute(path: '/settings', builder: (context, state) => const SettingsRoute()),
     GoRoute(path: '/packs', builder: (context, state) => const OfflinePlayRoute()),
-    GoRoute(path: '/play', builder: (context, state) => const RoundScreen()),
+    GoRoute(path: '/play', builder: (context, state) => const RoundRoute()),
     GoRoute(path: '/results', builder: (context, state) => const RegisterPromptOnResults(child: ResultsScreen())),
     GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardPage()),
     GoRoute(

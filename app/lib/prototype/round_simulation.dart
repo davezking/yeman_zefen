@@ -269,6 +269,8 @@ class RoundSimulation extends ChangeNotifier {
     if (_disposed || _finished || _left || _backgrounded) return;
     switch (_overlay) {
       case RoundOverlay.leaveDialog:
+      // The real engine's pause notice; the prototype pauses by being in the background.
+      case RoundOverlay.paused:
         return;
       case RoundOverlay.hintSheet:
         _clipMs += _tickMs;

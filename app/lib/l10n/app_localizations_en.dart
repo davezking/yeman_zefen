@@ -884,6 +884,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Paused. The clip plays again when you resume. The time you already used still counts.';
 
   @override
+  String get roundPausedTitle => 'Paused';
+
+  @override
   String get roundResume => 'Resume';
 
   @override

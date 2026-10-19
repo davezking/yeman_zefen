@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/l10n/display_name.dart';
+import 'package:yeman_zefen/core/widgets/widgets.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 import 'package:yeman_zefen/features/packs/data/packs_api.dart';
@@ -125,7 +126,7 @@ void main() {
         testWidgets('round: song question, long titles', (tester) async {
           await pump(tester, '/play', state: _round(RoundPhase.answering));
           // Long titles can push the last answer below the fold; the list scrolls to it.
-          await tester.scrollUntilVisible(find.byKey(const Key('option-14')), 200);
+          await tester.scrollUntilVisible(find.byType(AnswerTile).last, 200);
           expect(tester.takeException(), isNull);
         });
 

@@ -873,6 +873,9 @@ class AppLocalizationsAm extends AppLocalizations {
       'ቆሟል። ሲቀጥሉ ቅንጭቡ እንደገና ይጫወታል። የተጠቀሙበት ጊዜ አሁንም ይቆጠራል።';
 
   @override
+  String get roundPausedTitle => 'ቆሟል';
+
+  @override
   String get roundResume => 'ይቀጥሉ';
 
   @override

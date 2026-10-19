@@ -51,6 +51,7 @@ class RecordingSessionController extends SessionController {
   var resumed = 0;
   var backgrounded = 0;
   var left = 0;
+  var feedbackSkipped = 0;
 
   @override
   SessionState build() => initial;
@@ -63,6 +64,9 @@ class RecordingSessionController extends SessionController {
 
   @override
   void resume() => resumed++;
+
+  @override
+  void skipFeedback() => feedbackSkipped++;
 
   @override
   void pauseForBackground() => backgrounded++;
@@ -90,8 +94,22 @@ RoundView roundView({
   int? points,
   bool timedOut = false,
   bool valid = true,
+  int score = 0,
+  int speedBonus = 0,
+  bool clipPlaying = true,
+  int? answerClockStartMs,
+  int? feedbackStartedAtMs,
+  int feedbackMs = 0,
 }) {
   return RoundView(
+    score: score,
+    speedBonus: speedBonus,
+    trackName: const DisplayName(am: 'ዘፈን አንድ', latin: 'Song One'),
+    artistName: const DisplayName(am: 'ድምፃዊ', latin: 'The Singer'),
+    clipPlaying: clipPlaying,
+    answerClockStartMs: answerClockStartMs,
+    feedbackStartedAtMs: feedbackStartedAtMs,
+    feedbackMs: feedbackMs,
     number: number,
     total: total,
     kind: kind,

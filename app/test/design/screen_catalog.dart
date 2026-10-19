@@ -12,7 +12,7 @@ import 'package:yeman_zefen/features/game/presentation/mode_select_screen.dart';
 import 'package:yeman_zefen/features/packs/presentation/offline_play_screen.dart';
 import 'package:yeman_zefen/prototype/screens/onboarding_screens.dart';
 import 'package:yeman_zefen/prototype/screens/results_screen.dart';
-import 'package:yeman_zefen/prototype/screens/round_screen.dart';
+import 'package:yeman_zefen/features/game/presentation/round_screen.dart';
 import 'package:yeman_zefen/features/settings/presentation/settings_screen.dart';
 import 'package:yeman_zefen/features/game/presentation/setup_screen.dart';
 import 'package:yeman_zefen/features/account/ui/sign_in_sheet.dart';
@@ -174,6 +174,7 @@ List<DesignScreen> _buildDesignScreens() {
     int secondsLeft = 7,
     int feedbackSeconds = 0,
     int score = 420,
+    bool valid = true,
     // The longest names in the catalog, to push the tiles to their limit.
     List<int> trackIndexes = const [3, 0, 8, 11],
   }) => RoundView(
@@ -201,6 +202,7 @@ List<DesignScreen> _buildDesignScreens() {
     hintUsed: hintUsed,
     points: points,
     speedBonus: points > 100 ? points - 100 : 0,
+    valid: valid,
     feedbackSecondsLeft: feedbackSeconds,
     overlay: overlay,
     overlaySeconds: overlaySeconds,
@@ -468,6 +470,19 @@ List<DesignScreen> _buildDesignScreens() {
       ),
     ),
     DesignScreen(
+      'round-too-fast',
+      "round: answer too fast to count",
+      null,
+      () => round(
+        roundView(
+          phase: RoundPhase.correct,
+          picked: 1,
+          points: 0,
+          valid: false,
+        ),
+      ),
+    ),
+    DesignScreen(
       'round-timeout',
       "round: time-out",
       'H08-Wrong',
@@ -539,6 +554,14 @@ List<DesignScreen> _buildDesignScreens() {
       "round: paused in the background",
       null,
       () => round(roundView(paused: true, playing: false)),
+    ),
+    DesignScreen(
+      'round-resume-notice',
+      "round: paused notice with Resume (back from the background or a call)",
+      null,
+      () => round(
+        roundView(overlay: RoundOverlay.paused, paused: true, playing: false),
+      ),
     ),
     DesignScreen(
       'results-guest-new-best',

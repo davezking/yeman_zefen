@@ -12,17 +12,20 @@ class AppDialog extends StatelessWidget {
     required this.title,
     required this.body,
     required this.confirmLabel,
-    required this.cancelLabel,
     required this.onConfirm,
-    required this.onCancel,
+    this.cancelLabel,
+    this.onCancel,
   });
 
   final String title;
   final String body;
   final String confirmLabel;
-  final String cancelLabel;
   final VoidCallback onConfirm;
-  final VoidCallback onCancel;
+
+  /// The second choice. A dialog with only [cancelLabel] unset has just the one button (a notice
+  /// that has to be acknowledged, such as "Resume").
+  final String? cancelLabel;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +58,10 @@ class AppDialog extends StatelessWidget {
               ),
               const SizedBox(height: SpacingTokens.n20),
               PrimaryButton(label: confirmLabel, onPressed: onConfirm),
-              const SizedBox(height: SpacingTokens.n10),
-              SecondaryButton(label: cancelLabel, onPressed: onCancel),
+              if (cancelLabel != null) ...[
+                const SizedBox(height: SpacingTokens.n10),
+                SecondaryButton(label: cancelLabel!, onPressed: onCancel),
+              ],
             ],
           ),
         ),
