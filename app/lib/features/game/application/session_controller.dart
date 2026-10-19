@@ -205,8 +205,14 @@ class SessionController extends Notifier<SessionState> {
       // The provider is being disposed: trim to the default cap.
     }
     unawaited(() async {
+      var cap = ClipStore.defaultStreamCacheCapBytes;
       try {
-        final cap = await settings?.streamCacheCapBytes() ?? ClipStore.defaultStreamCacheCapBytes;
+        cap = await settings?.streamCacheCapBytes() ?? cap;
+      } catch (_) {
+        // Unreadable: trim to the default cap. The session must still end, or a pack removal
+        // waiting for it would wait for ever.
+      }
+      try {
         await prefetcher.finish(capBytes: cap);
       } catch (_) {
         // The cache is trimmed after the next session instead.

@@ -70,7 +70,6 @@ class BackgroundClipDownloader implements ClipDownloader {
     String? group,
     bool wifiOnly = false,
   }) async {
-    await _configure();
     final task = DownloadTask(
       url: url,
       directory: p.posix.dirname(relativePath),
@@ -81,9 +80,14 @@ class BackgroundClipDownloader implements ClipDownloader {
       allowPause: true,
       requiresWiFi: wifiOnly,
     );
+    // In its group before the first await, so a [cancelGroup] from now on reaches it.
     if (group != null) (_groups[group] ??= {}).add(task);
     final TaskStatusUpdate result;
     try {
+      await _configure();
+      if (group != null && !(_groups[group]?.contains(task) ?? false)) {
+        throw ClipDownloadException('canceled before it started: $url');
+      }
       result = await _downloader.download(
         task,
         onProgress: (fraction) {

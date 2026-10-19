@@ -76,7 +76,8 @@ class PackDownloadsNotifier extends Notifier<Map<String, PackJob>> {
     _put(slug, const PackJob.running());
     var listing = listingOf(listings, slug);
     if (listing == null) {
-      ref.invalidate(packListingsProvider);
+      // A list still loading is waited for; one that failed or lacks the pack is fetched again.
+      if (!ref.read(packListingsProvider).isLoading) ref.invalidate(packListingsProvider);
       // Listened to while it loads: an unlistened provider would be paused or disposed.
       final list = ref.listen(packListingsProvider.future, (_, _) {});
       try {

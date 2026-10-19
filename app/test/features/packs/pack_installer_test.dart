@@ -576,8 +576,9 @@ void main() {
       await install();
       var clip = await (db.select(db.clips)..where((c) => c.trackId.equals(2) & c.kind.equals('intro'))).getSingle();
       expect((clip.source, clip.path), (ClipSource.starter, ClipStore.starterPath(2, ClipKind.intro)));
-      // Copied into the pack, not downloaded.
+      // Neither downloaded nor copied into the pack: the built-in file is the one that plays.
       expect(downloader.calls, isNot(contains(clipUrl(2, 'intro', 1))));
+      expect(fileExists('packs/golden-era/v1/2-intro.mp3'), isFalse);
 
       await installer.remove('golden-era');
       clip = await (db.select(db.clips)..where((c) => c.trackId.equals(2) & c.kind.equals('intro'))).getSingle();
@@ -586,7 +587,7 @@ void main() {
     });
   });
 
-  test('a clip prefetched earlier is moved into the pack, not copied', () async {
+  test('a clip prefetched earlier stays playable until the pack is in, then is removed', () async {
     final url = clipUrl(1, 'intro', 1);
     final streamPath = ClipStore.streamPath(1, ClipKind.intro);
     File(p.join(base.path, streamPath))
@@ -602,15 +603,43 @@ void main() {
             lastPlayedAt: 1,
           ),
         );
-    // The file is gone from the cache before the pack is registered: moved, not copied.
+    // Copied, not moved: a game may be playing it while the pack downloads.
     downloader.hold = Completer<void>();
     final run = install();
     await Future<void>.delayed(const Duration(milliseconds: 20));
-    expect(fileExists(streamPath), isFalse);
+    expect(fileExists(streamPath), isTrue);
     expect(fileExists('packs/golden-era/v1/1-intro.mp3'), isTrue);
     downloader.hold!.complete();
     await run;
     expect(downloader.calls, isNot(contains(url)));
+    expect(fileExists(streamPath), isFalse);
+  });
+
+  test('a cancelled install leaves a prefetched clip where it was', () async {
+    final streamPath = ClipStore.streamPath(1, ClipKind.intro);
+    File(p.join(base.path, streamPath))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(bodyFor(clipUrl(1, 'intro', 1)));
+    await db.into(db.clips).insert(
+          ClipsCompanion.insert(
+            trackId: 1,
+            kind: 'intro',
+            path: streamPath,
+            bytes: 1,
+            source: ClipSource.stream,
+            lastPlayedAt: 1,
+          ),
+        );
+    downloader.hold = Completer<void>();
+    addTearDown(() => downloader.hold!.isCompleted ? null : downloader.hold!.complete());
+    final run = install();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    installer.cancel('golden-era');
+    await expectLater(run, throwsA(isA<PackInstallException>()));
+
+    final row = await (db.select(db.clips)..where((c) => c.trackId.equals(1))).getSingle();
+    expect((row.source, row.path), (ClipSource.stream, streamPath));
+    expect(fileExists(streamPath), isTrue);
   });
 
   test('removing a pack waits for the game in progress to end', () async {

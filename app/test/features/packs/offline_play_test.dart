@@ -182,6 +182,32 @@ void main() {
       expect(container.read(packDownloadsProvider), isEmpty);
     });
 
+    test('a tap while the list is still loading waits for it instead of fetching it again', () async {
+      final service = _ScriptedPackService();
+      final list = Completer<List<PackListing>>();
+      var fetches = 0;
+      final container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWithValue(db),
+          packServiceProvider.overrideWithValue(service),
+          packListingsProvider.overrideWith((ref) {
+            fetches++;
+            return list.future;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      // The screen is open and its list is loading.
+      final screen = container.listen(packListingsProvider, (_, _) {});
+      addTearDown(screen.close);
+
+      final run = container.read(packDownloadsProvider.notifier).start('golden-era');
+      list.complete([_listing()]);
+      await run;
+      expect(fetches, 1);
+      expect(service.installs, 1);
+    });
+
     test('a pack the list still does not have fails with Try again, rather than doing nothing', () async {
       final service = _ScriptedPackService();
       final container = ProviderContainer(

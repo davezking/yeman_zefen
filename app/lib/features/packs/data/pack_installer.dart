@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart' show SqliteException;
+import 'package:drift/isolate.dart' show DriftRemoteException;
 import 'package:path/path.dart' as p;
 
 import '../../../core/db/app_db.dart';
@@ -226,6 +227,8 @@ class PackInstaller {
         ClipDownloadException(noSpace: true) => storageFull(),
         FileSystemException(osError: OSError(errorCode: _noSpaceLeft)) => storageFull(),
         SqliteException(resultCode: _sqliteFull) => storageFull(),
+        // The database runs on a background isolate, which wraps its errors.
+        DriftRemoteException(remoteCause: SqliteException(resultCode: _sqliteFull)) => storageFull(),
         _ => PackInstallException('$e'),
       };
       final state = failure.failure == PackInstallFailure.cancelled
@@ -278,6 +281,11 @@ class PackInstaller {
     _Run token,
     Clip? onPhone,
   ) async {
+    // A built-in clip stays the one that plays (see [_register]): a copy would only take space.
+    if (onPhone?.source == ClipSource.starter) {
+      tracker.fileDone(file.relativePath, file.clip.bytes);
+      return;
+    }
     final target = File(p.join(base.path, file.relativePath));
     if (onPhone != null && !await target.exists()) await _reuseFromPhone(base, onPhone, target);
     var downloads = 0;
@@ -298,6 +306,9 @@ class PackInstaller {
       }
       downloads++;
       await target.parent.create(recursive: true);
+      // Checked again here, after the awaits above: a download that starts after [cancel] would
+      // not be among those it stopped.
+      _checkCancelled(token);
       tracker.downloading(file.relativePath);
       await downloader.download(
         url: file.clip.url,
@@ -312,22 +323,18 @@ class PackInstaller {
     }
   }
 
-  /// Puts the clip [row] already on the phone at [target]. The caller checks it against the
-  /// manifest's SHA-256 like a download, so a clip that changed since is simply downloaded. A
-  /// prefetched clip is moved, since the pack replaces it anyway (a row left pointing at the moved
-  /// file is forgotten by the game if the install fails). A built-in clip or another version's is
-  /// copied: it stays where it is.
+  /// Copies the clip [row] already on the phone (prefetched, or another version's) to [target].
+  /// The caller checks it against the manifest's SHA-256 like a download, so a clip that changed
+  /// since is simply downloaded. Copied, not moved: a game may be playing it, and an install that
+  /// fails or is cancelled must leave it where it was. A prefetched copy is deleted once the pack
+  /// is registered.
   Future<void> _reuseFromPhone(Directory base, Clip row, File target) async {
     if (p.join(base.path, row.path) == target.path) return;
     final source = File(p.join(base.path, row.path));
     try {
       if (!await source.exists()) return;
       await target.parent.create(recursive: true);
-      if (row.source == ClipSource.stream) {
-        await source.rename(target.path);
-      } else {
-        await source.copy(target.path);
-      }
+      await source.copy(target.path);
     } on FileSystemException catch (e) {
       if (e.osError?.errorCode == _noSpaceLeft) rethrow;
       // Anything else: the clip is downloaded instead.
