@@ -4,9 +4,13 @@ import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_service.dart';
 import '../../../core/db/app_db.dart';
+import '../../../core/http/api_providers.dart';
 import '../../../core/net/network_kind.dart';
 import 'catalog_refresher.dart';
+import 'clip_checker.dart';
+import 'clip_reporter.dart';
 import 'clip_settings.dart';
 import 'clip_store.dart';
 import 'packs_providers.dart';
@@ -32,6 +36,42 @@ final catalogRefresherProvider = Provider<CatalogRefresher>((ref) {
     api: ref.watch(packsApiProvider),
     store: ref.watch(clipStoreProvider),
   );
+});
+
+final clipReporterProvider = Provider<ClipReporter>((ref) {
+  return ClipReporter(db: ref.watch(appDbProvider), store: ref.watch(clipStoreProvider), api: ref.watch(apiClientProvider));
+});
+
+final clipCheckerProvider = Provider<ClipChecker>((ref) {
+  final settings = ref.watch(clipSettingsProvider);
+  final network = ref.watch(networkKindProvider);
+  return ClipChecker(
+    db: ref.watch(appDbProvider),
+    store: ref.watch(clipStoreProvider),
+    installer: ref.watch(packInstallerProvider),
+    starter: ref.watch(starterPackProvider),
+    // Repairs follow the same rule as prefetching while playing.
+    allowDownloads: () async => switch (await network()) {
+      NetworkKind.unmetered => true,
+      NetworkKind.cellular => await settings.prefetchOnMobile(),
+      NetworkKind.none => false,
+    },
+  );
+});
+
+/// Checks the clip files on the phone once the starter clips are registered, and sends clip
+/// reports left over from earlier: on start, once the player has a uid, and when back online.
+final clipHealthStarterProvider = Provider<void>((ref) {
+  final checker = ref.watch(clipCheckerProvider);
+  unawaited(ref.read(starterReadyProvider.future).then((_) => checker.run()));
+  final reporter = ref.watch(clipReporterProvider);
+  ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
+    if (next.value?.hasUid ?? false) unawaited(reporter.flush());
+  }, fireImmediately: true);
+  final online = connectivityOnlineChanges().listen((online) {
+    if (online) unawaited(reporter.flush());
+  }, onError: (Object _) {});
+  ref.onDispose(() => unawaited(online.cancel()));
 });
 
 /// Registers the bundled starter clips. A session waits for this before it reads the catalog, so

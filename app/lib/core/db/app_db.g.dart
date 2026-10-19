@@ -4185,6 +4185,19 @@ class $ClipsTable extends Clips with TableInfo<$ClipsTable, Clip> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _brokenMeta = const VerificationMeta('broken');
+  @override
+  late final GeneratedColumn<bool> broken = GeneratedColumn<bool>(
+    'broken',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("broken" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     trackId,
@@ -4193,6 +4206,7 @@ class $ClipsTable extends Clips with TableInfo<$ClipsTable, Clip> {
     bytes,
     source,
     lastPlayedAt,
+    broken,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4257,6 +4271,12 @@ class $ClipsTable extends Clips with TableInfo<$ClipsTable, Clip> {
     } else if (isInserting) {
       context.missing(_lastPlayedAtMeta);
     }
+    if (data.containsKey('broken')) {
+      context.handle(
+        _brokenMeta,
+        broken.isAcceptableOrUnknown(data['broken']!, _brokenMeta),
+      );
+    }
     return context;
   }
 
@@ -4290,6 +4310,10 @@ class $ClipsTable extends Clips with TableInfo<$ClipsTable, Clip> {
         DriftSqlType.int,
         data['${effectivePrefix}last_played_at'],
       )!,
+      broken: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}broken'],
+      )!,
     );
   }
 
@@ -4306,6 +4330,11 @@ class Clip extends DataClass implements Insertable<Clip> {
   final int bytes;
   final String source;
   final int lastPlayedAt;
+
+  /// The file would not play (missing, would not decode, or under a second of audio), or failed
+  /// its checksum when it was checked again. A broken clip is not played, and is replaced by a
+  /// clip that downloads and verifies (a starter clip, by the next app update).
+  final bool broken;
   const Clip({
     required this.trackId,
     required this.kind,
@@ -4313,6 +4342,7 @@ class Clip extends DataClass implements Insertable<Clip> {
     required this.bytes,
     required this.source,
     required this.lastPlayedAt,
+    required this.broken,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4323,6 +4353,7 @@ class Clip extends DataClass implements Insertable<Clip> {
     map['bytes'] = Variable<int>(bytes);
     map['source'] = Variable<String>(source);
     map['last_played_at'] = Variable<int>(lastPlayedAt);
+    map['broken'] = Variable<bool>(broken);
     return map;
   }
 
@@ -4334,6 +4365,7 @@ class Clip extends DataClass implements Insertable<Clip> {
       bytes: Value(bytes),
       source: Value(source),
       lastPlayedAt: Value(lastPlayedAt),
+      broken: Value(broken),
     );
   }
 
@@ -4349,6 +4381,7 @@ class Clip extends DataClass implements Insertable<Clip> {
       bytes: serializer.fromJson<int>(json['bytes']),
       source: serializer.fromJson<String>(json['source']),
       lastPlayedAt: serializer.fromJson<int>(json['lastPlayedAt']),
+      broken: serializer.fromJson<bool>(json['broken']),
     );
   }
   @override
@@ -4361,6 +4394,7 @@ class Clip extends DataClass implements Insertable<Clip> {
       'bytes': serializer.toJson<int>(bytes),
       'source': serializer.toJson<String>(source),
       'lastPlayedAt': serializer.toJson<int>(lastPlayedAt),
+      'broken': serializer.toJson<bool>(broken),
     };
   }
 
@@ -4371,6 +4405,7 @@ class Clip extends DataClass implements Insertable<Clip> {
     int? bytes,
     String? source,
     int? lastPlayedAt,
+    bool? broken,
   }) => Clip(
     trackId: trackId ?? this.trackId,
     kind: kind ?? this.kind,
@@ -4378,6 +4413,7 @@ class Clip extends DataClass implements Insertable<Clip> {
     bytes: bytes ?? this.bytes,
     source: source ?? this.source,
     lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+    broken: broken ?? this.broken,
   );
   Clip copyWithCompanion(ClipsCompanion data) {
     return Clip(
@@ -4389,6 +4425,7 @@ class Clip extends DataClass implements Insertable<Clip> {
       lastPlayedAt: data.lastPlayedAt.present
           ? data.lastPlayedAt.value
           : this.lastPlayedAt,
+      broken: data.broken.present ? data.broken.value : this.broken,
     );
   }
 
@@ -4400,14 +4437,15 @@ class Clip extends DataClass implements Insertable<Clip> {
           ..write('path: $path, ')
           ..write('bytes: $bytes, ')
           ..write('source: $source, ')
-          ..write('lastPlayedAt: $lastPlayedAt')
+          ..write('lastPlayedAt: $lastPlayedAt, ')
+          ..write('broken: $broken')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(trackId, kind, path, bytes, source, lastPlayedAt);
+      Object.hash(trackId, kind, path, bytes, source, lastPlayedAt, broken);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4417,7 +4455,8 @@ class Clip extends DataClass implements Insertable<Clip> {
           other.path == this.path &&
           other.bytes == this.bytes &&
           other.source == this.source &&
-          other.lastPlayedAt == this.lastPlayedAt);
+          other.lastPlayedAt == this.lastPlayedAt &&
+          other.broken == this.broken);
 }
 
 class ClipsCompanion extends UpdateCompanion<Clip> {
@@ -4427,6 +4466,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
   final Value<int> bytes;
   final Value<String> source;
   final Value<int> lastPlayedAt;
+  final Value<bool> broken;
   final Value<int> rowid;
   const ClipsCompanion({
     this.trackId = const Value.absent(),
@@ -4435,6 +4475,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
     this.bytes = const Value.absent(),
     this.source = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
+    this.broken = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ClipsCompanion.insert({
@@ -4444,6 +4485,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
     required int bytes,
     required String source,
     required int lastPlayedAt,
+    this.broken = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : trackId = Value(trackId),
        kind = Value(kind),
@@ -4458,6 +4500,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
     Expression<int>? bytes,
     Expression<String>? source,
     Expression<int>? lastPlayedAt,
+    Expression<bool>? broken,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4467,6 +4510,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
       if (bytes != null) 'bytes': bytes,
       if (source != null) 'source': source,
       if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
+      if (broken != null) 'broken': broken,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4478,6 +4522,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
     Value<int>? bytes,
     Value<String>? source,
     Value<int>? lastPlayedAt,
+    Value<bool>? broken,
     Value<int>? rowid,
   }) {
     return ClipsCompanion(
@@ -4487,6 +4532,7 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
       bytes: bytes ?? this.bytes,
       source: source ?? this.source,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      broken: broken ?? this.broken,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4512,6 +4558,9 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
     if (lastPlayedAt.present) {
       map['last_played_at'] = Variable<int>(lastPlayedAt.value);
     }
+    if (broken.present) {
+      map['broken'] = Variable<bool>(broken.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4527,6 +4576,319 @@ class ClipsCompanion extends UpdateCompanion<Clip> {
           ..write('bytes: $bytes, ')
           ..write('source: $source, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
+          ..write('broken: $broken, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingClipReportsTable extends PendingClipReports
+    with TableInfo<$PendingClipReportsTable, PendingClipReport> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingClipReportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _trackIdMeta = const VerificationMeta(
+    'trackId',
+  );
+  @override
+  late final GeneratedColumn<int> trackId = GeneratedColumn<int>(
+    'track_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _errorMeta = const VerificationMeta('error');
+  @override
+  late final GeneratedColumn<String> error = GeneratedColumn<String>(
+    'error',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [trackId, kind, error, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_clip_reports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingClipReport> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('track_id')) {
+      context.handle(
+        _trackIdMeta,
+        trackId.isAcceptableOrUnknown(data['track_id']!, _trackIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_trackIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('error')) {
+      context.handle(
+        _errorMeta,
+        error.isAcceptableOrUnknown(data['error']!, _errorMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_errorMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {trackId, kind};
+  @override
+  PendingClipReport map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingClipReport(
+      trackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      error: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingClipReportsTable createAlias(String alias) {
+    return $PendingClipReportsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingClipReport extends DataClass
+    implements Insertable<PendingClipReport> {
+  final int trackId;
+  final String kind;
+  final String error;
+  final int createdAt;
+  const PendingClipReport({
+    required this.trackId,
+    required this.kind,
+    required this.error,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['track_id'] = Variable<int>(trackId);
+    map['kind'] = Variable<String>(kind);
+    map['error'] = Variable<String>(error);
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  PendingClipReportsCompanion toCompanion(bool nullToAbsent) {
+    return PendingClipReportsCompanion(
+      trackId: Value(trackId),
+      kind: Value(kind),
+      error: Value(error),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PendingClipReport.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingClipReport(
+      trackId: serializer.fromJson<int>(json['trackId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      error: serializer.fromJson<String>(json['error']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'trackId': serializer.toJson<int>(trackId),
+      'kind': serializer.toJson<String>(kind),
+      'error': serializer.toJson<String>(error),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  PendingClipReport copyWith({
+    int? trackId,
+    String? kind,
+    String? error,
+    int? createdAt,
+  }) => PendingClipReport(
+    trackId: trackId ?? this.trackId,
+    kind: kind ?? this.kind,
+    error: error ?? this.error,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PendingClipReport copyWithCompanion(PendingClipReportsCompanion data) {
+    return PendingClipReport(
+      trackId: data.trackId.present ? data.trackId.value : this.trackId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      error: data.error.present ? data.error.value : this.error,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingClipReport(')
+          ..write('trackId: $trackId, ')
+          ..write('kind: $kind, ')
+          ..write('error: $error, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(trackId, kind, error, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingClipReport &&
+          other.trackId == this.trackId &&
+          other.kind == this.kind &&
+          other.error == this.error &&
+          other.createdAt == this.createdAt);
+}
+
+class PendingClipReportsCompanion extends UpdateCompanion<PendingClipReport> {
+  final Value<int> trackId;
+  final Value<String> kind;
+  final Value<String> error;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const PendingClipReportsCompanion({
+    this.trackId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.error = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingClipReportsCompanion.insert({
+    required int trackId,
+    required String kind,
+    required String error,
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : trackId = Value(trackId),
+       kind = Value(kind),
+       error = Value(error),
+       createdAt = Value(createdAt);
+  static Insertable<PendingClipReport> custom({
+    Expression<int>? trackId,
+    Expression<String>? kind,
+    Expression<String>? error,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (trackId != null) 'track_id': trackId,
+      if (kind != null) 'kind': kind,
+      if (error != null) 'error': error,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingClipReportsCompanion copyWith({
+    Value<int>? trackId,
+    Value<String>? kind,
+    Value<String>? error,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PendingClipReportsCompanion(
+      trackId: trackId ?? this.trackId,
+      kind: kind ?? this.kind,
+      error: error ?? this.error,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (trackId.present) {
+      map['track_id'] = Variable<int>(trackId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (error.present) {
+      map['error'] = Variable<String>(error.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingClipReportsCompanion(')
+          ..write('trackId: $trackId, ')
+          ..write('kind: $kind, ')
+          ..write('error: $error, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4551,6 +4913,8 @@ abstract class _$AppDb extends GeneratedDatabase {
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $CatalogTracksTable catalogTracks = $CatalogTracksTable(this);
   late final $ClipsTable clips = $ClipsTable(this);
+  late final $PendingClipReportsTable pendingClipReports =
+      $PendingClipReportsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4567,6 +4931,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     appSettings,
     catalogTracks,
     clips,
+    pendingClipReports,
   ];
 }
 
@@ -6846,6 +7211,7 @@ typedef $$ClipsTableCreateCompanionBuilder = ClipsCompanion Function({
   required int bytes,
   required String source,
   required int lastPlayedAt,
+  Value<bool> broken,
   Value<int> rowid,
 });
 typedef $$ClipsTableUpdateCompanionBuilder = ClipsCompanion Function({
@@ -6855,6 +7221,7 @@ typedef $$ClipsTableUpdateCompanionBuilder = ClipsCompanion Function({
   Value<int> bytes,
   Value<String> source,
   Value<int> lastPlayedAt,
+  Value<bool> broken,
   Value<int> rowid,
 });
 
@@ -6893,6 +7260,11 @@ class $$ClipsTableFilterComposer extends Composer<_$AppDb, $ClipsTable> {
 
   ColumnFilters<int> get lastPlayedAt => $composableBuilder(
     column: $table.lastPlayedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get broken => $composableBuilder(
+    column: $table.broken,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6934,6 +7306,11 @@ class $$ClipsTableOrderingComposer extends Composer<_$AppDb, $ClipsTable> {
     column: $table.lastPlayedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get broken => $composableBuilder(
+    column: $table.broken,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ClipsTableAnnotationComposer extends Composer<_$AppDb, $ClipsTable> {
@@ -6963,6 +7340,9 @@ class $$ClipsTableAnnotationComposer extends Composer<_$AppDb, $ClipsTable> {
     column: $table.lastPlayedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get broken =>
+      $composableBuilder(column: $table.broken, builder: (column) => column);
 }
 
 class $$ClipsTableTableManager
@@ -6999,6 +7379,7 @@ class $$ClipsTableTableManager
                 Value<int> bytes = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<int> lastPlayedAt = const Value.absent(),
+                Value<bool> broken = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ClipsCompanion(
                 trackId: trackId,
@@ -7007,6 +7388,7 @@ class $$ClipsTableTableManager
                 bytes: bytes,
                 source: source,
                 lastPlayedAt: lastPlayedAt,
+                broken: broken,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7017,6 +7399,7 @@ class $$ClipsTableTableManager
                 required int bytes,
                 required String source,
                 required int lastPlayedAt,
+                Value<bool> broken = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ClipsCompanion.insert(
                 trackId: trackId,
@@ -7025,6 +7408,7 @@ class $$ClipsTableTableManager
                 bytes: bytes,
                 source: source,
                 lastPlayedAt: lastPlayedAt,
+                broken: broken,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7054,6 +7438,207 @@ typedef $$ClipsTableProcessedTableManager =
       Clip,
       PrefetchHooks Function()
     >;
+typedef $$PendingClipReportsTableCreateCompanionBuilder =
+    PendingClipReportsCompanion Function({
+      required int trackId,
+      required String kind,
+      required String error,
+      required int createdAt,
+      Value<int> rowid,
+    });
+typedef $$PendingClipReportsTableUpdateCompanionBuilder =
+    PendingClipReportsCompanion Function({
+      Value<int> trackId,
+      Value<String> kind,
+      Value<String> error,
+      Value<int> createdAt,
+      Value<int> rowid,
+    });
+
+class $$PendingClipReportsTableFilterComposer
+    extends Composer<_$AppDb, $PendingClipReportsTable> {
+  $$PendingClipReportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get error => $composableBuilder(
+    column: $table.error,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingClipReportsTableOrderingComposer
+    extends Composer<_$AppDb, $PendingClipReportsTable> {
+  $$PendingClipReportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get error => $composableBuilder(
+    column: $table.error,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingClipReportsTableAnnotationComposer
+    extends Composer<_$AppDb, $PendingClipReportsTable> {
+  $$PendingClipReportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get trackId =>
+      $composableBuilder(column: $table.trackId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get error =>
+      $composableBuilder(column: $table.error, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$PendingClipReportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $PendingClipReportsTable,
+          PendingClipReport,
+          $$PendingClipReportsTableFilterComposer,
+          $$PendingClipReportsTableOrderingComposer,
+          $$PendingClipReportsTableAnnotationComposer,
+          $$PendingClipReportsTableCreateCompanionBuilder,
+          $$PendingClipReportsTableUpdateCompanionBuilder,
+          (
+            PendingClipReport,
+            BaseReferences<
+              _$AppDb,
+              $PendingClipReportsTable,
+              PendingClipReport
+            >,
+          ),
+          PendingClipReport,
+          PrefetchHooks Function()
+        > {
+  $$PendingClipReportsTableTableManager(
+    _$AppDb db,
+    $PendingClipReportsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingClipReportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PendingClipReportsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PendingClipReportsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> trackId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> error = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingClipReportsCompanion(
+                trackId: trackId,
+                kind: kind,
+                error: error,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int trackId,
+                required String kind,
+                required String error,
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingClipReportsCompanion.insert(
+                trackId: trackId,
+                kind: kind,
+                error: error,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PendingClipReportsTable, PendingClipReport>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDb,
+                    $PendingClipReportsTable,
+                    PendingClipReport
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingClipReportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $PendingClipReportsTable,
+      PendingClipReport,
+      $$PendingClipReportsTableFilterComposer,
+      $$PendingClipReportsTableOrderingComposer,
+      $$PendingClipReportsTableAnnotationComposer,
+      $$PendingClipReportsTableCreateCompanionBuilder,
+      $$PendingClipReportsTableUpdateCompanionBuilder,
+      (
+        PendingClipReport,
+        BaseReferences<_$AppDb, $PendingClipReportsTable, PendingClipReport>,
+      ),
+      PendingClipReport,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -7080,4 +7665,6 @@ class $AppDbManager {
       $$CatalogTracksTableTableManager(_db, _db.catalogTracks);
   $$ClipsTableTableManager get clips =>
       $$ClipsTableTableManager(_db, _db.clips);
+  $$PendingClipReportsTableTableManager get pendingClipReports =>
+      $$PendingClipReportsTableTableManager(_db, _db.pendingClipReports);
 }

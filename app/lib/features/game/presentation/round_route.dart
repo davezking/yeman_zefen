@@ -9,6 +9,7 @@ import '../../../core/l10n/display_name.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../prototype/models.dart' as proto;
+import '../../../prototype/screens/message_screens.dart' show OutOfSongsScreen;
 import '../../settings/application/settings_providers.dart';
 import '../application/session_controller.dart';
 import '../application/session_state.dart';
@@ -137,7 +138,15 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
     final round = state.round;
 
     final Widget body;
-    if (state.phase == SessionPhase.playing && round != null) {
+    if (state.phase == SessionPhase.outOfSongs) {
+      body = OutOfSongsScreen(
+        onBrowsePacks: () {
+          _controller.leave();
+          context.go('/packs');
+        },
+        onReplay: _controller.playAgain,
+      );
+    } else if (state.phase == SessionPhase.playing && round != null) {
       body = RoundScreen(
         view: screenViewOf(
           state,

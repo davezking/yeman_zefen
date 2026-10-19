@@ -23,6 +23,7 @@ class LeaderboardScreen extends StatelessWidget {
     required this.onScope,
     required this.onEra,
     required this.onSignIn,
+    this.onRetry,
   });
 
   final LeaderboardView view;
@@ -32,6 +33,9 @@ class LeaderboardScreen extends StatelessWidget {
   /// An era was picked from the filter (0 for all eras).
   final ValueChanged<int> onEra;
   final VoidCallback onSignIn;
+
+  /// Offline with nothing saved: loads the board again. No button when null.
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +145,10 @@ class LeaderboardScreen extends StatelessWidget {
                       text: v.state == LeaderboardState.empty
                           ? l10n.lbEmpty
                           : l10n.lbOfflineNone,
+                      retryLabel: l10n.errorRetry,
+                      onRetry: v.state == LeaderboardState.offlineNone
+                          ? onRetry
+                          : null,
                     ),
             ),
             if (v.state != LeaderboardState.loading)
@@ -580,10 +588,17 @@ class _Loading extends StatelessWidget {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.text});
+  const _Message({
+    required this.icon,
+    required this.text,
+    required this.retryLabel,
+    this.onRetry,
+  });
 
   final IconData icon;
   final String text;
+  final String retryLabel;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -606,6 +621,14 @@ class _Message extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: context.text.bodyLarge,
               ),
+              if (onRetry != null) ...[
+                const SizedBox(height: SpacingTokens.n16),
+                SecondaryButton(
+                  label: retryLabel,
+                  small: true,
+                  onPressed: onRetry,
+                ),
+              ],
             ],
           ),
         ),

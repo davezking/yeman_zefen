@@ -45,6 +45,7 @@ class LeaderboardPage extends ConsumerWidget {
       onScope: (s) => ref.read(leaderboardQueryProvider.notifier).setScope(s),
       onEra: (id) => ref.read(leaderboardQueryProvider.notifier).setEra(id),
       onSignIn: () => _signIn(context, ref),
+      onRetry: () => ref.invalidate(leaderboardProvider),
     );
   }
 

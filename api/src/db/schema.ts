@@ -366,3 +366,15 @@ export const moderationLog = sqliteTable(
     check("moderation_log_action_check", inList("action", MODERATION_ACTIONS)),
   ],
 );
+
+/**
+ * How many clip reports (POST /v1/reports/clip) each player sent today. One row per player: a
+ * report on a new UTC day resets the count, so the table never grows past the number of players
+ * who ever reported. No foreign key: a guest can report before a users row exists.
+ */
+export const clipReportCounts = sqliteTable("clip_report_counts", {
+  userId: text("user_id").primaryKey(),
+  /** UTC day number (epoch ms / 86 400 000) the count is for. */
+  day: integer("day").notNull(),
+  count: integer("count").notNull(),
+});

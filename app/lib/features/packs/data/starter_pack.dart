@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show BooleanExpressionOperators;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
@@ -90,6 +91,34 @@ class StarterPack {
           );
     });
     return verified.length;
+  }
+
+  /// Checks the starter clips on the device against the bundled manifest. One whose file is gone
+  /// or no longer matches is marked broken: it is not played again until an app update brings a
+  /// new starter pack (or a download replaces it). Returns how many failed. Never throws.
+  Future<int> checkClips() async {
+    try {
+      final manifest = PackManifest.parse(await _bundle.loadString('$starterAssetDir/manifest.json'));
+      final byId = {for (final t in manifest.tracks) t.id: t};
+      final rows = await (db.select(db.clips)
+            ..where((t) => t.source.equals(ClipSource.starter) & t.broken.equals(false)))
+          .get();
+      final base = await supportDirectory();
+      var failed = 0;
+      for (final row in rows) {
+        final track = byId[row.trackId];
+        if (track == null) continue;
+        final kind = ClipKind.values.byName(row.kind);
+        final clip = kind == ClipKind.intro ? track.intro : track.middle;
+        final file = File(p.join(base.path, row.path));
+        if (await file.exists() && await fileHasSha256(file, clip.sha256)) continue;
+        await store.markBroken(row.trackId, kind);
+        failed++;
+      }
+      return failed;
+    } catch (_) {
+      return 0; // No starter pack in this build, or it cannot be read: nothing to check.
+    }
   }
 
   /// Every starter track has a clip row. False after a "Clear cache" would be wrong, since that

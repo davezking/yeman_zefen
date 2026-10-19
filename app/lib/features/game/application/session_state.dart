@@ -1,7 +1,17 @@
 import '../../../core/l10n/display_name.dart';
 import '../domain/session_config.dart';
 
-enum SessionPhase { idle, preparing, playing, finished, failed }
+enum SessionPhase {
+  idle,
+  preparing,
+
+  /// Offline, and every song on the phone was played recently. Waiting for the player to play
+  /// them again (`SessionController.playAgain`) or leave for Offline play.
+  outOfSongs,
+  playing,
+  finished,
+  failed,
+}
 
 enum RoundPhase {
   /// The clip is loading. Nothing to answer yet.

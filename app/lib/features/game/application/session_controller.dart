@@ -10,6 +10,7 @@ import '../../../core/l10n/display_name.dart';
 import '../../../core/net/network_kind.dart';
 import '../../packs/data/clip_prefetcher.dart';
 import '../../packs/data/clip_providers.dart';
+import '../../packs/data/clip_reporter.dart';
 import '../../packs/data/clip_settings.dart';
 import '../../packs/data/clip_store.dart';
 import '../../packs/data/packs_providers.dart';
@@ -69,11 +70,14 @@ class _Abandoned extends _Outcome {
 
 /// How a round ended when it was not played to an answer: [clipError] says the clip file was
 /// missing or would not play (counted as a clip error), otherwise no clip arrived in time and the
-/// round was skipped without penalty.
+/// round was skipped without penalty. [failure] says how the clip of [trackId] failed to play,
+/// when it did, so it can be reported.
 class _RoundResult {
-  const _RoundResult(this.summary, {this.clipError = false});
+  const _RoundResult(this.summary, {this.clipError = false, this.failure, this.trackId});
   final RoundSummary? summary;
   final bool clipError;
+  final ClipFailure? failure;
+  final int? trackId;
 }
 
 /// Runs a session: it picks the rounds, plays each clip, times the answer, scores
@@ -96,6 +100,11 @@ class SessionController extends Notifier<SessionState> {
 
   Completer<_Outcome>? _outcome;
   Completer<void>? _resume;
+  Completer<void>? _replayChoice;
+
+  /// The player chose to play recently heard songs again while offline. Not asked again until the
+  /// app restarts.
+  var _repeatsAccepted = false;
   Completer<void>? _feedbackWait;
   Timer? _windowTimer;
   Timer? _feedbackTimer;
@@ -191,6 +200,14 @@ class SessionController extends Notifier<SessionState> {
     wait.complete();
   }
 
+  /// The out-of-songs note: the player wants to play the songs on the phone again.
+  void playAgain() {
+    final choice = _replayChoice;
+    if (state.phase != SessionPhase.outOfSongs || choice == null || choice.isCompleted) return;
+    _repeatsAccepted = true;
+    choice.complete();
+  }
+
   /// Leaves the session without saving it.
   void leave() {
     _abandon();
@@ -254,6 +271,9 @@ class SessionController extends Notifier<SessionState> {
     final feedback = _feedbackWait;
     _feedbackWait = null;
     if (feedback != null && !feedback.isCompleted) feedback.complete();
+    final replay = _replayChoice;
+    _replayChoice = null;
+    if (replay != null && !replay.isCompleted) replay.complete();
     final interrupted = _interruptedSub;
     _interruptedSub = null;
     if (interrupted != null) unawaited(interrupted.cancel());
@@ -316,6 +336,23 @@ class SessionController extends Notifier<SessionState> {
     }
 
     final offlineAtStart = network == NetworkKind.none;
+    final recentIds = {for (final s in recent.take(RoundGenerator.historySessions)) ...s};
+    if (offlineAtStart &&
+        !_repeatsAccepted &&
+        generated.rounds.every((r) => recentIds.contains(r.trackId))) {
+      // Offline, and every song the phone can play was heard in the last few games: the session
+      // would be all repeats. The player is told, and plays them anyway or goes to get a pack.
+      final choice = Completer<void>();
+      _replayChoice = choice;
+      _set(SessionState(phase: SessionPhase.outOfSongs, config: config));
+      await choice.future;
+      _replayChoice = null;
+      check();
+      _set(SessionState(phase: SessionPhase.preparing, config: config));
+    }
+
+    final reporter = ref.read(clipReporterProvider);
+    final kind = ClipKind.forMode(config.mode);
     final recorder = SessionRecorder(id: env.newId(), config: config, startedAtMs: env.epochMs());
     _interruptedSub = player.interrupted.listen((_) => _onInterrupted());
 
@@ -330,7 +367,8 @@ class SessionController extends Notifier<SessionState> {
       timer: env.timer,
       allowDownloads: allowDownloads,
       rng: env.rng(),
-      recentTrackIds: {for (final s in recent.take(RoundGenerator.historySessions)) ...s},
+      recentTrackIds: recentIds,
+      onFileMissing: (trackId) => reporter.report(trackId, kind, ClipFailure.fileMissing),
     );
     _prefetcher = prefetcher;
 
@@ -368,6 +406,9 @@ class SessionController extends Notifier<SessionState> {
         // The clip is missing or will not play, or none arrived in time. The round is skipped.
         skipped++;
         if (result.clipError) await store.addClipError();
+        final failure = result.failure;
+        final trackId = result.trackId;
+        if (failure != null && trackId != null) await reporter.report(trackId, kind, failure);
         check();
       } else {
         played.add(summary);
@@ -578,7 +619,13 @@ class SessionController extends Notifier<SessionState> {
       } catch (e) {
         if (e is _Cancelled) rethrow;
         check();
-        return const _RoundResult(null, clipError: true);
+        // Missing files were caught before the round; this clip is there but will not play.
+        return _RoundResult(
+          null,
+          clipError: true,
+          failure: e is ClipTooShortException ? ClipFailure.tooShort : ClipFailure.decodeError,
+          trackId: round.trackId,
+        );
       }
 
       // The clock starts here: the audio is playing. After a pause it carries on

@@ -71,6 +71,13 @@
       "when": 1792343698026,
       "tag": "0009_moderation_log",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792437646589,
+      "tag": "0010_clip_report_counts",
+      "breakpoints": true
     }
   ]
 }

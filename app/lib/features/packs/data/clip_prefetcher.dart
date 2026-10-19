@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-
 import '../../game/data/game_library.dart';
 import '../../game/domain/eras.dart';
 import '../../game/domain/game_track.dart';
@@ -57,6 +56,7 @@ class ClipPrefetcher {
     required this.allowDownloads,
     required this.rng,
     this.recentTrackIds = const {},
+    this.onFileMissing,
     this.lookahead = 6,
     this.waitLimit = const Duration(seconds: 10),
     this.maxDownloadAttempts = 2,
@@ -89,6 +89,10 @@ class ClipPrefetcher {
   /// Tracks played in the last few sessions. A swap takes other tracks first, as the round
   /// generator does, so the same few clips on the phone do not open every session.
   final Set<int> recentTrackIds;
+
+  /// A track's clip was on the device but its file is gone. Without it the clip is only marked
+  /// broken (see [ClipStore.markBroken]).
+  final Future<void> Function(int trackId)? onFileMissing;
 
   /// How many rounds have their clip fetched: the one about to play and the next 5.
   final int lookahead;
@@ -178,14 +182,15 @@ class ClipPrefetcher {
     await store.sessionEnded(capBytes: capBytes);
   }
 
-  /// The track's clip path if the file is really there. A row whose file is gone is dropped, so
-  /// the clip counts as not on the device from then on.
+  /// The track's clip path if the file is really there. A clip whose file is gone is marked
+  /// broken (a cached one is dropped), so it counts as not on the device from then on.
   Future<String?> _verifiedPath(int trackId) async {
     final path = _onDevice[trackId];
     if (path == null) return null;
     if (await fileExists(path)) return path;
     _onDevice.remove(trackId);
-    await store.forget(trackId, _kind);
+    final report = onFileMissing;
+    await (report == null ? store.markBroken(trackId, _kind) : report(trackId));
     return null;
   }
 
