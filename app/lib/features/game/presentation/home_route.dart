@@ -50,7 +50,7 @@ class HomeRoute extends ConsumerWidget {
       hasDownloadedPacks: (packs?.count ?? 0) > 0,
       builtInSongCount: songs?.onDevice ?? 0,
       packUpdateAvailable: ref.watch(packUpdateAvailableProvider),
-      modes: const [proto.GameMode.intro, proto.GameMode.middle],
+      modes: proto.GameMode.values,
       onPlay: () {
         startPlaying(ref, quick);
         context.go('/play');

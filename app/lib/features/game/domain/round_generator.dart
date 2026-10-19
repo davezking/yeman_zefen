@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'eras.dart';
 import 'game_track.dart';
 import 'generated_session.dart';
 import 'session_config.dart';
@@ -47,9 +48,7 @@ class RoundGenerator {
     List<Iterable<int>> recentSessions = const [],
     Set<int>? playable,
   }) {
-    if (config.mode == GameMode.generation) {
-      throw ArgumentError.value(config.mode, 'config.mode', 'generation mode has no round generator yet');
-    }
+    if (config.mode == GameMode.generation) return _generateEraSession(config, recentSessions, playable);
     if (_tracks.length < optionCount) {
       throw RoundGenerationException(
         'need at least $optionCount tracks for 4 options, have ${_tracks.length}',
@@ -89,6 +88,31 @@ class RoundGenerator {
     );
   }
 
+  /// The generation-guess session (FR-12): each round plays a track and asks which era it is from.
+  /// It has no era filter and no question mix: the answer would give the filter away, and every
+  /// round is an era question. Only tracks with an era can be asked about.
+  GeneratedSession _generateEraSession(
+    SessionConfig config,
+    List<Iterable<int>> recentSessions,
+    Set<int>? playable,
+  ) {
+    final pool = [
+      for (final t in _tracks)
+        if (t.generationId != null && (playable == null || playable.contains(t.id))) t,
+    ];
+    if (pool.isEmpty) {
+      throw const RoundGenerationException(
+        'no playable tracks with an era',
+        RoundGenerationReason.noTracksInEra,
+      );
+    }
+    final chosen = _chooseTracks(pool, config.rounds, recentSessions);
+    return GeneratedSession(
+      config: config,
+      rounds: [for (final track in chosen) roundFor(track, QuestionKind.era)],
+    );
+  }
+
   /// A round about [track] with fresh options, by the same rules as [generate]: same-era wrong
   /// answers first, and distinct artists for an artist question. The prefetcher uses this to put
   /// another track in a round whose clip did not arrive in time.
@@ -114,7 +138,27 @@ class RoundGenerator {
         QuestionMix.mixed => canAskArtist && _rng.nextBool() ? QuestionKind.artist : QuestionKind.song,
       };
 
+  /// An era question: the track's era and three others, all distinct. With fewer than four eras in
+  /// all, every era is an option.
+  GeneratedRound _buildEraRound(GameTrack track) {
+    final correctId = track.generationId;
+    if (correctId == null) {
+      throw ArgumentError.value(track.id, 'track', 'has no era to ask about');
+    }
+    // The seeded eras, and any other era the tracks mention.
+    final eras = {...eraIds, for (final t in _tracks) ?t.generationId}.toList()..sort();
+    final others = [for (final e in eras) if (e != correctId) e]..shuffle(_rng);
+    final options = [correctId, ...others.take(optionCount - 1)]..shuffle(_rng);
+    return GeneratedRound(
+      trackId: track.id,
+      kind: QuestionKind.era,
+      correctId: correctId,
+      optionIds: options,
+    );
+  }
+
   GeneratedRound _buildRound(GameTrack track, QuestionKind kind) {
+    if (kind == QuestionKind.era) return _buildEraRound(track);
     final picked = kind == QuestionKind.artist ? _artistDistractors(track) : _songDistractors(track);
     final correctId = kind == QuestionKind.artist ? track.artistId : track.id;
     final options = [correctId, ...picked.ids]..shuffle(_rng);

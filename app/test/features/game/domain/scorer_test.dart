@@ -59,7 +59,7 @@ void main() {
     final cases = _roundCases();
 
     test('the fixture was read, with every worked example', () {
-      expect(cases.map((e) => e.id), [for (var i = 1; i <= 17; i++) 'E$i']);
+      expect(cases.map((e) => e.id), [for (var i = 1; i <= 20; i++) 'E$i']);
     });
 
     for (final e in cases) {

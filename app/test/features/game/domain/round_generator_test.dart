@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/features/game/domain/eras.dart';
 import 'package:yeman_zefen/features/game/domain/game_track.dart';
 import 'package:yeman_zefen/features/game/domain/generated_session.dart';
 import 'package:yeman_zefen/features/game/domain/round_generator.dart';
@@ -296,10 +297,85 @@ void main() {
       );
     });
 
-    test('generation mode has no generator yet', () {
+  });
+
+  group('generation-guess mode (Which Era?)', () {
+    GeneratedSession era([int seed = 1, int rounds = 10]) =>
+        generator(plenty, seed).generate(config(mode: GameMode.generation, rounds: rounds));
+
+    test('asks an era question about every track, with the track\'s era as the answer', () {
+      final session = era();
+      expect(session.rounds, hasLength(10));
+      for (final r in session.rounds) {
+        expect(r.kind, QuestionKind.era);
+        expect(r.correctId, eraOfTrack[r.trackId]);
+        expect(r.isCorrect(eraOfTrack[r.trackId]), isTrue);
+      }
+      expect(session.rounds.map((r) => r.trackId).toSet(), hasLength(10));
+    });
+
+    test('offers four distinct eras that include the right one, over many sessions', () {
+      for (var seed = 1; seed <= 30; seed++) {
+        for (final r in era(seed).rounds) {
+          expect(r.optionIds, hasLength(4));
+          expect(r.optionIds.toSet(), hasLength(4));
+          expect(r.optionIds, contains(r.correctId));
+          expect(r.optionIds.every(eraIds.contains), isTrue);
+        }
+      }
+    });
+
+    test('puts the right era in every position over many rounds', () {
+      final positions = {
+        for (var seed = 1; seed <= 40; seed++)
+          for (final r in era(seed).rounds) r.optionIds.indexOf(r.correctId),
+      };
+      expect(positions, {0, 1, 2, 3});
+    });
+
+    test('ignores the era filter and the question mix: the answer would give the filter away', () {
+      final session = generator(plenty).generate(
+        config(mode: GameMode.generation, generationId: 3, questions: QuestionMix.artist),
+      );
+      expect(session.rounds.map((r) => eraOfTrack[r.trackId]).toSet().length, greaterThan(1));
+      expect(session.rounds.every((r) => r.kind == QuestionKind.era), isTrue);
+    });
+
+    test('never asks about a track that has no era', () {
+      final tracks = [
+        ...makeTracks({1: (3, 3), 2: (3, 3)}),
+        for (var i = 0; i < 6; i++) GameTrack(id: 100 + i, artistId: 900 + i),
+      ];
+      final session = generator(tracks).generate(config(mode: GameMode.generation, rounds: 6));
+      expect(session.rounds, hasLength(6));
+      expect(session.rounds.every((r) => r.trackId < 100), isTrue);
+    });
+
+    test('only asks about playable tracks, but any era can be an option', () {
+      final playable = {for (final t in plenty.where((t) => t.generationId == 2)) t.id};
+      final session = generator(plenty).generate(config(mode: GameMode.generation), playable: playable);
+      expect(session.rounds.every((r) => r.correctId == 2), isTrue);
+      expect(session.rounds.every((r) => r.optionIds.toSet().length == 4), isTrue);
+    });
+
+    test('fails when no playable track has an era', () {
+      final tracks = [for (var i = 1; i <= 6; i++) GameTrack(id: i, artistId: i)];
       expect(
-        () => generator(plenty).generate(config(mode: GameMode.generation)),
-        throwsArgumentError,
+        () => generator(tracks).generate(config(mode: GameMode.generation)),
+        throwsA(isA<RoundGenerationException>().having((e) => e.reason, 'reason', RoundGenerationReason.noTracksInEra)),
+      );
+    });
+
+    test('a rebuilt round (a swap) is an era round with fresh options', () {
+      final round = generator(plenty).roundFor(plenty.first, QuestionKind.era);
+      expect((round.kind, round.correctId), (QuestionKind.era, 1));
+      expect(round.optionIds, hasLength(4));
+    });
+
+    test('is the same session for the same seed', () {
+      expect(
+        [for (final r in era(9).rounds) '${r.trackId}:${r.optionIds}'],
+        [for (final r in era(9).rounds) '${r.trackId}:${r.optionIds}'],
       );
     });
   });

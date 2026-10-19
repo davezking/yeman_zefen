@@ -193,7 +193,11 @@ class ClipPrefetcher {
     final era = config.generationId;
     final eligible = [
       for (final id in _onDevice.keys)
-        if (!_taken.contains(id) && (era == 0 || _tracks[id]?.generationId == era)) id,
+        if (!_taken.contains(id) &&
+            (era == 0 || _tracks[id]?.generationId == era) &&
+            // An era question can only be about a track that has an era.
+            (planned.kind != QuestionKind.era || _tracks[id]?.generationId != null))
+          id,
     ]..sort(); // a stable order, so the shuffles below are all the randomness there is
     final unseen = [for (final id in eligible) if (!recentTrackIds.contains(id)) id]..shuffle(rng);
     final seen = [for (final id in eligible) if (recentTrackIds.contains(id)) id]..shuffle(rng);

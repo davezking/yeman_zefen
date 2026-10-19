@@ -167,13 +167,18 @@ final playableSongsProvider = FutureProvider.autoDispose
       return PlayableSongs(perEra: perEra, onDevice: onDevice);
     });
 
-/// The round engine's mode for a chosen mode. Era guessing is not offered yet, so it plays Intro.
+/// The round engine's mode for a chosen mode. Which Era? is the generation-guess mode.
 domain.GameMode domainMode(proto.GameMode mode) => switch (mode) {
   proto.GameMode.intro => domain.GameMode.intro,
   proto.GameMode.middle => domain.GameMode.middle,
-  proto.GameMode.era => domain.GameMode.intro,
+  proto.GameMode.era => domain.GameMode.generation,
 };
 
+/// What a session plays for the choices in [s].
+///
+/// Which Era? has no era filter (the answer would be the filter) and no question choice, so its
+/// sessions are for all eras: they count on the all-eras leaderboards, under generation 0
+/// (`docs/scoring.md`). Its clip is always 10 s of the intro, whatever the difficulty says.
 domain.SessionConfig sessionConfigFor(proto.PlaySettings s) =>
     domain.SessionConfig(
       mode: domainMode(s.mode),
@@ -182,10 +187,12 @@ domain.SessionConfig sessionConfigFor(proto.PlaySettings s) =>
         proto.Difficulty.medium => domain.Difficulty.medium,
         proto.Difficulty.hard => domain.Difficulty.hard,
       },
-      generationId: s.generationId,
-      questions: s.guess == proto.GuessTarget.artist
-          ? domain.QuestionMix.artist
-          : domain.QuestionMix.song,
+      generationId: s.mode == proto.GameMode.era ? proto.EraId.all : s.generationId,
+      questions: switch (s.guess) {
+        proto.GuessTarget.song => domain.QuestionMix.song,
+        proto.GuessTarget.artist => domain.QuestionMix.artist,
+        proto.GuessTarget.mixed => domain.QuestionMix.mixed,
+      },
     );
 
 /// Applies [change] to the saved Play choices.

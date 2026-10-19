@@ -59,7 +59,7 @@ A real session has 10 rounds. Two are shown.
 |---|---|
 | `id` | A UUID made once per session. It is the server's idempotency key, so a retried upload is not counted twice. |
 | `mode` | `intro` or `middle` (which clip played), or `generation` for the era-guess mode. |
-| `generationId` | The era the session was limited to, or `0` for all eras. |
+| `generationId` | The era the session was limited to, or `0` for all eras. Always `0` in `generation` mode, which has no era filter: its sessions count on the all-eras boards (`docs/scoring.md`). |
 | `difficulty` | `easy` = 10 s clip, `medium` = 5 s, `hard` = 3 s. |
 | `clientStartedAt`, `clientEndedAt` | Epoch milliseconds, UTC, from the device clock. |
 | `offline` | True when the device had no connection during the session. |

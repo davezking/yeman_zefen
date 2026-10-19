@@ -49,8 +49,8 @@ Boards are 840 × 900 and hold two 360 × 780 phones: English on the left, Amhar
 
 ## 02 · Mode select — `H04-ModeSelect`
 
-- **Layout**: hero with back button and `mode.title`. Body: three large option cards (52 icon tile, name, tag, description): Intro (no tag), Middle (`mode.middle.tag` "+25%"), Which Era? (`mode.bonus`). The selected card is dark. Then `mode.guess.label` with a two-item segmented control (`mode.guess.song`, `mode.guess.artist`; hidden for Which Era?). Primary `common.next`.
-- **Behavior**: Next opens Era setup. The last choice is remembered and becomes what Play starts.
+- **Layout**: hero with back button and `mode.title`. Body: three large option cards (52 icon tile, name, tag, description): Intro (no tag), Middle (`mode.middle.tag` "+25%"), Which Era? (`mode.bonus`). The selected card is dark. Then `mode.guess.label` with a three-item segmented control (`mode.guess.song`, `mode.guess.artist`, and Mixed, `startQuestionsMixed`: each round is a song or an artist question; hidden for Which Era?). Mixed was added in Phase 4 · Sprint 2 so every way to play in the PRD is offered; the Amharic for it is the one the first prototype used, not yet reviewed against the deck. Primary `common.next`.
+- **Behavior**: Next opens Era setup. The last choice is remembered and becomes what Play starts. Which Era? plays 10 s of the intro in a 15 s window whatever the setup says, for all eras (`docs/scoring.md`).
 
 ## 03 · Era, genre, difficulty — `H05-EraSetup`
 

@@ -11,8 +11,8 @@ export '../core/widgets/pack_card.dart' show PackStatus;
 /// The three ways to play (`docs/design/screens.md`, "Mode select").
 enum GameMode { intro, middle, era }
 
-/// What the player is asked to name in Intro and Middle: the song or the singer.
-enum GuessTarget { song, artist }
+/// What the player is asked to name in Intro and Middle: the song, the singer, or a mix of both.
+enum GuessTarget { song, artist, mixed }
 
 /// Clip length: 10, 5 or 3 seconds.
 enum Difficulty { easy, medium, hard }

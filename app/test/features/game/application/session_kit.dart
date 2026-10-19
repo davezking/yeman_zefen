@@ -136,7 +136,7 @@ class SessionKit {
 
   /// Tracks 1..[tracks] are in the catalog. Those in [onDevice] (default: all) have both clips on
   /// the device, as `pack` clips; the others can only be fetched.
-  static Future<SessionKit> create({int tracks = 30, Set<int>? onDevice, Duration? wrongFeedback}) async {
+  static Future<SessionKit> create({int tracks = 30, Set<int>? onDevice, Duration? wrongFeedback, bool eras = true}) async {
     final kit = SessionKit._();
     kit.downloader = KitDownloader(kit);
     kit.dir = Directory.systemTemp.createTempSync('session_kit');
@@ -149,7 +149,7 @@ class SessionKit {
       },
       interruptions: kit.interruptions.stream,
     );
-    await kit._seed(tracks, onDevice ?? {for (var i = 1; i <= tracks; i++) i});
+    await kit._seed(tracks, onDevice ?? {for (var i = 1; i <= tracks; i++) i}, eras: eras);
     kit.container = ProviderContainer(
       overrides: [
         appDbProvider.overrideWithValue(kit.db),
@@ -190,7 +190,7 @@ class SessionKit {
 
   static String clipUrl(int id, String kind) => 'https://cdn.test/clips/$id-$kind.mp3';
 
-  Future<void> _seed(int n, Set<int> onDevice) async {
+  Future<void> _seed(int n, Set<int> onDevice, {bool eras = true}) async {
     for (var id = 1; id <= n; id++) {
       final intro = clipBody(id, 'intro');
       final middle = clipBody(id, 'middle');
@@ -202,7 +202,7 @@ class SessionKit {
               artistAm: Value('ድምፃዊ ${artistOf(id)}'),
               artistLatin: Value('Artist ${artistOf(id)}'),
               artistId: artistOf(id),
-              generationId: Value(eraOf(id)),
+              generationId: Value(eras ? eraOf(id) : null),
               introUrl: Value(clipUrl(id, 'intro')),
               introSha256: Value(sha256.convert(intro).toString()),
               introBytes: Value(intro.length),

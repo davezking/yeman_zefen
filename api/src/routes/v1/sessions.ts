@@ -184,6 +184,8 @@ function scoreAgainstCatalog(p: Payload, catalog: CatalogRow[], now: number) {
 
   const flags = new Set<FlagReason>();
   const mode: GameMode = p.mode;
+  // Which Era? has no era filter, so its sessions are for all eras and count on the all-eras boards.
+  if (mode === "generation" && p.generationId !== 0) invalid("generationId: must be 0 in generation mode");
   const difficulty: Difficulty = p.difficulty;
   const window = windowMs(mode, difficulty);
 

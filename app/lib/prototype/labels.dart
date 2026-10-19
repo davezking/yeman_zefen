@@ -80,6 +80,7 @@ extension PrototypeLabels on AppLocalizations {
   String guessLabel(GuessTarget t) => switch (t) {
     GuessTarget.song => modeGuessSong,
     GuessTarget.artist => modeGuessArtist,
+    GuessTarget.mixed => startQuestionsMixed,
   };
 
   String questionText(QuestionKind kind) => switch (kind) {

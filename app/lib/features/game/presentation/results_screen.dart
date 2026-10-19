@@ -123,7 +123,12 @@ class _RoundRow extends StatelessWidget {
       subtitle: Text(
         round.chosenName == null
             ? l10n.feedbackTimeout
-            : (round.correct ? l10n.feedbackCorrect : l10n.resultsYouChose(l10n.nameOf(round.chosenName!, locale))),
+            : (round.correct
+                ? l10n.feedbackCorrect
+                // An era question's answer is an era, named in the UI language.
+                : l10n.resultsYouChose(
+                    round.chosenEraId != null ? l10n.eraLabel(round.chosenEraId!) : l10n.nameOf(round.chosenName!, locale),
+                  )),
       ),
       trailing: Text('${round.points}'),
     );

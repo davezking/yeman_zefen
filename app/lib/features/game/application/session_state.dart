@@ -115,14 +115,23 @@ class RoundSummary {
     required this.points,
     required this.valid,
     required this.responseMs,
+    this.correctEraId,
+    this.chosenEraId,
   });
 
   final int number;
   final QuestionKind kind;
+
+  /// The song or singer that was the answer. For an era question, the song that played.
   final DisplayName correctName;
 
   /// Null when the window ran out.
   final DisplayName? chosenName;
+
+  /// Era questions only: the era the song is from, and the era the player picked (null on a
+  /// time-out). The screen names an era in the UI language.
+  final int? correctEraId;
+  final int? chosenEraId;
   final bool correct;
   final int points;
   final bool valid;

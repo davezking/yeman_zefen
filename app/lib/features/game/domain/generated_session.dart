@@ -14,10 +14,11 @@ class GeneratedRound {
   final QuestionKind kind;
 
   /// The right answer: the track's id for a `song` question, its artist's id
-  /// for an `artist` question.
+  /// for an `artist` question, its era's id for an `era` question.
   final int correctId;
 
-  /// Four distinct ids in random order, including [correctId].
+  /// Four distinct ids in random order, including [correctId] (fewer only for an `era` question
+  /// when there are fewer than four eras).
   final List<int> optionIds;
 
   /// How many of the 3 distractors came from outside the track's own era.

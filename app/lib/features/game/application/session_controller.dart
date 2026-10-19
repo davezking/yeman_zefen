@@ -336,7 +336,8 @@ class SessionController extends Notifier<SessionState> {
 
     final total = generated.rounds.length;
     final windowMs = _scorer.windowMs(config.mode, config.difficulty);
-    final limitMs = config.difficulty.clipLengthMs;
+    // The generation-guess mode always plays 10 s of the intro, whatever the difficulty says.
+    final limitMs = config.mode == GameMode.generation ? Scorer.generationClipMs : config.difficulty.clipLengthMs;
 
     final played = <RoundSummary>[];
     var skipped = 0;
@@ -449,7 +450,15 @@ class SessionController extends Notifier<SessionState> {
 
     var round = planned;
     var path = '';
-    DisplayName nameOf(int id) => round.kind == QuestionKind.artist ? library.artistName(id) : library.trackName(id);
+    // An era option is an era id, which the screen names in the UI language: it has no catalog name.
+    DisplayName nameOf(int id) => switch (round.kind) {
+          QuestionKind.artist => library.artistName(id),
+          QuestionKind.era => const DisplayName(),
+          QuestionKind.song => library.trackName(id),
+        };
+    // What the results list names for a round: the song that played, for an era question too.
+    DisplayName correctNameOf() => round.kind == QuestionKind.era ? library.trackName(round.trackId) : nameOf(round.correctId);
+    int? eraOf(int? id) => round.kind == QuestionKind.era ? id : null;
     var options = <AnswerOption>[];
     var trackName = const DisplayName();
     var artistName = const DisplayName();
@@ -534,8 +543,9 @@ class SessionController extends Notifier<SessionState> {
       return _RoundResult(RoundSummary(
         number: index + 1,
         kind: round.kind,
-        correctName: nameOf(round.correctId),
+        correctName: correctNameOf(),
         chosenName: null,
+        correctEraId: eraOf(round.correctId),
         correct: false,
         points: 0,
         valid: true,
@@ -626,8 +636,10 @@ class SessionController extends Notifier<SessionState> {
           return _RoundResult(RoundSummary(
             number: index + 1,
             kind: round.kind,
-            correctName: nameOf(round.correctId),
+            correctName: correctNameOf(),
             chosenName: nameOf(optionId),
+            correctEraId: eraOf(round.correctId),
+            chosenEraId: eraOf(optionId),
             correct: correct,
             points: score.points,
             valid: score.valid,
@@ -683,6 +695,9 @@ class SessionController extends Notifier<SessionState> {
   }
 
   SessionError _explain(RoundGenerationException e, SessionConfig config) {
+    // The generation-guess mode has no era to pick: with no song that has an era to play, there
+    // are too few songs, whatever "era 0" would read as.
+    if (config.mode == GameMode.generation) return const SessionError(SessionProblem.tooFewSongs);
     return switch (e.reason) {
       RoundGenerationReason.tooFewTracks => const SessionError(SessionProblem.tooFewSongs),
       RoundGenerationReason.tooFewArtists => const SessionError(SessionProblem.tooFewArtists),

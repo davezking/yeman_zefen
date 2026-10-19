@@ -76,6 +76,9 @@ Each row is checked by a test. `Difficulty` is ignored in generation mode. `Vali
 | E15 | generation | - | yes | 3000 | no | 120 | 15000 | 48 | 168 | yes |
 | E16 | intro | hard | yes | 7000 | no | 200 | 8000 | 13 | 213 | yes |
 | E17 | middle | hard | yes | 1000 | yes | 250 | 8000 | 109 | 180 | yes |
+| E18 | generation | - | no | 3000 | no | 120 | 15000 | 0 | 0 | yes |
+| E19 | generation | - | yes | 200 | no | 120 | 15000 | 59 | 179 | yes |
+| E20 | generation | - | yes | 3000 | yes | 120 | 15000 | 48 | 84 | yes |
 
 What the rows show:
 
@@ -86,19 +89,35 @@ What the rows show:
 - **E8, E9, E17:** the hint halves the total. E8 is 143 → 71.5 → 72. E17 is 359 → 179.5 → 180.
 - **E10, E11:** the bonus is 0 at the window and stays 0 after it. The base is still earned (see the open item above).
 - **E12–E14:** under 200 ms is invalid and scores 0, right or wrong. 199 is invalid and 200 is valid.
-- **E15:** generation-guess mode.
+- **E15, E18–E20:** generation-guess mode (Which Era?): the base is 120 whatever the difficulty, the window is 15 s, a wrong era is 0 (E18), 200 ms is the first valid response (E19: 59.2 rounds to 59), and the hint halves the total (E20).
 
 ### A session
 
 A session's score is the sum of its rounds' points. Rounds E1, E4 and E8 played in an intro/easy session give
-143 + 0 + 72 = **215**. If a fourth round were E12, the total stays 215 and the session is flagged.
+143 + 0 + 72 = **215**. If a fourth round were E12, the total stays 215 and the session is flagged. A Which Era?
+session with rounds E15, E18 and E19 gives 168 + 0 + 179 = **347** (fixture S4).
+
+## Which Era? (generation-guess mode, FR-12)
+
+- Every round plays 10 s of the **intro** and asks which era the song is from. The question is `era`, in a session whose
+  mode is `generation`; no other mode asks it, and `generation` mode asks nothing else.
+- The options are **4 distinct era ids** that include the song's era (the seeded eras are 1 to 5). The app never asks
+  about a song that has no era. With fewer than four eras in all, every era would be an option, but the catalog has five
+  and the admin site cannot remove one, so the server requires exactly four.
+- It has **no era filter and no difficulty**: a filter would give the answer away. The app sends `generationId: 0` and
+  ignores the difficulty it stores; the server ignores the difficulty and rejects a `generation` session whose
+  `generationId` is not 0.
+- **Leaderboards:** because its `generationId` is 0, an era-mode session counts toward the **all-eras** boards, weekly
+  and all-time, under `generation 0`, like any all-eras session. It never counts toward an era board, so a player cannot
+  fill an era's board by guessing eras.
 
 ## What the server adds
 
 `POST /v1/sessions` (`api/src/routes/v1/sessions.ts`) scores each round with the rules above, after checking it against
 the catalog. A payload that cannot come from a real game is rejected with 422 `invalid_session` and nothing is stored:
 an unknown track or session era; a `song` round whose options include an unknown track or leave out the track; a chosen
-id that is not an option; an `era` question outside generation mode, or another kind inside it.
+id that is not an option; an `era` question outside generation mode, or another kind inside it; a `generation`-mode
+session with a session era (`generationId` other than 0).
 
 A session that breaks a sanity bound is stored (its plays still count for royalties) and **flagged**, which keeps it off
 every leaderboard. `flag_reason` lists why, comma-separated:
