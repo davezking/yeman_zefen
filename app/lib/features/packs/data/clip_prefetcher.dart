@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
-import 'package:path/path.dart' as p;
 
 import '../../game/data/game_library.dart';
 import '../../game/domain/game_track.dart';
@@ -10,7 +8,6 @@ import '../../game/domain/generated_session.dart';
 import '../../game/domain/round_generator.dart';
 import '../../game/domain/session_config.dart';
 import '../../../core/db/app_db.dart';
-import 'checksum.dart';
 import 'clip_downloader.dart';
 import 'clip_store.dart';
 
@@ -55,11 +52,11 @@ class ClipPrefetcher {
     required this.generator,
     required this.downloader,
     required this.store,
-    required this.base,
     required this.fileExists,
     required this.timer,
     required this.allowDownloads,
     required this.rng,
+    this.recentTrackIds = const {},
     this.lookahead = 6,
     this.waitLimit = const Duration(seconds: 10),
     this.maxDownloadAttempts = 2,
@@ -71,6 +68,7 @@ class ClipPrefetcher {
       if (path != null) _onDevice[t.id] = path;
       _tracks[t.id] = t;
     }
+    store.sessionStarted();
   }
 
   final GameLibrary library;
@@ -81,13 +79,16 @@ class ClipPrefetcher {
   final RoundGenerator generator;
   final ClipDownloader downloader;
   final ClipStore store;
-  final Directory base;
   final Future<bool> Function(String path) fileExists;
   final PrefetchTimer timer;
 
   /// Downloads are allowed: the phone is online and not on mobile data the player ruled out.
   final bool allowDownloads;
   final Random rng;
+
+  /// Tracks played in the last few sessions. A swap takes other tracks first, as the round
+  /// generator does, so the same few clips on the phone do not open every session.
+  final Set<int> recentTrackIds;
 
   /// How many rounds have their clip fetched: the one about to play and the next 5.
   final int lookahead;
@@ -168,12 +169,13 @@ class ClipPrefetcher {
   /// The clip was played: moves it to the back of the line for eviction.
   Future<void> markPlayed(int trackId) => store.touch(trackId, _kind);
 
-  /// Stops starting downloads, lets the ones running finish, then evicts `stream` clips down to
-  /// [capBytes], least recently played first.
+  /// Stops starting downloads, lets the ones running finish, then, once no other session is
+  /// running, evicts `stream` clips down to [capBytes], least recently played first. Call it once.
   Future<void> finish({required int capBytes}) async {
-    if (!_closed.isCompleted) _closed.complete();
+    if (_closed.isCompleted) return;
+    _closed.complete();
     await Future.wait(_downloads.values.toList());
-    await store.evict(capBytes);
+    await store.sessionEnded(capBytes: capBytes);
   }
 
   /// The track's clip path if the file is really there. A row whose file is gone is dropped, so
@@ -190,12 +192,13 @@ class ClipPrefetcher {
   Future<PreparedRound?> _swapIn(int index) async {
     final planned = _rounds[index];
     final era = config.generationId;
-    final candidates = [
+    final eligible = [
       for (final id in _onDevice.keys)
         if (!_taken.contains(id) && (era == 0 || _tracks[id]?.generationId == era)) id,
-    ]..sort(); // a stable order, so the shuffle below is all the randomness there is
-    candidates.shuffle(rng);
-    for (final id in candidates) {
+    ]..sort(); // a stable order, so the shuffles below are all the randomness there is
+    final unseen = [for (final id in eligible) if (!recentTrackIds.contains(id)) id]..shuffle(rng);
+    final seen = [for (final id in eligible) if (recentTrackIds.contains(id)) id]..shuffle(rng);
+    for (final id in [...unseen, ...seen]) {
       final path = await _verifiedPath(id);
       if (path == null) continue;
       final round = generator.roundFor(_tracks[id]!, planned.kind);
@@ -211,32 +214,17 @@ class ClipPrefetcher {
   Future<bool> _download(int trackId) async {
     final remote = library.remoteClip(trackId, config.mode);
     if (remote == null) return false;
-    final relative = ClipStore.streamPath(trackId, _kind);
-    final file = File(p.join(base.path, relative));
-    try {
-      for (var attempt = 0; attempt < maxDownloadAttempts; attempt++) {
-        // A leftover of an interrupted or mismatching download is never trusted.
-        if (await file.exists()) await file.delete();
-        await file.parent.create(recursive: true);
-        await downloader.download(url: remote.url, relativePath: relative, onProgress: (_) {});
-        if (await file.exists() && await fileHasSha256(file, remote.sha256)) {
-          await store.registerClip(
-            trackId: trackId,
-            kind: _kind,
-            path: relative,
-            bytes: remote.bytes,
-            source: ClipSource.stream,
-          );
-          _onDevice[trackId] = file.path;
-          return true;
-        }
-      }
-    } catch (_) {
-      // Offline, or the download gave up. The round is swapped or skipped, never failed.
-    }
-    try {
-      if (await file.exists()) await file.delete();
-    } catch (_) {}
-    return false;
+    final path = await store.fetchStreamClip(
+      trackId: trackId,
+      kind: _kind,
+      url: remote.url,
+      sha256: remote.sha256,
+      bytes: remote.bytes,
+      downloader: downloader,
+      maxAttempts: maxDownloadAttempts,
+    );
+    if (path == null) return false;
+    _onDevice[trackId] = path;
+    return true;
   }
 }

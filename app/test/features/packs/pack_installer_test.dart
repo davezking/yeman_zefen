@@ -113,6 +113,23 @@ void main() {
     expect(clips.map((c) => c.trackId).toSet(), {1, 2});
   });
 
+  test('a track the new version drops keeps its clip from another installed pack', () async {
+    // Both packs have tracks 1-3; golden-era is installed last, so the clip rows point at it.
+    final other = manifestJson(slug: 'other-pack', tracks: 3);
+    await installer.install(manifestOf(other), other, expectedSlug: 'other-pack', expectedVersion: 1);
+    await install(version: 1, tracks: 3);
+    expect((await db.select(db.clips).get()).every((c) => c.path.startsWith('packs/golden-era/')), isTrue);
+
+    await install(version: 2, tracks: 2); // drops track 3
+
+    final three = await (db.select(db.clips)..where((c) => c.trackId.equals(3))).get();
+    expect(three.map((c) => (c.kind, c.path, c.source)), unorderedEquals([
+      ('intro', 'packs/other-pack/v1/3-intro.mp3', ClipSource.pack),
+      ('middle', 'packs/other-pack/v1/3-middle.mp3', ClipSource.pack),
+    ]));
+    expect(fileExists('packs/other-pack/v1/3-intro.mp3'), isTrue);
+  });
+
   test('a failed install adds nothing to the catalog or the clip store', () async {
     downloader.failing.add(clipUrl(2, 'middle', 1));
     await expectLater(install(), throwsA(isA<PackInstallException>()));

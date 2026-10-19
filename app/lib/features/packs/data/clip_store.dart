@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/db/app_db.dart';
 import '../../game/domain/session_config.dart';
+import 'checksum.dart';
+import 'clip_downloader.dart';
 import 'pack_manifest.dart';
 
 /// The two clips every track has. Its name is the `kind` column and the file name part.
@@ -103,10 +107,11 @@ class ClipStore {
     });
   }
 
-  /// Records a verified clip file. With [replace] false a `starter` or `pack` row that is already
-  /// there stays (a bundled clip never downgrades a pack's), while a prefetched `stream` row is
-  /// replaced and its file removed, so the clip is not kept twice.
-  Future<void> registerClip({
+  /// Records a verified clip file and returns the row that is there now. With [replace] false a
+  /// `starter` or `pack` row that is already there stays (a bundled or prefetched clip never
+  /// downgrades a pack's), while a prefetched `stream` row is replaced and its file removed, so the
+  /// clip is not kept twice.
+  Future<Clip> registerClip({
     required int trackId,
     required ClipKind kind,
     required String path,
@@ -134,6 +139,84 @@ class ClipStore {
           ),
           mode: replace ? InsertMode.insertOrReplace : InsertMode.insertOrIgnore,
         );
+    return (db.select(db.clips)..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name))).getSingle();
+  }
+
+  /// Downloads of stream clips running now, shared by every session, so a session that starts
+  /// while an earlier one's download is still going waits for it instead of writing the same file.
+  final _inFlight = <(int, ClipKind), Future<String?>>{};
+
+  /// Downloads a clip into the stream cache, checks it against [sha256] and registers it. Returns
+  /// the absolute path of the clip now on the device, or null when the download failed or never
+  /// matched. If a `pack` or `starter` copy was registered meanwhile, that copy is kept and its path
+  /// returned. Never throws.
+  Future<String?> fetchStreamClip({
+    required int trackId,
+    required ClipKind kind,
+    required String url,
+    required String sha256,
+    required int bytes,
+    required ClipDownloader downloader,
+    int maxAttempts = 2,
+  }) {
+    final key = (trackId, kind);
+    final running = _inFlight[key];
+    if (running != null) return running;
+    final run = _fetch(trackId, kind, url, sha256, bytes, downloader, maxAttempts);
+    _inFlight[key] = run;
+    unawaited(run.whenComplete(() => _inFlight.remove(key)));
+    return run;
+  }
+
+  Future<String?> _fetch(
+    int trackId,
+    ClipKind kind,
+    String url,
+    String sha256,
+    int bytes,
+    ClipDownloader downloader,
+    int maxAttempts,
+  ) async {
+    File? file;
+    try {
+      final base = await supportDirectory();
+      final relative = streamPath(trackId, kind);
+      file = File(p.join(base.path, relative));
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        // A leftover of an interrupted or mismatching download is never trusted.
+        if (await file.exists()) await file.delete();
+        await file.parent.create(recursive: true);
+        await downloader.download(url: url, relativePath: relative, onProgress: (_) {});
+        if (await file.exists() && await fileHasSha256(file, sha256)) {
+          final row = await registerClip(
+            trackId: trackId,
+            kind: kind,
+            path: relative,
+            bytes: bytes,
+            source: ClipSource.stream,
+            replace: false,
+          );
+          if (row.path != relative) await _deleteFile(file);
+          return p.join(base.path, row.path);
+        }
+      }
+    } catch (_) {
+      // Offline, or the download gave up. The round is swapped or skipped, never failed.
+    }
+    if (file != null) await _deleteFile(file);
+    return null;
+  }
+
+  /// Sessions running now. The cache is trimmed only when none is, so a trim never removes a clip
+  /// a session counts on.
+  var _activeSessions = 0;
+
+  void sessionStarted() => _activeSessions++;
+
+  /// A session ended: once no other session runs, trims `stream` clips to [capBytes].
+  Future<void> sessionEnded({required int capBytes}) async {
+    _activeSessions = max(0, _activeSessions - 1);
+    if (_activeSessions == 0) await evict(capBytes);
   }
 
   /// Drops a clip row whose file turned out to be gone, so the clip counts as not on the device.
@@ -159,7 +242,8 @@ class ClipStore {
     final base = await supportDirectory();
     var freed = 0;
     for (final row in rows) {
-      if (total <= capBytes) break;
+      // A session started meanwhile: it may count on these clips, so the rest waits for its end.
+      if (total <= capBytes || _activeSessions > 0) break;
       await forget(row.trackId, ClipKind.values.byName(row.kind));
       await _deleteFile(File(p.join(base.path, row.path)));
       total -= row.bytes;

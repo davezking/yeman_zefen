@@ -2,10 +2,37 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
+import 'package:yeman_zefen/features/packs/data/clip_downloader.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/features/packs/data/clip_settings.dart';
 import 'package:yeman_zefen/features/packs/data/clip_store.dart';
+
+/// Writes [body] for any url, after [gate] completes when one is set.
+class _Downloader implements ClipDownloader {
+  _Downloader(this.base, this.body);
+  final Directory base;
+  final List<int> body;
+  Completer<void>? gate;
+  var calls = 0;
+
+  @override
+  Future<void> download({
+    required String url,
+    required String relativePath,
+    required void Function(double fraction) onProgress,
+  }) async {
+    calls++;
+    await gate?.future;
+    final file = File(p.join(base.path, relativePath));
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(body);
+  }
+}
 
 void main() {
   late Directory base;
@@ -137,5 +164,82 @@ void main() {
     expect(await settings.prefetchOnMobile(), isFalse);
     await settings.setPrefetchOnMobile(true);
     expect(await settings.prefetchOnMobile(), isTrue);
+  });
+
+  group('fetching a stream clip', () {
+    final body = utf8.encode('clip');
+    final sha = sha256.convert(body).toString();
+
+    Future<String?> fetch(_Downloader d) => store.fetchStreamClip(
+          trackId: 7,
+          kind: ClipKind.intro,
+          url: 'https://cdn.test/7-intro.mp3',
+          sha256: sha,
+          bytes: body.length,
+          downloader: d,
+        );
+
+    test('registers a checked download as a stream clip', () async {
+      final path = await fetch(_Downloader(base, body));
+
+      expect(path, p.join(base.path, ClipStore.streamPath(7, ClipKind.intro)));
+      expect(await ids(ClipSource.stream), {7});
+    });
+
+    test('never replaces a pack clip that was registered while it downloaded', () async {
+      final d = _Downloader(base, body)..gate = Completer<void>();
+      final pending = fetch(d);
+      await Future<void>.delayed(Duration.zero);
+      await add(7, ClipSource.pack, 100);
+      d.gate!.complete();
+
+      final path = await pending;
+
+      expect(path, p.join(base.path, 'packs/p/v1/7-intro.mp3'));
+      expect(await ids(ClipSource.pack), {7});
+      expect(await ids(ClipSource.stream), isEmpty);
+      expect(onDisk(7, ClipSource.stream), isFalse, reason: 'the extra copy is removed');
+    });
+
+    test('two sessions asking for the same clip share one download', () async {
+      final d = _Downloader(base, body)..gate = Completer<void>();
+      final first = fetch(d);
+      final second = fetch(d);
+      d.gate!.complete();
+
+      expect(await first, await second);
+      expect(d.calls, 1);
+    });
+
+    test('a download that never matches leaves nothing behind', () async {
+      final path = await fetch(_Downloader(base, utf8.encode('wrong')));
+
+      expect(path, isNull);
+      expect(await ids(ClipSource.stream), isEmpty);
+      expect(onDisk(7, ClipSource.stream), isFalse);
+    });
+  });
+
+  group('trimming around sessions', () {
+    test('waits until the last running session has ended', () async {
+      await add(1, ClipSource.stream, 100, at: 1);
+      store.sessionStarted();
+      store.sessionStarted();
+
+      await store.sessionEnded(capBytes: 0);
+      expect(await ids(ClipSource.stream), {1}, reason: 'another session is still running');
+
+      await store.sessionEnded(capBytes: 0);
+      expect(await ids(ClipSource.stream), isEmpty);
+    });
+
+    test('stops when a session starts while it runs', () async {
+      await add(1, ClipSource.stream, 100, at: 1);
+      await add(2, ClipSource.stream, 100, at: 2);
+      store.sessionStarted();
+
+      expect(await store.evict(0), 0);
+      expect(await ids(ClipSource.stream), {1, 2});
+    });
   });
 }

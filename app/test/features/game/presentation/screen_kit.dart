@@ -177,7 +177,7 @@ Future<Harness> pumpScreens(
           )),
       authStateProvider.overrideWith((ref) => Stream.value(auth)),
       ownNameProvider.overrideWith((ref) async => null),
-      currentNetworkProvider.overrideWith((ref) async => network),
+      currentNetworkProvider.overrideWith((ref) => Stream.value(network)),
       appDbProvider.overrideWith((ref) => db),
       installedPacksSummaryProvider.overrideWith((ref) => Stream.value(InstalledPacksSummary(count: installed.length, bytes: 0))),
       appVersionProvider.overrideWith((ref) async => '1.0.0'),

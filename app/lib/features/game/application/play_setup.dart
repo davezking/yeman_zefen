@@ -95,15 +95,18 @@ final playSetupProvider =
       PlaySetupNotifier.new,
     );
 
-/// What the phone is connected to now.
-final currentNetworkProvider = FutureProvider.autoDispose<NetworkKind>(
-  (ref) => ref.watch(networkKindProvider)(),
-);
+/// What the phone is connected to, updated when the connection changes.
+final currentNetworkProvider = StreamProvider.autoDispose<NetworkKind>((ref) async* {
+  final changes = ref.watch(networkChangesProvider)();
+  yield await ref.watch(networkKindProvider)();
+  yield* changes;
+});
 
 /// Whether clips can be fetched now: on Wi-Fi or another unmetered connection, or on mobile data
-/// when the player allows it.
+/// when the player allows it. Follows connection changes.
 final clipAccessProvider = FutureProvider.autoDispose<bool>((ref) async {
-  final network = await ref.watch(currentNetworkProvider.future);
+  final current = ref.watch(currentNetworkProvider);
+  final network = current.hasValue ? current.requireValue : await ref.watch(currentNetworkProvider.future);
   return switch (network) {
     NetworkKind.unmetered => true,
     NetworkKind.cellular => ref.watch(clipSettingsProvider).prefetchOnMobile(),
@@ -133,8 +136,16 @@ class PlayableSongs {
   bool get tooFew => countFor(proto.EraId.all) < minPlayableSongsPerEra;
 }
 
+/// Counted again whenever the catalog or the clips on the phone change, so a first launch shows
+/// the starter songs as soon as they are registered.
 final playableSongsProvider = FutureProvider.autoDispose
     .family<PlayableSongs, domain.GameMode>((ref, mode) async {
+      ref.watch(clipsChangedProvider);
+      try {
+        await ref.watch(starterReadyProvider.future);
+      } catch (_) {
+        // No starter pack: count what is there.
+      }
       final base = await ref.watch(supportDirectoryProvider.future);
       final library = await loadGameLibrary(ref.watch(appDbProvider), base);
       final fetchable = await ref.watch(clipAccessProvider.future);

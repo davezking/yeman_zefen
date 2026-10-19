@@ -136,6 +136,7 @@ class SessionController extends Notifier<SessionState> {
     } catch (e) {
       if (_alive(runId)) {
         unawaited(_stopPlayer());
+        _finishPrefetch();
         _set(SessionState(phase: SessionPhase.failed, config: config, error: SessionError(SessionProblem.unexpected, detail: '$e')));
       }
     }
@@ -302,11 +303,11 @@ class SessionController extends Notifier<SessionState> {
       generator: generator,
       downloader: ref.read(clipDownloaderProvider),
       store: ref.read(clipStoreProvider),
-      base: base,
       fileExists: env.fileExists,
       timer: env.timer,
       allowDownloads: allowDownloads,
       rng: env.rng(),
+      recentTrackIds: {for (final s in recent.take(RoundGenerator.historySessions)) ...s},
     );
     _prefetcher = prefetcher;
 
@@ -359,7 +360,7 @@ class SessionController extends Notifier<SessionState> {
       return;
     }
 
-    final offlineAtEnd = await _isOffline(env);
+    final offlineAtEnd = await _networkOf(env) == NetworkKind.none;
     check();
     final payload = recorder.finish(endedAtMs: env.epochMs(), offline: offlineAtStart || offlineAtEnd);
     final totalScore = played.fold<int>(0, (sum, r) => sum + r.points);
@@ -617,14 +618,6 @@ class SessionController extends Notifier<SessionState> {
       return await settings.prefetchOnMobile();
     } catch (_) {
       return true;
-    }
-  }
-
-  Future<bool> _isOffline(SessionEnvironment env) async {
-    try {
-      return await env.isOffline();
-    } catch (_) {
-      return false;
     }
   }
 

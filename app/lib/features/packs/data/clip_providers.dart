@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -54,6 +55,16 @@ final clearStreamCacheProvider = Provider<Future<void> Function()>((ref) {
 
 /// What the phone is connected to now.
 final networkKindProvider = Provider<Future<NetworkKind> Function()>((ref) => currentNetworkKind);
+
+/// What the phone is connected to, each time that changes.
+final networkChangesProvider = Provider<Stream<NetworkKind> Function()>((ref) => networkKindChanges);
+
+/// Fires whenever the catalog or the clips on the phone change: the starter clips registered, a
+/// download finished, a pack installed, the catalog refreshed, the cache trimmed.
+final clipsChangedProvider = StreamProvider.autoDispose<void>((ref) {
+  final db = ref.watch(appDbProvider);
+  return db.tableUpdates(TableUpdateQuery.onAllTables([db.clips, db.catalogTracks])).map((_) {});
+});
 
 /// Registers the starter clips, then keeps the catalog fresh: on start (when online) and every
 /// 12 hours while the app runs, and again when the app returns to the foreground after that long.

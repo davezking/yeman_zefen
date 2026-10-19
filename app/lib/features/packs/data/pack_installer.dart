@@ -244,6 +244,9 @@ class PackInstaller {
       });
       await _store.upsertCatalog(m.tracks);
       // Clips of the version being replaced, including tracks the new version dropped.
+      final previous = await (db.select(db.clips)
+            ..where((c) => c.source.equals(ClipSource.pack) & c.path.like('packs/${m.slug}/%')))
+          .get();
       await (db.delete(db.clips)
             ..where((c) => c.source.equals(ClipSource.pack) & c.path.like('packs/${m.slug}/%')))
           .go();
@@ -267,8 +270,37 @@ class PackInstaller {
           source: ClipSource.pack,
         );
       }
+      await _keepOtherPacksClips(m, {for (final c in previous) c.trackId}.difference(ids.toSet()));
       return replaced;
     });
+  }
+
+  /// A track this version dropped can still be in another installed pack. Its clip row pointed at
+  /// this pack's files and is gone, so it is pointed at the other pack's files instead.
+  Future<void> _keepOtherPacksClips(PackManifest m, Set<int> dropped) async {
+    if (dropped.isEmpty) return;
+    final others = await (db.select(db.localTracks)
+          ..where((t) => t.id.isIn(dropped) & t.packSlug.equals(m.slug).not()))
+        .get();
+    final catalog = {
+      for (final t in await (db.select(db.catalogTracks)..where((t) => t.id.isIn(dropped))).get()) t.id: t,
+    };
+    for (final row in others) {
+      for (final (kind, path, bytes) in [
+        (ClipKind.intro, row.introPath, catalog[row.id]?.introBytes),
+        (ClipKind.middle, row.middlePath, catalog[row.id]?.middleBytes),
+      ]) {
+        if (path == null) continue;
+        await _store.registerClip(
+          trackId: row.id,
+          kind: kind,
+          path: path,
+          bytes: bytes ?? 0,
+          source: ClipSource.pack,
+          replace: false,
+        );
+      }
+    }
   }
 
   void _emit(PackInstallProgress event) {

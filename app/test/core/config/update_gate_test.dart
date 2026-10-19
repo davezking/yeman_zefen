@@ -38,7 +38,7 @@ void main() {
             return db;
           }),
           authStateProvider.overrideWith((ref) => Stream.value(AuthState.signedOut)),
-          currentNetworkProvider.overrideWith((ref) async => NetworkKind.unmetered),
+          currentNetworkProvider.overrideWith((ref) => Stream.value(NetworkKind.unmetered)),
           installedPacksSummaryProvider.overrideWith((ref) => Stream.value(const InstalledPacksSummary(count: 0, bytes: 0))),
         ],
         child: const App(),

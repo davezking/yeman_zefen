@@ -118,6 +118,26 @@ void main() {
       expect(await savedTrackIds(), played, reason: 'the session lists what was played, swaps included');
     });
 
+    test('a swap takes tracks the last sessions did not play', () async {
+      kit = await SessionKit.create(onDevice: {for (var i = 1; i <= 20; i++) i});
+      kit.offline = false;
+      kit.downloader.hold = true;
+      // The last session played tracks 1-10.
+      await kit.db.into(kit.db.recentSessions).insert(
+            RecentSessionsCompanion.insert(
+              sessionId: 'earlier',
+              playedAt: 1,
+              trackIdsJson: jsonEncode([for (var i = 1; i <= 10; i++) i]),
+            ),
+          );
+
+      kit.start(easy);
+      final played = await playAndRecord();
+
+      expect(played, hasLength(10));
+      expect(played.every((id) => id > 10), isTrue, reason: 'no track from the last session came back');
+    });
+
     test('a swapped round gets options for the new track, with distinct artists for an artist question', () async {
       kit = await SessionKit.create(onDevice: {for (var i = 1; i <= 20; i++) i});
       kit.offline = false;
