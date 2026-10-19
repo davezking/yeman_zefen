@@ -10,7 +10,6 @@ import 'package:yeman_zefen/core/net/network_kind.dart';
 import 'package:yeman_zefen/features/game/application/play_setup.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 import 'package:yeman_zefen/features/packs/data/clip_providers.dart';
-import 'package:yeman_zefen/features/packs/data/clip_store.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
 
 void main() {
