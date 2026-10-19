@@ -9,6 +9,8 @@ class AppConfig {
   /// The OAuth web client id of the Firebase project, which Google Sign-In on Android needs to
   /// return an ID token. Empty: Google sign-in is not offered.
   static const googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  /// The privacy policy page, linked from Settings. Empty until the policy is published.
+  static const privacyUrl = String.fromEnvironment('PRIVACY_URL');
   /// Offer Sign in with Apple on Android too (it is always offered on iOS).
   static const appleOnAndroid = bool.fromEnvironment('APPLE_ON_ANDROID');
 

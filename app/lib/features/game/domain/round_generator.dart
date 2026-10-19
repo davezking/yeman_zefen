@@ -38,9 +38,14 @@ class RoundGenerator {
   /// [recentSessions] holds the track ids played in earlier sessions, newest
   /// first. Only the first [historySessions] count. Tracks outside them come
   /// first, but older ones are used when there are not enough.
+  ///
+  /// [playable] limits which tracks a round can be about; every track still supplies wrong
+  /// answers. Null means all of them. The catalog is the whole pool for distractors, so a
+  /// session can ask about a few clips that are on the device and still have four answers.
   GeneratedSession generate(
     SessionConfig config, {
     List<Iterable<int>> recentSessions = const [],
+    Set<int>? playable,
   }) {
     if (config.mode == GameMode.generation) {
       throw ArgumentError.value(config.mode, 'config.mode', 'generation mode has no round generator yet');
@@ -54,11 +59,13 @@ class RoundGenerator {
 
     final pool = [
       for (final t in _tracks)
-        if (config.generationId == 0 || t.generationId == config.generationId) t,
+        if ((config.generationId == 0 || t.generationId == config.generationId) &&
+            (playable == null || playable.contains(t.id)))
+          t,
     ];
     if (pool.isEmpty) {
       throw RoundGenerationException(
-        'no installed tracks in era ${config.generationId}',
+        'no playable tracks in era ${config.generationId}',
         RoundGenerationReason.noTracksInEra,
       );
     }
@@ -77,10 +84,15 @@ class RoundGenerator {
       config: config,
       rounds: [
         for (final track in chosen)
-          _buildRound(track, _kindFor(config.questions, canAskArtist)),
+          roundFor(track, _kindFor(config.questions, canAskArtist)),
       ],
     );
   }
+
+  /// A round about [track] with fresh options, by the same rules as [generate]: same-era wrong
+  /// answers first, and distinct artists for an artist question. The prefetcher uses this to put
+  /// another track in a round whose clip did not arrive in time.
+  GeneratedRound roundFor(GameTrack track, QuestionKind kind) => _buildRound(track, kind);
 
   /// Tracks not seen recently first, then the rest, each in random order.
   /// A track appears at most once.

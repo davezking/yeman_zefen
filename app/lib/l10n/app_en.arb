@@ -616,15 +616,15 @@
       }
     }
   },
-  "sessionErrorNoSongs": "There are no songs on this phone yet. Download a pack first.",
+  "sessionErrorNoSongs": "There are no songs to play yet. Connect to the internet and try again.",
   "@sessionErrorNoSongs": {
-    "description": "A game cannot start because no songs are installed"
+    "description": "A game cannot start because no songs are on the phone and none can be fetched"
   },
-  "sessionErrorTooFewSongs": "There aren't enough songs to make a round. Download another pack.",
+  "sessionErrorTooFewSongs": "There aren't enough songs to make a round. Connect to the internet and try again.",
   "@sessionErrorTooFewSongs": {
     "description": "A game cannot start: too few songs"
   },
-  "sessionErrorTooFewArtists": "There aren't enough different artists for artist questions. Choose Song questions or download another pack.",
+  "sessionErrorTooFewArtists": "There aren't enough different artists for artist questions. Choose Song questions or connect to the internet.",
   "@sessionErrorTooFewArtists": {
     "description": "A game cannot start: too few different artists for artist questions"
   },
@@ -637,7 +637,7 @@
       }
     }
   },
-  "sessionErrorClipsFailed": "None of the {count} clips could be played. Download the pack again and try once more.",
+  "sessionErrorClipsFailed": "None of the {count} clips could be played. Check your connection and try once more.",
   "@sessionErrorClipsFailed": {
     "description": "A game ended because no clip would play",
     "placeholders": {

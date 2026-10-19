@@ -921,15 +921,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionErrorNoSongs =>
-      'There are no songs on this phone yet. Download a pack first.';
+      'There are no songs to play yet. Connect to the internet and try again.';
 
   @override
   String get sessionErrorTooFewSongs =>
-      'There aren\'t enough songs to make a round. Download another pack.';
+      'There aren\'t enough songs to make a round. Connect to the internet and try again.';
 
   @override
   String get sessionErrorTooFewArtists =>
-      'There aren\'t enough different artists for artist questions. Choose Song questions or download another pack.';
+      'There aren\'t enough different artists for artist questions. Choose Song questions or connect to the internet.';
 
   @override
   String sessionErrorNoSongsInEra(String era) {
@@ -938,7 +938,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String sessionErrorClipsFailed(int count) {
-    return 'None of the $count clips could be played. Download the pack again and try once more.';
+    return 'None of the $count clips could be played. Check your connection and try once more.';
   }
 
   @override

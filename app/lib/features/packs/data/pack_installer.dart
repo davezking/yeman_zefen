@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/db/app_db.dart';
 import '../domain/pack_install_progress.dart';
+import 'checksum.dart';
 import 'clip_downloader.dart';
+import 'clip_store.dart';
 import 'pack_manifest.dart';
 
 class PackInstallException implements Exception {
@@ -33,7 +34,8 @@ class PackInstaller {
     this.maxParallelDownloads = 4,
     this.maxDownloadAttempts = 3,
     Future<void> Function(Directory dir)? deleteDirectory,
-  }) : _deleteDirectory = deleteDirectory ?? _deleteRecursively;
+  })  : _deleteDirectory = deleteDirectory ?? _deleteRecursively,
+        _store = ClipStore(db: db, supportDirectory: supportDirectory);
 
   final AppDb db;
   final ClipDownloader downloader;
@@ -43,6 +45,8 @@ class PackInstaller {
 
   /// Downloads per file, including the first. 3 means one try and two re-fetches.
   final int maxDownloadAttempts;
+
+  final ClipStore _store;
 
   /// Removes an old version's folder. Replaceable so a test can make it fail.
   final Future<void> Function(Directory dir) _deleteDirectory;
@@ -136,6 +140,7 @@ class PackInstaller {
     _emit(tracker.snapshot(PackInstallState.queued));
     final Directory base;
     final int? previousVersion;
+    List<Clip> replacedStream = const [];
     try {
       base = await supportDirectory();
       previousVersion = await installedVersion(slug);
@@ -143,7 +148,7 @@ class PackInstaller {
       await _forEachLimited(files, maxParallelDownloads, (file) {
         return _fetchVerified(base, file, tracker);
       });
-      await _register(manifest, manifestJson, paths);
+      replacedStream = await _register(manifest, manifestJson, paths);
     } catch (e) {
       final message = e is PackInstallException ? e.message : '$e';
       _emit(tracker.snapshot(PackInstallState.failed, error: message));
@@ -158,6 +163,14 @@ class PackInstaller {
         await _deleteDirectory(Directory(p.join(base.path, 'packs', slug, 'v$previousVersion')));
       } catch (_) {}
     }
+    // The pack's own files now stand in for prefetched copies of the same clips, which only
+    // take space (and are outside the cache cap once their rows are gone).
+    for (final clip in replacedStream) {
+      try {
+        final file = File(p.join(base.path, clip.path));
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
     _emit(tracker.snapshot(PackInstallState.installed));
   }
 
@@ -170,7 +183,7 @@ class PackInstaller {
     while (true) {
       if (await target.exists()) {
         tracker.verifying(file.relativePath);
-        if (await _matches(target, file.clip.sha256)) {
+        if (await fileHasSha256(target, file.clip.sha256)) {
           tracker.fileDone(file.relativePath, file.clip.bytes);
           return;
         }
@@ -196,8 +209,10 @@ class PackInstaller {
   }
 
   /// Registers the pack in one transaction. The previous row and its tracks are
-  /// replaced only here, so a failure above leaves them untouched.
-  Future<void> _register(PackManifest m, String manifestJson, _TrackPaths paths) {
+  /// replaced only here, so a failure above leaves them untouched. The tracks also go into the
+  /// catalog, and each clip becomes a `pack` clip (replacing a prefetched `stream` copy, which is
+  /// returned so its file can be removed).
+  Future<List<Clip>> _register(PackManifest m, String manifestJson, _TrackPaths paths) {
     return db.transaction(() async {
       await (db.delete(db.localTracks)..where((t) => t.packSlug.equals(m.slug))).go();
       await db.into(db.installedPacks).insertOnConflictUpdate(
@@ -227,17 +242,70 @@ class PackInstaller {
             ),
         ]);
       });
+      await _store.upsertCatalog(m.tracks);
+      // Clips of the version being replaced, including tracks the new version dropped.
+      final previous = await (db.select(db.clips)
+            ..where((c) => c.source.equals(ClipSource.pack) & c.path.like('packs/${m.slug}/%')))
+          .get();
+      await (db.delete(db.clips)
+            ..where((c) => c.source.equals(ClipSource.pack) & c.path.like('packs/${m.slug}/%')))
+          .go();
+      final ids = [for (final t in m.tracks) t.id];
+      final replaced = await (db.select(db.clips)
+            ..where((c) => c.trackId.isIn(ids) & c.source.equals(ClipSource.stream)))
+          .get();
+      for (final t in m.tracks) {
+        await _store.registerClip(
+          trackId: t.id,
+          kind: ClipKind.intro,
+          path: paths.intro(t.id),
+          bytes: t.intro.bytes,
+          source: ClipSource.pack,
+        );
+        await _store.registerClip(
+          trackId: t.id,
+          kind: ClipKind.middle,
+          path: paths.middle(t.id),
+          bytes: t.middle.bytes,
+          source: ClipSource.pack,
+        );
+      }
+      await _keepOtherPacksClips(m, {for (final c in previous) c.trackId}.difference(ids.toSet()));
+      return replaced;
     });
+  }
+
+  /// A track this version dropped can still be in another installed pack. Its clip row pointed at
+  /// this pack's files and is gone, so it is pointed at the other pack's files instead.
+  Future<void> _keepOtherPacksClips(PackManifest m, Set<int> dropped) async {
+    if (dropped.isEmpty) return;
+    final others = await (db.select(db.localTracks)
+          ..where((t) => t.id.isIn(dropped) & t.packSlug.equals(m.slug).not()))
+        .get();
+    final catalog = {
+      for (final t in await (db.select(db.catalogTracks)..where((t) => t.id.isIn(dropped))).get()) t.id: t,
+    };
+    for (final row in others) {
+      for (final (kind, path, bytes) in [
+        (ClipKind.intro, row.introPath, catalog[row.id]?.introBytes),
+        (ClipKind.middle, row.middlePath, catalog[row.id]?.middleBytes),
+      ]) {
+        if (path == null) continue;
+        await _store.registerClip(
+          trackId: row.id,
+          kind: kind,
+          path: path,
+          bytes: bytes ?? 0,
+          source: ClipSource.pack,
+          replace: false,
+        );
+      }
+    }
   }
 
   void _emit(PackInstallProgress event) {
     _latest[event.slug] = event;
     if (!_controller.isClosed) _controller.add(event);
-  }
-
-  static Future<bool> _matches(File file, String expectedSha256) async {
-    final digest = await sha256.bind(file.openRead()).first;
-    return digest.toString() == expectedSha256;
   }
 
   /// Runs [action] over [items] with at most [limit] running at once. Once one

@@ -1,62 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/l10n/locale_provider.dart';
+import 'package:yeman_zefen/features/game/domain/session_config.dart';
+import 'package:yeman_zefen/l10n/app_localizations.dart';
 
 import 'screen_kit.dart';
 
 void main() {
-  group('the language toggle on Home', () {
+  group('the language choice in Settings', () {
     testWidgets('follows an Amharic device', (tester) async {
-      await pumpScreens(tester, device: const Locale('am', 'ET'));
-      expect(find.text('ጀምር'), findsOneWidget);
+      await pumpScreens(tester, location: '/settings', device: const Locale('am', 'ET'));
+      expect(find.text(lookupAppLocalizations(amharic).settingsTitle), findsOneWidget);
     });
 
     testWidgets('switches the screen it is on, at once', (tester) async {
-      final h = await pumpScreens(tester);
-      expect(find.text('Play'), findsOneWidget);
-      expect(find.text('Listen to the clip and pick the song.'), findsOneWidget);
+      final h = await pumpScreens(tester, location: '/settings');
+      expect(find.text('Settings'), findsOneWidget);
 
       await tester.tap(find.text('አማርኛ'));
       await tester.pump();
 
-      expect(find.text('ጀምር'), findsOneWidget);
-      expect(find.text('Play'), findsNothing);
-      expect(find.text('Listen to the clip and pick the song.'), findsNothing);
+      expect(find.text(lookupAppLocalizations(amharic).settingsTitle), findsOneWidget);
+      expect(find.text('Settings'), findsNothing);
       expect(h.container.read(localeProvider), amharic);
 
       await tester.tap(find.text('English'));
       await tester.pump();
-      expect(find.text('Play'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
       expect(h.container.read(localeProvider), english);
     });
 
     testWidgets('keeps the language while moving between screens', (tester) async {
-      final h = await pumpScreens(tester);
+      final h = await pumpScreens(tester, location: '/settings');
       await tester.tap(find.text('አማርኛ'));
       await tester.pump();
 
-      h.router.go('/start');
+      h.router.go('/setup');
       await tester.pumpAndSettle();
-      expect(find.text('አዲስ ጨዋታ'), findsOneWidget);
-      expect(find.text('New game'), findsNothing);
+      expect(find.text('ይጀምሩ · 10 ዙሮች'), findsOneWidget);
+      expect(find.text('Start · 10 rounds'), findsNothing);
     });
   });
 
   group('a screen already open', () {
     testWidgets('the setup screen changes language without losing the picked options', (tester) async {
-      final h = await pumpScreens(tester, location: '/start');
-      await tester.tap(find.text('Middle'));
-      await tester.pump();
-      expect(find.text('New game'), findsOneWidget);
+      final h = await pumpScreens(tester, location: '/setup');
+      expect(find.text('Start · 10 rounds'), findsOneWidget);
 
       await h.container.read(localeChoiceProvider.notifier).choose(amharic);
       await tester.pumpAndSettle();
 
-      expect(find.text('አዲስ ጨዋታ'), findsOneWidget);
-      expect(find.text('New game'), findsNothing);
+      expect(find.text('ይጀምሩ · 10 ዙሮች'), findsOneWidget);
+      expect(find.text('Start · 10 rounds'), findsNothing);
       await tester.tap(find.text('ይጀምሩ · 10 ዙሮች'));
       await tester.pumpAndSettle();
-      expect(h.session.startedWith!.mode.name, 'middle', reason: 'the picked mode survives the switch');
+      expect(h.session.startedWith!.mode, GameMode.intro, reason: 'the saved choices survive the switch');
     });
 
     testWidgets('a round shows its songs in the new script and the new words', (tester) async {

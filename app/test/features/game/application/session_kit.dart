@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,10 +12,13 @@ import 'package:path/path.dart' as p;
 import 'package:yeman_zefen/core/audio/audio_providers.dart';
 import 'package:yeman_zefen/core/audio/clip_player.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/core/net/network_kind.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_environment.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
+import 'package:yeman_zefen/features/packs/data/clip_downloader.dart';
+import 'package:yeman_zefen/features/packs/data/clip_providers.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
 
 import '../../../core/audio/fake_clip_voice.dart';
@@ -41,6 +47,59 @@ class FakeTimer implements Timer {
   }
 }
 
+/// Serves the kit's clips. Each download can be held until a test lets it go, or made to fail.
+class KitDownloader implements ClipDownloader {
+  KitDownloader(this.kit);
+
+  final SessionKit kit;
+
+  /// Every url asked for, in order.
+  final calls = <String>[];
+
+  /// Urls whose download fails.
+  final failing = <String>{};
+
+  /// Urls that are served with the wrong bytes, like a damaged transfer.
+  final corrupt = <String>{};
+
+  /// Downloads wait for [release] when set. Tests release them one by one or all at once.
+  bool hold = false;
+  final _held = <Completer<void>>[];
+
+  void release() {
+    for (final c in _held) {
+      if (!c.isCompleted) c.complete();
+    }
+    _held.clear();
+    hold = false;
+  }
+
+  @override
+  Future<void> download({
+    required String url,
+    required String relativePath,
+    required void Function(double fraction) onProgress,
+  }) async {
+    calls.add(url);
+    if (hold) {
+      final gate = Completer<void>();
+      _held.add(gate);
+      await gate.future;
+    } else {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    if (failing.contains(url)) throw const ClipDownloadException('connection lost');
+    final id = int.parse(url.split('/').last.split('-').first);
+    final kind = url.contains('-middle') ? 'middle' : 'intro';
+    final file = File(p.join(kit.dir.path, relativePath));
+    await file.parent.create(recursive: true);
+    final body = SessionKit.clipBody(id, kind);
+    await file.writeAsBytes(corrupt.contains(url) ? [...body, 0] : body);
+    kit.existing.add(file.path);
+    onProgress(1);
+  }
+}
+
 /// A session flow with nothing real in it: a manual clock and timers, fake audio
 /// voices, a real in-memory database and a temp folder for clip files.
 class SessionKit {
@@ -65,8 +124,16 @@ class SessionKit {
 
   static const feedback = Duration(seconds: 1);
 
-  static Future<SessionKit> create({int tracks = 30}) async {
+  late final KitDownloader downloader;
+
+  /// What the phone is connected to. Null follows [offline].
+  NetworkKind? network;
+
+  /// Tracks 1..[tracks] are in the catalog. Those in [onDevice] (default: all) have both clips on
+  /// the device, as `pack` clips; the others can only be fetched.
+  static Future<SessionKit> create({int tracks = 30, Set<int>? onDevice}) async {
     final kit = SessionKit._();
+    kit.downloader = KitDownloader(kit);
     kit.dir = Directory.systemTemp.createTempSync('session_kit');
     kit.db = AppDb(NativeDatabase.memory());
     kit.player = ClipPlayer(
@@ -77,12 +144,14 @@ class SessionKit {
       },
       interruptions: kit.interruptions.stream,
     );
-    await kit._seed(tracks);
+    await kit._seed(tracks, onDevice ?? {for (var i = 1; i <= tracks; i++) i});
     kit.container = ProviderContainer(
       overrides: [
         appDbProvider.overrideWithValue(kit.db),
         supportDirectoryProvider.overrideWith((ref) async => kit.dir),
         clipPlayerProvider.overrideWithValue(kit.player),
+        clipDownloaderProvider.overrideWithValue(kit.downloader),
+        starterReadyProvider.overrideWith((ref) async {}),
         sessionEnvironmentProvider.overrideWithValue(
           SessionEnvironment(
             monotonicMs: () => kit.clockMs,
@@ -95,6 +164,7 @@ class SessionKit {
             fileExists: (path) async => kit.existing.contains(path),
             newId: () => 'session-${++kit.idCounter}',
             isOffline: () async => kit.offline,
+            networkProbe: () async => kit.network ?? (kit.offline ? NetworkKind.none : NetworkKind.unmetered),
             rng: () => Random(kit.seed),
             feedbackDuration: feedback,
           ),
@@ -110,25 +180,46 @@ class SessionKit {
   static String introRel(int id) => 'packs/t/v1/$id-intro.mp3';
   static String middleRel(int id) => 'packs/t/v1/$id-middle.mp3';
 
-  Future<void> _seed(int n) async {
+  static List<int> clipBody(int id, String kind) => utf8.encode('clip:$id:$kind');
+
+  static String clipUrl(int id, String kind) => 'https://cdn.test/clips/$id-$kind.mp3';
+
+  Future<void> _seed(int n, Set<int> onDevice) async {
     for (var id = 1; id <= n; id++) {
-      await db.into(db.localTracks).insert(
-            LocalTracksCompanion.insert(
-              packSlug: 't',
-              id: id,
+      final intro = clipBody(id, 'intro');
+      final middle = clipBody(id, 'middle');
+      await db.into(db.catalogTracks).insert(
+            CatalogTracksCompanion.insert(
+              id: Value(id),
               titleAm: Value('ዘፈን $id'),
               titleLatin: Value('Song $id'),
               artistAm: Value('ድምፃዊ ${artistOf(id)}'),
               artistLatin: Value('Artist ${artistOf(id)}'),
-              artistId: Value(artistOf(id)),
+              artistId: artistOf(id),
               generationId: Value(eraOf(id)),
-              introPath: Value(introRel(id)),
-              middlePath: Value(middleRel(id)),
+              introUrl: Value(clipUrl(id, 'intro')),
+              introSha256: Value(sha256.convert(intro).toString()),
+              introBytes: Value(intro.length),
+              middleUrl: Value(clipUrl(id, 'middle')),
+              middleSha256: Value(sha256.convert(middle).toString()),
+              middleBytes: Value(middle.length),
+              updatedAt: 1,
             ),
           );
-      existing
-        ..add(p.join(dir.path, introRel(id)))
-        ..add(p.join(dir.path, middleRel(id)));
+      if (!onDevice.contains(id)) continue;
+      for (final (kind, rel) in [('intro', introRel(id)), ('middle', middleRel(id))]) {
+        await db.into(db.clips).insert(
+              ClipsCompanion.insert(
+                trackId: id,
+                kind: kind,
+                path: rel,
+                bytes: 100,
+                source: ClipSource.pack,
+                lastPlayedAt: 1,
+              ),
+            );
+        existing.add(p.join(dir.path, rel));
+      }
     }
   }
 

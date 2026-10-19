@@ -11,6 +11,7 @@ import 'core/l10n/locale_provider.dart';
 import 'core/config/remote_config.dart';
 import 'core/profile/profile_sync.dart';
 import 'features/game/application/session_sync_providers.dart';
+import 'features/packs/data/clip_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,5 +33,7 @@ Future<void> main() async {
   container.read(remoteConfigStarterProvider);
   // Uploads finished sessions: on start, once signed in, when back online, after each session, on resume.
   container.read(sessionSyncStarterProvider);
+  // Registers the bundled starter clips, then keeps the catalog fresh: on start and every 12 hours.
+  container.read(catalogStarterProvider);
   runApp(UncontrolledProviderScope(container: container, child: const App()));
 }

@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/net/network_kind.dart';
+
 typedef TimerFactory = Timer Function(Duration duration, void Function() callback);
 
 /// Everything the session flow takes from the outside: clocks, timers, the file
@@ -19,6 +21,7 @@ class SessionEnvironment {
     required this.newId,
     required this.isOffline,
     required this.rng,
+    this.networkProbe,
     this.feedbackDuration = const Duration(seconds: 1),
   });
 
@@ -35,6 +38,7 @@ class SessionEnvironment {
         return results.every((r) => r == ConnectivityResult.none);
       },
       rng: Random.new,
+      networkProbe: currentNetworkKind,
     );
   }
 
@@ -50,6 +54,15 @@ class SessionEnvironment {
   final String Function() newId;
   final Future<bool> Function() isOffline;
   final Random Function() rng;
+  final Future<NetworkKind> Function()? networkProbe;
+
+  /// What the phone is connected to. Without a probe of its own, it follows [isOffline]: online
+  /// means an unmetered connection.
+  Future<NetworkKind> network() async {
+    final probe = networkProbe;
+    if (probe != null) return probe();
+    return await isOffline() ? NetworkKind.none : NetworkKind.unmetered;
+  }
 
   /// How long the right or wrong result stays on screen before the next round.
   final Duration feedbackDuration;

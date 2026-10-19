@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../labels.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/labels.dart';
+import '../../../prototype/models.dart';
 
 /// Home: the greeting, the best score and what Play will start, three ways to
 /// play, and the Leaderboard entry (`docs/design/screens.md`, "Home").
@@ -26,7 +26,11 @@ class HomeScreen extends StatelessWidget {
     this.offline = false,
     this.hasDownloadedPacks = false,
     this.builtInSongCount = 0,
+    this.modes = GameMode.values,
   });
+
+  /// The modes offered as rows. The app offers only the modes its round engine can play.
+  final List<GameMode> modes;
 
   final UserInfo user;
 
@@ -126,7 +130,7 @@ class HomeScreen extends StatelessWidget {
               style: AppTextStyles.withWeight(text.body, FontWeight.w800),
             ),
           ),
-          for (final mode in GameMode.values)
+          for (final mode in modes)
             ListRow(
               title: l10n.modeName(mode),
               subtitle: l10n.modeHomeShort(mode),

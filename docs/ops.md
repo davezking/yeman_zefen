@@ -462,3 +462,19 @@ Setup before these work on a device:
 - **Google on iOS:** add the `REVERSED_CLIENT_ID` URL scheme from `GoogleService-Info.plist` to `ios/Runner/Info.plist`.
 - **Apple:** turn on the *Sign in with Apple* capability for the iOS app in Xcode and the Apple Developer portal. Apple is offered on iOS only. Set `APPLE_ON_ANDROID` to `true` to offer it on Android, which also needs a Services ID and return URL.
 - Merges are logged as `guest_merged` with both uids. Rejected guest tokens are logged as `merge_token_rejected`.
+
+## Starter clips (play-first delivery)
+
+The app bundles a small `starter` pack so a first launch plays with no network (see "Play-first delivery" in `docs/architecture.md` §3). The pack is built in the admin site like any other (about 25 tracks, spread across eras, about 8 MB) and copied into the app's assets:
+
+```
+cd app
+dart run tool/fetch_starter_pack.dart --api-base https://<api host>   # prod or dev Worker
+```
+
+- It reads `GET /v1/packs`, takes the pack with slug `starter`, checks every clip's SHA-256 and only then replaces `app/assets/starter/` (`manifest.json` and `clips/{trackId}-{intro|middle}.mp3`). A failure leaves the folder as it was.
+- **Under 10 MB in total: commit the files.** The tool says which case you are in. **Over 10 MB: do not commit them.** Run the tool in CI before `flutter build` (add a step with the flavor's API base) and keep the folder out of git.
+- The folder is registered in `app/pubspec.yaml`. An app built with no `manifest.json` still starts; it just has no bundled clips, so a first launch with no network cannot play.
+- On first start, and after an update that changes the starter manifest (pack version or publish time), the app copies each clip once into `starter/` in its support directory (`just_audio` is handed file paths) and records it as a `starter` clip. Starter clips are never evicted.
+- **Republish the starter pack only when a new app build should pick it up.** Old app versions keep their bundled copy.
+- `app/assets/starter/` has no clips until a `starter` pack is published and the tool has been run. Do that before the first release build.

@@ -3242,6 +3242,1297 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $CatalogTracksTable extends CatalogTracks
+    with TableInfo<$CatalogTracksTable, CatalogTrack> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CatalogTracksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleAmMeta = const VerificationMeta(
+    'titleAm',
+  );
+  @override
+  late final GeneratedColumn<String> titleAm = GeneratedColumn<String>(
+    'title_am',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleLatinMeta = const VerificationMeta(
+    'titleLatin',
+  );
+  @override
+  late final GeneratedColumn<String> titleLatin = GeneratedColumn<String>(
+    'title_latin',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _artistIdMeta = const VerificationMeta(
+    'artistId',
+  );
+  @override
+  late final GeneratedColumn<int> artistId = GeneratedColumn<int>(
+    'artist_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _artistAmMeta = const VerificationMeta(
+    'artistAm',
+  );
+  @override
+  late final GeneratedColumn<String> artistAm = GeneratedColumn<String>(
+    'artist_am',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _artistLatinMeta = const VerificationMeta(
+    'artistLatin',
+  );
+  @override
+  late final GeneratedColumn<String> artistLatin = GeneratedColumn<String>(
+    'artist_latin',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _generationIdMeta = const VerificationMeta(
+    'generationId',
+  );
+  @override
+  late final GeneratedColumn<int> generationId = GeneratedColumn<int>(
+    'generation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _releaseYearMeta = const VerificationMeta(
+    'releaseYear',
+  );
+  @override
+  late final GeneratedColumn<int> releaseYear = GeneratedColumn<int>(
+    'release_year',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _introUrlMeta = const VerificationMeta(
+    'introUrl',
+  );
+  @override
+  late final GeneratedColumn<String> introUrl = GeneratedColumn<String>(
+    'intro_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _introSha256Meta = const VerificationMeta(
+    'introSha256',
+  );
+  @override
+  late final GeneratedColumn<String> introSha256 = GeneratedColumn<String>(
+    'intro_sha256',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _introBytesMeta = const VerificationMeta(
+    'introBytes',
+  );
+  @override
+  late final GeneratedColumn<int> introBytes = GeneratedColumn<int>(
+    'intro_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _middleUrlMeta = const VerificationMeta(
+    'middleUrl',
+  );
+  @override
+  late final GeneratedColumn<String> middleUrl = GeneratedColumn<String>(
+    'middle_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _middleSha256Meta = const VerificationMeta(
+    'middleSha256',
+  );
+  @override
+  late final GeneratedColumn<String> middleSha256 = GeneratedColumn<String>(
+    'middle_sha256',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _middleBytesMeta = const VerificationMeta(
+    'middleBytes',
+  );
+  @override
+  late final GeneratedColumn<int> middleBytes = GeneratedColumn<int>(
+    'middle_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    titleAm,
+    titleLatin,
+    artistId,
+    artistAm,
+    artistLatin,
+    generationId,
+    releaseYear,
+    introUrl,
+    introSha256,
+    introBytes,
+    middleUrl,
+    middleSha256,
+    middleBytes,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'catalog_tracks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CatalogTrack> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('title_am')) {
+      context.handle(
+        _titleAmMeta,
+        titleAm.isAcceptableOrUnknown(data['title_am']!, _titleAmMeta),
+      );
+    }
+    if (data.containsKey('title_latin')) {
+      context.handle(
+        _titleLatinMeta,
+        titleLatin.isAcceptableOrUnknown(data['title_latin']!, _titleLatinMeta),
+      );
+    }
+    if (data.containsKey('artist_id')) {
+      context.handle(
+        _artistIdMeta,
+        artistId.isAcceptableOrUnknown(data['artist_id']!, _artistIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_artistIdMeta);
+    }
+    if (data.containsKey('artist_am')) {
+      context.handle(
+        _artistAmMeta,
+        artistAm.isAcceptableOrUnknown(data['artist_am']!, _artistAmMeta),
+      );
+    }
+    if (data.containsKey('artist_latin')) {
+      context.handle(
+        _artistLatinMeta,
+        artistLatin.isAcceptableOrUnknown(
+          data['artist_latin']!,
+          _artistLatinMeta,
+        ),
+      );
+    }
+    if (data.containsKey('generation_id')) {
+      context.handle(
+        _generationIdMeta,
+        generationId.isAcceptableOrUnknown(
+          data['generation_id']!,
+          _generationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('release_year')) {
+      context.handle(
+        _releaseYearMeta,
+        releaseYear.isAcceptableOrUnknown(
+          data['release_year']!,
+          _releaseYearMeta,
+        ),
+      );
+    }
+    if (data.containsKey('intro_url')) {
+      context.handle(
+        _introUrlMeta,
+        introUrl.isAcceptableOrUnknown(data['intro_url']!, _introUrlMeta),
+      );
+    }
+    if (data.containsKey('intro_sha256')) {
+      context.handle(
+        _introSha256Meta,
+        introSha256.isAcceptableOrUnknown(
+          data['intro_sha256']!,
+          _introSha256Meta,
+        ),
+      );
+    }
+    if (data.containsKey('intro_bytes')) {
+      context.handle(
+        _introBytesMeta,
+        introBytes.isAcceptableOrUnknown(data['intro_bytes']!, _introBytesMeta),
+      );
+    }
+    if (data.containsKey('middle_url')) {
+      context.handle(
+        _middleUrlMeta,
+        middleUrl.isAcceptableOrUnknown(data['middle_url']!, _middleUrlMeta),
+      );
+    }
+    if (data.containsKey('middle_sha256')) {
+      context.handle(
+        _middleSha256Meta,
+        middleSha256.isAcceptableOrUnknown(
+          data['middle_sha256']!,
+          _middleSha256Meta,
+        ),
+      );
+    }
+    if (data.containsKey('middle_bytes')) {
+      context.handle(
+        _middleBytesMeta,
+        middleBytes.isAcceptableOrUnknown(
+          data['middle_bytes']!,
+          _middleBytesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CatalogTrack map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CatalogTrack(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      titleAm: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title_am'],
+      ),
+      titleLatin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title_latin'],
+      ),
+      artistId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}artist_id'],
+      )!,
+      artistAm: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}artist_am'],
+      ),
+      artistLatin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}artist_latin'],
+      ),
+      generationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}generation_id'],
+      ),
+      releaseYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}release_year'],
+      ),
+      introUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intro_url'],
+      ),
+      introSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intro_sha256'],
+      ),
+      introBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}intro_bytes'],
+      ),
+      middleUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}middle_url'],
+      ),
+      middleSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}middle_sha256'],
+      ),
+      middleBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}middle_bytes'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CatalogTracksTable createAlias(String alias) {
+    return $CatalogTracksTable(attachedDatabase, alias);
+  }
+}
+
+class CatalogTrack extends DataClass implements Insertable<CatalogTrack> {
+  final int id;
+  final String? titleAm;
+  final String? titleLatin;
+  final int artistId;
+  final String? artistAm;
+  final String? artistLatin;
+  final int? generationId;
+  final int? releaseYear;
+  final String? introUrl;
+  final String? introSha256;
+  final int? introBytes;
+  final String? middleUrl;
+  final String? middleSha256;
+  final int? middleBytes;
+  final int updatedAt;
+  const CatalogTrack({
+    required this.id,
+    this.titleAm,
+    this.titleLatin,
+    required this.artistId,
+    this.artistAm,
+    this.artistLatin,
+    this.generationId,
+    this.releaseYear,
+    this.introUrl,
+    this.introSha256,
+    this.introBytes,
+    this.middleUrl,
+    this.middleSha256,
+    this.middleBytes,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || titleAm != null) {
+      map['title_am'] = Variable<String>(titleAm);
+    }
+    if (!nullToAbsent || titleLatin != null) {
+      map['title_latin'] = Variable<String>(titleLatin);
+    }
+    map['artist_id'] = Variable<int>(artistId);
+    if (!nullToAbsent || artistAm != null) {
+      map['artist_am'] = Variable<String>(artistAm);
+    }
+    if (!nullToAbsent || artistLatin != null) {
+      map['artist_latin'] = Variable<String>(artistLatin);
+    }
+    if (!nullToAbsent || generationId != null) {
+      map['generation_id'] = Variable<int>(generationId);
+    }
+    if (!nullToAbsent || releaseYear != null) {
+      map['release_year'] = Variable<int>(releaseYear);
+    }
+    if (!nullToAbsent || introUrl != null) {
+      map['intro_url'] = Variable<String>(introUrl);
+    }
+    if (!nullToAbsent || introSha256 != null) {
+      map['intro_sha256'] = Variable<String>(introSha256);
+    }
+    if (!nullToAbsent || introBytes != null) {
+      map['intro_bytes'] = Variable<int>(introBytes);
+    }
+    if (!nullToAbsent || middleUrl != null) {
+      map['middle_url'] = Variable<String>(middleUrl);
+    }
+    if (!nullToAbsent || middleSha256 != null) {
+      map['middle_sha256'] = Variable<String>(middleSha256);
+    }
+    if (!nullToAbsent || middleBytes != null) {
+      map['middle_bytes'] = Variable<int>(middleBytes);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  CatalogTracksCompanion toCompanion(bool nullToAbsent) {
+    return CatalogTracksCompanion(
+      id: Value(id),
+      titleAm: titleAm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(titleAm),
+      titleLatin: titleLatin == null && nullToAbsent
+          ? const Value.absent()
+          : Value(titleLatin),
+      artistId: Value(artistId),
+      artistAm: artistAm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artistAm),
+      artistLatin: artistLatin == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artistLatin),
+      generationId: generationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(generationId),
+      releaseYear: releaseYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releaseYear),
+      introUrl: introUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(introUrl),
+      introSha256: introSha256 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(introSha256),
+      introBytes: introBytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(introBytes),
+      middleUrl: middleUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(middleUrl),
+      middleSha256: middleSha256 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(middleSha256),
+      middleBytes: middleBytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(middleBytes),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CatalogTrack.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CatalogTrack(
+      id: serializer.fromJson<int>(json['id']),
+      titleAm: serializer.fromJson<String?>(json['titleAm']),
+      titleLatin: serializer.fromJson<String?>(json['titleLatin']),
+      artistId: serializer.fromJson<int>(json['artistId']),
+      artistAm: serializer.fromJson<String?>(json['artistAm']),
+      artistLatin: serializer.fromJson<String?>(json['artistLatin']),
+      generationId: serializer.fromJson<int?>(json['generationId']),
+      releaseYear: serializer.fromJson<int?>(json['releaseYear']),
+      introUrl: serializer.fromJson<String?>(json['introUrl']),
+      introSha256: serializer.fromJson<String?>(json['introSha256']),
+      introBytes: serializer.fromJson<int?>(json['introBytes']),
+      middleUrl: serializer.fromJson<String?>(json['middleUrl']),
+      middleSha256: serializer.fromJson<String?>(json['middleSha256']),
+      middleBytes: serializer.fromJson<int?>(json['middleBytes']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'titleAm': serializer.toJson<String?>(titleAm),
+      'titleLatin': serializer.toJson<String?>(titleLatin),
+      'artistId': serializer.toJson<int>(artistId),
+      'artistAm': serializer.toJson<String?>(artistAm),
+      'artistLatin': serializer.toJson<String?>(artistLatin),
+      'generationId': serializer.toJson<int?>(generationId),
+      'releaseYear': serializer.toJson<int?>(releaseYear),
+      'introUrl': serializer.toJson<String?>(introUrl),
+      'introSha256': serializer.toJson<String?>(introSha256),
+      'introBytes': serializer.toJson<int?>(introBytes),
+      'middleUrl': serializer.toJson<String?>(middleUrl),
+      'middleSha256': serializer.toJson<String?>(middleSha256),
+      'middleBytes': serializer.toJson<int?>(middleBytes),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  CatalogTrack copyWith({
+    int? id,
+    Value<String?> titleAm = const Value.absent(),
+    Value<String?> titleLatin = const Value.absent(),
+    int? artistId,
+    Value<String?> artistAm = const Value.absent(),
+    Value<String?> artistLatin = const Value.absent(),
+    Value<int?> generationId = const Value.absent(),
+    Value<int?> releaseYear = const Value.absent(),
+    Value<String?> introUrl = const Value.absent(),
+    Value<String?> introSha256 = const Value.absent(),
+    Value<int?> introBytes = const Value.absent(),
+    Value<String?> middleUrl = const Value.absent(),
+    Value<String?> middleSha256 = const Value.absent(),
+    Value<int?> middleBytes = const Value.absent(),
+    int? updatedAt,
+  }) => CatalogTrack(
+    id: id ?? this.id,
+    titleAm: titleAm.present ? titleAm.value : this.titleAm,
+    titleLatin: titleLatin.present ? titleLatin.value : this.titleLatin,
+    artistId: artistId ?? this.artistId,
+    artistAm: artistAm.present ? artistAm.value : this.artistAm,
+    artistLatin: artistLatin.present ? artistLatin.value : this.artistLatin,
+    generationId: generationId.present ? generationId.value : this.generationId,
+    releaseYear: releaseYear.present ? releaseYear.value : this.releaseYear,
+    introUrl: introUrl.present ? introUrl.value : this.introUrl,
+    introSha256: introSha256.present ? introSha256.value : this.introSha256,
+    introBytes: introBytes.present ? introBytes.value : this.introBytes,
+    middleUrl: middleUrl.present ? middleUrl.value : this.middleUrl,
+    middleSha256: middleSha256.present ? middleSha256.value : this.middleSha256,
+    middleBytes: middleBytes.present ? middleBytes.value : this.middleBytes,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CatalogTrack copyWithCompanion(CatalogTracksCompanion data) {
+    return CatalogTrack(
+      id: data.id.present ? data.id.value : this.id,
+      titleAm: data.titleAm.present ? data.titleAm.value : this.titleAm,
+      titleLatin: data.titleLatin.present
+          ? data.titleLatin.value
+          : this.titleLatin,
+      artistId: data.artistId.present ? data.artistId.value : this.artistId,
+      artistAm: data.artistAm.present ? data.artistAm.value : this.artistAm,
+      artistLatin: data.artistLatin.present
+          ? data.artistLatin.value
+          : this.artistLatin,
+      generationId: data.generationId.present
+          ? data.generationId.value
+          : this.generationId,
+      releaseYear: data.releaseYear.present
+          ? data.releaseYear.value
+          : this.releaseYear,
+      introUrl: data.introUrl.present ? data.introUrl.value : this.introUrl,
+      introSha256: data.introSha256.present
+          ? data.introSha256.value
+          : this.introSha256,
+      introBytes: data.introBytes.present
+          ? data.introBytes.value
+          : this.introBytes,
+      middleUrl: data.middleUrl.present ? data.middleUrl.value : this.middleUrl,
+      middleSha256: data.middleSha256.present
+          ? data.middleSha256.value
+          : this.middleSha256,
+      middleBytes: data.middleBytes.present
+          ? data.middleBytes.value
+          : this.middleBytes,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogTrack(')
+          ..write('id: $id, ')
+          ..write('titleAm: $titleAm, ')
+          ..write('titleLatin: $titleLatin, ')
+          ..write('artistId: $artistId, ')
+          ..write('artistAm: $artistAm, ')
+          ..write('artistLatin: $artistLatin, ')
+          ..write('generationId: $generationId, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('introUrl: $introUrl, ')
+          ..write('introSha256: $introSha256, ')
+          ..write('introBytes: $introBytes, ')
+          ..write('middleUrl: $middleUrl, ')
+          ..write('middleSha256: $middleSha256, ')
+          ..write('middleBytes: $middleBytes, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    titleAm,
+    titleLatin,
+    artistId,
+    artistAm,
+    artistLatin,
+    generationId,
+    releaseYear,
+    introUrl,
+    introSha256,
+    introBytes,
+    middleUrl,
+    middleSha256,
+    middleBytes,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CatalogTrack &&
+          other.id == this.id &&
+          other.titleAm == this.titleAm &&
+          other.titleLatin == this.titleLatin &&
+          other.artistId == this.artistId &&
+          other.artistAm == this.artistAm &&
+          other.artistLatin == this.artistLatin &&
+          other.generationId == this.generationId &&
+          other.releaseYear == this.releaseYear &&
+          other.introUrl == this.introUrl &&
+          other.introSha256 == this.introSha256 &&
+          other.introBytes == this.introBytes &&
+          other.middleUrl == this.middleUrl &&
+          other.middleSha256 == this.middleSha256 &&
+          other.middleBytes == this.middleBytes &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CatalogTracksCompanion extends UpdateCompanion<CatalogTrack> {
+  final Value<int> id;
+  final Value<String?> titleAm;
+  final Value<String?> titleLatin;
+  final Value<int> artistId;
+  final Value<String?> artistAm;
+  final Value<String?> artistLatin;
+  final Value<int?> generationId;
+  final Value<int?> releaseYear;
+  final Value<String?> introUrl;
+  final Value<String?> introSha256;
+  final Value<int?> introBytes;
+  final Value<String?> middleUrl;
+  final Value<String?> middleSha256;
+  final Value<int?> middleBytes;
+  final Value<int> updatedAt;
+  const CatalogTracksCompanion({
+    this.id = const Value.absent(),
+    this.titleAm = const Value.absent(),
+    this.titleLatin = const Value.absent(),
+    this.artistId = const Value.absent(),
+    this.artistAm = const Value.absent(),
+    this.artistLatin = const Value.absent(),
+    this.generationId = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.introUrl = const Value.absent(),
+    this.introSha256 = const Value.absent(),
+    this.introBytes = const Value.absent(),
+    this.middleUrl = const Value.absent(),
+    this.middleSha256 = const Value.absent(),
+    this.middleBytes = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  CatalogTracksCompanion.insert({
+    this.id = const Value.absent(),
+    this.titleAm = const Value.absent(),
+    this.titleLatin = const Value.absent(),
+    required int artistId,
+    this.artistAm = const Value.absent(),
+    this.artistLatin = const Value.absent(),
+    this.generationId = const Value.absent(),
+    this.releaseYear = const Value.absent(),
+    this.introUrl = const Value.absent(),
+    this.introSha256 = const Value.absent(),
+    this.introBytes = const Value.absent(),
+    this.middleUrl = const Value.absent(),
+    this.middleSha256 = const Value.absent(),
+    this.middleBytes = const Value.absent(),
+    required int updatedAt,
+  }) : artistId = Value(artistId),
+       updatedAt = Value(updatedAt);
+  static Insertable<CatalogTrack> custom({
+    Expression<int>? id,
+    Expression<String>? titleAm,
+    Expression<String>? titleLatin,
+    Expression<int>? artistId,
+    Expression<String>? artistAm,
+    Expression<String>? artistLatin,
+    Expression<int>? generationId,
+    Expression<int>? releaseYear,
+    Expression<String>? introUrl,
+    Expression<String>? introSha256,
+    Expression<int>? introBytes,
+    Expression<String>? middleUrl,
+    Expression<String>? middleSha256,
+    Expression<int>? middleBytes,
+    Expression<int>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (titleAm != null) 'title_am': titleAm,
+      if (titleLatin != null) 'title_latin': titleLatin,
+      if (artistId != null) 'artist_id': artistId,
+      if (artistAm != null) 'artist_am': artistAm,
+      if (artistLatin != null) 'artist_latin': artistLatin,
+      if (generationId != null) 'generation_id': generationId,
+      if (releaseYear != null) 'release_year': releaseYear,
+      if (introUrl != null) 'intro_url': introUrl,
+      if (introSha256 != null) 'intro_sha256': introSha256,
+      if (introBytes != null) 'intro_bytes': introBytes,
+      if (middleUrl != null) 'middle_url': middleUrl,
+      if (middleSha256 != null) 'middle_sha256': middleSha256,
+      if (middleBytes != null) 'middle_bytes': middleBytes,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  CatalogTracksCompanion copyWith({
+    Value<int>? id,
+    Value<String?>? titleAm,
+    Value<String?>? titleLatin,
+    Value<int>? artistId,
+    Value<String?>? artistAm,
+    Value<String?>? artistLatin,
+    Value<int?>? generationId,
+    Value<int?>? releaseYear,
+    Value<String?>? introUrl,
+    Value<String?>? introSha256,
+    Value<int?>? introBytes,
+    Value<String?>? middleUrl,
+    Value<String?>? middleSha256,
+    Value<int?>? middleBytes,
+    Value<int>? updatedAt,
+  }) {
+    return CatalogTracksCompanion(
+      id: id ?? this.id,
+      titleAm: titleAm ?? this.titleAm,
+      titleLatin: titleLatin ?? this.titleLatin,
+      artistId: artistId ?? this.artistId,
+      artistAm: artistAm ?? this.artistAm,
+      artistLatin: artistLatin ?? this.artistLatin,
+      generationId: generationId ?? this.generationId,
+      releaseYear: releaseYear ?? this.releaseYear,
+      introUrl: introUrl ?? this.introUrl,
+      introSha256: introSha256 ?? this.introSha256,
+      introBytes: introBytes ?? this.introBytes,
+      middleUrl: middleUrl ?? this.middleUrl,
+      middleSha256: middleSha256 ?? this.middleSha256,
+      middleBytes: middleBytes ?? this.middleBytes,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (titleAm.present) {
+      map['title_am'] = Variable<String>(titleAm.value);
+    }
+    if (titleLatin.present) {
+      map['title_latin'] = Variable<String>(titleLatin.value);
+    }
+    if (artistId.present) {
+      map['artist_id'] = Variable<int>(artistId.value);
+    }
+    if (artistAm.present) {
+      map['artist_am'] = Variable<String>(artistAm.value);
+    }
+    if (artistLatin.present) {
+      map['artist_latin'] = Variable<String>(artistLatin.value);
+    }
+    if (generationId.present) {
+      map['generation_id'] = Variable<int>(generationId.value);
+    }
+    if (releaseYear.present) {
+      map['release_year'] = Variable<int>(releaseYear.value);
+    }
+    if (introUrl.present) {
+      map['intro_url'] = Variable<String>(introUrl.value);
+    }
+    if (introSha256.present) {
+      map['intro_sha256'] = Variable<String>(introSha256.value);
+    }
+    if (introBytes.present) {
+      map['intro_bytes'] = Variable<int>(introBytes.value);
+    }
+    if (middleUrl.present) {
+      map['middle_url'] = Variable<String>(middleUrl.value);
+    }
+    if (middleSha256.present) {
+      map['middle_sha256'] = Variable<String>(middleSha256.value);
+    }
+    if (middleBytes.present) {
+      map['middle_bytes'] = Variable<int>(middleBytes.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CatalogTracksCompanion(')
+          ..write('id: $id, ')
+          ..write('titleAm: $titleAm, ')
+          ..write('titleLatin: $titleLatin, ')
+          ..write('artistId: $artistId, ')
+          ..write('artistAm: $artistAm, ')
+          ..write('artistLatin: $artistLatin, ')
+          ..write('generationId: $generationId, ')
+          ..write('releaseYear: $releaseYear, ')
+          ..write('introUrl: $introUrl, ')
+          ..write('introSha256: $introSha256, ')
+          ..write('introBytes: $introBytes, ')
+          ..write('middleUrl: $middleUrl, ')
+          ..write('middleSha256: $middleSha256, ')
+          ..write('middleBytes: $middleBytes, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ClipsTable extends Clips with TableInfo<$ClipsTable, Clip> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ClipsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _trackIdMeta = const VerificationMeta(
+    'trackId',
+  );
+  @override
+  late final GeneratedColumn<int> trackId = GeneratedColumn<int>(
+    'track_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pathMeta = const VerificationMeta('path');
+  @override
+  late final GeneratedColumn<String> path = GeneratedColumn<String>(
+    'path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bytesMeta = const VerificationMeta('bytes');
+  @override
+  late final GeneratedColumn<int> bytes = GeneratedColumn<int>(
+    'bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastPlayedAtMeta = const VerificationMeta(
+    'lastPlayedAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastPlayedAt = GeneratedColumn<int>(
+    'last_played_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    trackId,
+    kind,
+    path,
+    bytes,
+    source,
+    lastPlayedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'clips';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Clip> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('track_id')) {
+      context.handle(
+        _trackIdMeta,
+        trackId.isAcceptableOrUnknown(data['track_id']!, _trackIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_trackIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('path')) {
+      context.handle(
+        _pathMeta,
+        path.isAcceptableOrUnknown(data['path']!, _pathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pathMeta);
+    }
+    if (data.containsKey('bytes')) {
+      context.handle(
+        _bytesMeta,
+        bytes.isAcceptableOrUnknown(data['bytes']!, _bytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bytesMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceMeta);
+    }
+    if (data.containsKey('last_played_at')) {
+      context.handle(
+        _lastPlayedAtMeta,
+        lastPlayedAt.isAcceptableOrUnknown(
+          data['last_played_at']!,
+          _lastPlayedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastPlayedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {trackId, kind};
+  @override
+  Clip map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Clip(
+      trackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}track_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      bytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bytes'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      lastPlayedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_played_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ClipsTable createAlias(String alias) {
+    return $ClipsTable(attachedDatabase, alias);
+  }
+}
+
+class Clip extends DataClass implements Insertable<Clip> {
+  final int trackId;
+  final String kind;
+  final String path;
+  final int bytes;
+  final String source;
+  final int lastPlayedAt;
+  const Clip({
+    required this.trackId,
+    required this.kind,
+    required this.path,
+    required this.bytes,
+    required this.source,
+    required this.lastPlayedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['track_id'] = Variable<int>(trackId);
+    map['kind'] = Variable<String>(kind);
+    map['path'] = Variable<String>(path);
+    map['bytes'] = Variable<int>(bytes);
+    map['source'] = Variable<String>(source);
+    map['last_played_at'] = Variable<int>(lastPlayedAt);
+    return map;
+  }
+
+  ClipsCompanion toCompanion(bool nullToAbsent) {
+    return ClipsCompanion(
+      trackId: Value(trackId),
+      kind: Value(kind),
+      path: Value(path),
+      bytes: Value(bytes),
+      source: Value(source),
+      lastPlayedAt: Value(lastPlayedAt),
+    );
+  }
+
+  factory Clip.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Clip(
+      trackId: serializer.fromJson<int>(json['trackId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      path: serializer.fromJson<String>(json['path']),
+      bytes: serializer.fromJson<int>(json['bytes']),
+      source: serializer.fromJson<String>(json['source']),
+      lastPlayedAt: serializer.fromJson<int>(json['lastPlayedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'trackId': serializer.toJson<int>(trackId),
+      'kind': serializer.toJson<String>(kind),
+      'path': serializer.toJson<String>(path),
+      'bytes': serializer.toJson<int>(bytes),
+      'source': serializer.toJson<String>(source),
+      'lastPlayedAt': serializer.toJson<int>(lastPlayedAt),
+    };
+  }
+
+  Clip copyWith({
+    int? trackId,
+    String? kind,
+    String? path,
+    int? bytes,
+    String? source,
+    int? lastPlayedAt,
+  }) => Clip(
+    trackId: trackId ?? this.trackId,
+    kind: kind ?? this.kind,
+    path: path ?? this.path,
+    bytes: bytes ?? this.bytes,
+    source: source ?? this.source,
+    lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+  );
+  Clip copyWithCompanion(ClipsCompanion data) {
+    return Clip(
+      trackId: data.trackId.present ? data.trackId.value : this.trackId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      path: data.path.present ? data.path.value : this.path,
+      bytes: data.bytes.present ? data.bytes.value : this.bytes,
+      source: data.source.present ? data.source.value : this.source,
+      lastPlayedAt: data.lastPlayedAt.present
+          ? data.lastPlayedAt.value
+          : this.lastPlayedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Clip(')
+          ..write('trackId: $trackId, ')
+          ..write('kind: $kind, ')
+          ..write('path: $path, ')
+          ..write('bytes: $bytes, ')
+          ..write('source: $source, ')
+          ..write('lastPlayedAt: $lastPlayedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(trackId, kind, path, bytes, source, lastPlayedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Clip &&
+          other.trackId == this.trackId &&
+          other.kind == this.kind &&
+          other.path == this.path &&
+          other.bytes == this.bytes &&
+          other.source == this.source &&
+          other.lastPlayedAt == this.lastPlayedAt);
+}
+
+class ClipsCompanion extends UpdateCompanion<Clip> {
+  final Value<int> trackId;
+  final Value<String> kind;
+  final Value<String> path;
+  final Value<int> bytes;
+  final Value<String> source;
+  final Value<int> lastPlayedAt;
+  final Value<int> rowid;
+  const ClipsCompanion({
+    this.trackId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.path = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.source = const Value.absent(),
+    this.lastPlayedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ClipsCompanion.insert({
+    required int trackId,
+    required String kind,
+    required String path,
+    required int bytes,
+    required String source,
+    required int lastPlayedAt,
+    this.rowid = const Value.absent(),
+  }) : trackId = Value(trackId),
+       kind = Value(kind),
+       path = Value(path),
+       bytes = Value(bytes),
+       source = Value(source),
+       lastPlayedAt = Value(lastPlayedAt);
+  static Insertable<Clip> custom({
+    Expression<int>? trackId,
+    Expression<String>? kind,
+    Expression<String>? path,
+    Expression<int>? bytes,
+    Expression<String>? source,
+    Expression<int>? lastPlayedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (trackId != null) 'track_id': trackId,
+      if (kind != null) 'kind': kind,
+      if (path != null) 'path': path,
+      if (bytes != null) 'bytes': bytes,
+      if (source != null) 'source': source,
+      if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ClipsCompanion copyWith({
+    Value<int>? trackId,
+    Value<String>? kind,
+    Value<String>? path,
+    Value<int>? bytes,
+    Value<String>? source,
+    Value<int>? lastPlayedAt,
+    Value<int>? rowid,
+  }) {
+    return ClipsCompanion(
+      trackId: trackId ?? this.trackId,
+      kind: kind ?? this.kind,
+      path: path ?? this.path,
+      bytes: bytes ?? this.bytes,
+      source: source ?? this.source,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (trackId.present) {
+      map['track_id'] = Variable<int>(trackId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (bytes.present) {
+      map['bytes'] = Variable<int>(bytes.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (lastPlayedAt.present) {
+      map['last_played_at'] = Variable<int>(lastPlayedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClipsCompanion(')
+          ..write('trackId: $trackId, ')
+          ..write('kind: $kind, ')
+          ..write('path: $path, ')
+          ..write('bytes: $bytes, ')
+          ..write('source: $source, ')
+          ..write('lastPlayedAt: $lastPlayedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -3258,6 +4549,8 @@ abstract class _$AppDb extends GeneratedDatabase {
   late final $PendingAccountSyncTable pendingAccountSync =
       $PendingAccountSyncTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $CatalogTracksTable catalogTracks = $CatalogTracksTable(this);
+  late final $ClipsTable clips = $ClipsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3272,6 +4565,8 @@ abstract class _$AppDb extends GeneratedDatabase {
     remoteConfigCache,
     pendingAccountSync,
     appSettings,
+    catalogTracks,
+    clips,
   ];
 }
 
@@ -5135,6 +6430,630 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$CatalogTracksTableCreateCompanionBuilder =
+    CatalogTracksCompanion Function({
+      Value<int> id,
+      Value<String?> titleAm,
+      Value<String?> titleLatin,
+      required int artistId,
+      Value<String?> artistAm,
+      Value<String?> artistLatin,
+      Value<int?> generationId,
+      Value<int?> releaseYear,
+      Value<String?> introUrl,
+      Value<String?> introSha256,
+      Value<int?> introBytes,
+      Value<String?> middleUrl,
+      Value<String?> middleSha256,
+      Value<int?> middleBytes,
+      required int updatedAt,
+    });
+typedef $$CatalogTracksTableUpdateCompanionBuilder =
+    CatalogTracksCompanion Function({
+      Value<int> id,
+      Value<String?> titleAm,
+      Value<String?> titleLatin,
+      Value<int> artistId,
+      Value<String?> artistAm,
+      Value<String?> artistLatin,
+      Value<int?> generationId,
+      Value<int?> releaseYear,
+      Value<String?> introUrl,
+      Value<String?> introSha256,
+      Value<int?> introBytes,
+      Value<String?> middleUrl,
+      Value<String?> middleSha256,
+      Value<int?> middleBytes,
+      Value<int> updatedAt,
+    });
+
+class $$CatalogTracksTableFilterComposer
+    extends Composer<_$AppDb, $CatalogTracksTable> {
+  $$CatalogTracksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titleAm => $composableBuilder(
+    column: $table.titleAm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titleLatin => $composableBuilder(
+    column: $table.titleLatin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get artistId => $composableBuilder(
+    column: $table.artistId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get artistAm => $composableBuilder(
+    column: $table.artistAm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get artistLatin => $composableBuilder(
+    column: $table.artistLatin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get generationId => $composableBuilder(
+    column: $table.generationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get introUrl => $composableBuilder(
+    column: $table.introUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get introSha256 => $composableBuilder(
+    column: $table.introSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get introBytes => $composableBuilder(
+    column: $table.introBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get middleUrl => $composableBuilder(
+    column: $table.middleUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get middleSha256 => $composableBuilder(
+    column: $table.middleSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get middleBytes => $composableBuilder(
+    column: $table.middleBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CatalogTracksTableOrderingComposer
+    extends Composer<_$AppDb, $CatalogTracksTable> {
+  $$CatalogTracksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titleAm => $composableBuilder(
+    column: $table.titleAm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titleLatin => $composableBuilder(
+    column: $table.titleLatin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get artistId => $composableBuilder(
+    column: $table.artistId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get artistAm => $composableBuilder(
+    column: $table.artistAm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get artistLatin => $composableBuilder(
+    column: $table.artistLatin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get generationId => $composableBuilder(
+    column: $table.generationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get introUrl => $composableBuilder(
+    column: $table.introUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get introSha256 => $composableBuilder(
+    column: $table.introSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get introBytes => $composableBuilder(
+    column: $table.introBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get middleUrl => $composableBuilder(
+    column: $table.middleUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get middleSha256 => $composableBuilder(
+    column: $table.middleSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get middleBytes => $composableBuilder(
+    column: $table.middleBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CatalogTracksTableAnnotationComposer
+    extends Composer<_$AppDb, $CatalogTracksTable> {
+  $$CatalogTracksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get titleAm =>
+      $composableBuilder(column: $table.titleAm, builder: (column) => column);
+
+  GeneratedColumn<String> get titleLatin => $composableBuilder(
+    column: $table.titleLatin,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get artistId =>
+      $composableBuilder(column: $table.artistId, builder: (column) => column);
+
+  GeneratedColumn<String> get artistAm =>
+      $composableBuilder(column: $table.artistAm, builder: (column) => column);
+
+  GeneratedColumn<String> get artistLatin => $composableBuilder(
+    column: $table.artistLatin,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get generationId => $composableBuilder(
+    column: $table.generationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get releaseYear => $composableBuilder(
+    column: $table.releaseYear,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get introUrl =>
+      $composableBuilder(column: $table.introUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get introSha256 => $composableBuilder(
+    column: $table.introSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get introBytes => $composableBuilder(
+    column: $table.introBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get middleUrl =>
+      $composableBuilder(column: $table.middleUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get middleSha256 => $composableBuilder(
+    column: $table.middleSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get middleBytes => $composableBuilder(
+    column: $table.middleBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CatalogTracksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $CatalogTracksTable,
+          CatalogTrack,
+          $$CatalogTracksTableFilterComposer,
+          $$CatalogTracksTableOrderingComposer,
+          $$CatalogTracksTableAnnotationComposer,
+          $$CatalogTracksTableCreateCompanionBuilder,
+          $$CatalogTracksTableUpdateCompanionBuilder,
+          (
+            CatalogTrack,
+            BaseReferences<_$AppDb, $CatalogTracksTable, CatalogTrack>,
+          ),
+          CatalogTrack,
+          PrefetchHooks Function()
+        > {
+  $$CatalogTracksTableTableManager(_$AppDb db, $CatalogTracksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CatalogTracksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CatalogTracksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CatalogTracksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String?> titleAm = const Value.absent(),
+                Value<String?> titleLatin = const Value.absent(),
+                Value<int> artistId = const Value.absent(),
+                Value<String?> artistAm = const Value.absent(),
+                Value<String?> artistLatin = const Value.absent(),
+                Value<int?> generationId = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> introUrl = const Value.absent(),
+                Value<String?> introSha256 = const Value.absent(),
+                Value<int?> introBytes = const Value.absent(),
+                Value<String?> middleUrl = const Value.absent(),
+                Value<String?> middleSha256 = const Value.absent(),
+                Value<int?> middleBytes = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+              }) => CatalogTracksCompanion(
+                id: id,
+                titleAm: titleAm,
+                titleLatin: titleLatin,
+                artistId: artistId,
+                artistAm: artistAm,
+                artistLatin: artistLatin,
+                generationId: generationId,
+                releaseYear: releaseYear,
+                introUrl: introUrl,
+                introSha256: introSha256,
+                introBytes: introBytes,
+                middleUrl: middleUrl,
+                middleSha256: middleSha256,
+                middleBytes: middleBytes,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String?> titleAm = const Value.absent(),
+                Value<String?> titleLatin = const Value.absent(),
+                required int artistId,
+                Value<String?> artistAm = const Value.absent(),
+                Value<String?> artistLatin = const Value.absent(),
+                Value<int?> generationId = const Value.absent(),
+                Value<int?> releaseYear = const Value.absent(),
+                Value<String?> introUrl = const Value.absent(),
+                Value<String?> introSha256 = const Value.absent(),
+                Value<int?> introBytes = const Value.absent(),
+                Value<String?> middleUrl = const Value.absent(),
+                Value<String?> middleSha256 = const Value.absent(),
+                Value<int?> middleBytes = const Value.absent(),
+                required int updatedAt,
+              }) => CatalogTracksCompanion.insert(
+                id: id,
+                titleAm: titleAm,
+                titleLatin: titleLatin,
+                artistId: artistId,
+                artistAm: artistAm,
+                artistLatin: artistLatin,
+                generationId: generationId,
+                releaseYear: releaseYear,
+                introUrl: introUrl,
+                introSha256: introSha256,
+                introBytes: introBytes,
+                middleUrl: middleUrl,
+                middleSha256: middleSha256,
+                middleBytes: middleBytes,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CatalogTracksTable, CatalogTrack>(table),
+                  BaseReferences<_$AppDb, $CatalogTracksTable, CatalogTrack>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CatalogTracksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $CatalogTracksTable,
+      CatalogTrack,
+      $$CatalogTracksTableFilterComposer,
+      $$CatalogTracksTableOrderingComposer,
+      $$CatalogTracksTableAnnotationComposer,
+      $$CatalogTracksTableCreateCompanionBuilder,
+      $$CatalogTracksTableUpdateCompanionBuilder,
+      (
+        CatalogTrack,
+        BaseReferences<_$AppDb, $CatalogTracksTable, CatalogTrack>,
+      ),
+      CatalogTrack,
+      PrefetchHooks Function()
+    >;
+typedef $$ClipsTableCreateCompanionBuilder = ClipsCompanion Function({
+  required int trackId,
+  required String kind,
+  required String path,
+  required int bytes,
+  required String source,
+  required int lastPlayedAt,
+  Value<int> rowid,
+});
+typedef $$ClipsTableUpdateCompanionBuilder = ClipsCompanion Function({
+  Value<int> trackId,
+  Value<String> kind,
+  Value<String> path,
+  Value<int> bytes,
+  Value<String> source,
+  Value<int> lastPlayedAt,
+  Value<int> rowid,
+});
+
+class $$ClipsTableFilterComposer extends Composer<_$AppDb, $ClipsTable> {
+  $$ClipsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastPlayedAt => $composableBuilder(
+    column: $table.lastPlayedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ClipsTableOrderingComposer extends Composer<_$AppDb, $ClipsTable> {
+  $$ClipsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get trackId => $composableBuilder(
+    column: $table.trackId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastPlayedAt => $composableBuilder(
+    column: $table.lastPlayedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ClipsTableAnnotationComposer extends Composer<_$AppDb, $ClipsTable> {
+  $$ClipsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get trackId =>
+      $composableBuilder(column: $table.trackId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get path =>
+      $composableBuilder(column: $table.path, builder: (column) => column);
+
+  GeneratedColumn<int> get bytes =>
+      $composableBuilder(column: $table.bytes, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<int> get lastPlayedAt => $composableBuilder(
+    column: $table.lastPlayedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$ClipsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $ClipsTable,
+          Clip,
+          $$ClipsTableFilterComposer,
+          $$ClipsTableOrderingComposer,
+          $$ClipsTableAnnotationComposer,
+          $$ClipsTableCreateCompanionBuilder,
+          $$ClipsTableUpdateCompanionBuilder,
+          (Clip, BaseReferences<_$AppDb, $ClipsTable, Clip>),
+          Clip,
+          PrefetchHooks Function()
+        > {
+  $$ClipsTableTableManager(_$AppDb db, $ClipsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ClipsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ClipsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ClipsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> trackId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> path = const Value.absent(),
+                Value<int> bytes = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<int> lastPlayedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ClipsCompanion(
+                trackId: trackId,
+                kind: kind,
+                path: path,
+                bytes: bytes,
+                source: source,
+                lastPlayedAt: lastPlayedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int trackId,
+                required String kind,
+                required String path,
+                required int bytes,
+                required String source,
+                required int lastPlayedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ClipsCompanion.insert(
+                trackId: trackId,
+                kind: kind,
+                path: path,
+                bytes: bytes,
+                source: source,
+                lastPlayedAt: lastPlayedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ClipsTable, Clip>(table),
+                  BaseReferences<_$AppDb, $ClipsTable, Clip>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ClipsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $ClipsTable,
+      Clip,
+      $$ClipsTableFilterComposer,
+      $$ClipsTableOrderingComposer,
+      $$ClipsTableAnnotationComposer,
+      $$ClipsTableCreateCompanionBuilder,
+      $$ClipsTableUpdateCompanionBuilder,
+      (Clip, BaseReferences<_$AppDb, $ClipsTable, Clip>),
+      Clip,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -5157,4 +7076,8 @@ class $AppDbManager {
       $$PendingAccountSyncTableTableManager(_db, _db.pendingAccountSync);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$CatalogTracksTableTableManager get catalogTracks =>
+      $$CatalogTracksTableTableManager(_db, _db.catalogTracks);
+  $$ClipsTableTableManager get clips =>
+      $$ClipsTableTableManager(_db, _db.clips);
 }

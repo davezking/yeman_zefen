@@ -68,7 +68,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Play again'), 200);
     await tester.tap(find.text('Play again'));
     await tester.pumpAndSettle();
-    expect(h.location, '/start');
+    expect(h.location, '/setup');
 
     h.router.go('/results');
     await tester.pumpAndSettle();
@@ -84,6 +84,6 @@ void main() {
 
     await tester.tap(find.text('New game'));
     await tester.pumpAndSettle();
-    expect(h.location, '/start');
+    expect(h.location, '/setup');
   });
 }

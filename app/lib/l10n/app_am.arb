@@ -319,25 +319,25 @@
   "@resultsYouChose": {
     "description": "Approved by a native speaker. Results row for a wrong answer; name is the song or singer picked"
   },
-  "sessionErrorNoSongs": "እስካሁን በዚህ ስልክ ላይ ምንም ዘፈን የለም። መጀመሪያ ጥቅል ያውርዱ።",
+  "sessionErrorNoSongs": "እስካሁን የሚጫወት ዘፈን የለም። ከበይነመረብ ጋር ተገናኝተው ደግመው ይሞክሩ።",
   "@sessionErrorNoSongs": {
-    "description": "Approved by a native speaker. A game cannot start because no songs are installed"
+    "description": "REVIEW. A game cannot start because no songs are installed"
   },
-  "sessionErrorTooFewSongs": "ዙር ለመሥራት በቂ ዘፈኖች የሉም። ሌላ ጥቅል ያውርዱ።",
+  "sessionErrorTooFewSongs": "ዙር ለመሥራት በቂ ዘፈኖች የሉም። ከበይነመረብ ጋር ተገናኝተው ደግመው ይሞክሩ።",
   "@sessionErrorTooFewSongs": {
-    "description": "Approved by a native speaker. A game cannot start: too few songs"
+    "description": "REVIEW. A game cannot start: too few songs"
   },
-  "sessionErrorTooFewArtists": "ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ሌላ ጥቅል ያውርዱ።",
+  "sessionErrorTooFewArtists": "ለዘፋኝ ጥያቄዎች በቂ የተለያዩ ዘፋኞች የሉም። የዘፈን ጥያቄዎችን ይምረጡ ወይም ከበይነመረብ ጋር ይገናኙ።",
   "@sessionErrorTooFewArtists": {
-    "description": "Approved by a native speaker. A game cannot start: too few different artists for artist questions"
+    "description": "REVIEW. A game cannot start: too few different artists for artist questions"
   },
   "sessionErrorNoSongsInEra": "ለ{era} ምንም ዘፈን የለም። ሌላ ዘመን ይምረጡ።",
   "@sessionErrorNoSongsInEra": {
     "description": "Approved by a native speaker. A game cannot start: the chosen era has no songs; era is the era's name"
   },
-  "sessionErrorClipsFailed": "ከ{count} ቅንጭቦች አንዱም መጫወት አልቻለም። ጥቅሉን እንደገና ያውርዱና ደግመው ይሞክሩ።",
+  "sessionErrorClipsFailed": "ከ{count} ቅንጭቦች አንዱም መጫወት አልቻለም። ግንኙነትዎን ያረጋግጡና ደግመው ይሞክሩ።",
   "@sessionErrorClipsFailed": {
-    "description": "Approved by a native speaker. A game ended because no clip would play"
+    "description": "REVIEW. A game ended because no clip would play"
   },
   "sessionErrorUnexpected": "የሆነ ችግር ተፈጥሯል፦ {detail}",
   "@sessionErrorUnexpected": {

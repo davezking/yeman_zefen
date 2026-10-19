@@ -28,7 +28,7 @@ class ResultsScreen extends ConsumerWidget {
             children: [
               Text(l10n.resultsNone),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.startTitle)),
+              FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.startTitle)),
             ],
           ),
         ),
@@ -94,7 +94,7 @@ class ResultsScreen extends ConsumerWidget {
           const Divider(height: 32),
           for (final round in summary.rounds) _RoundRow(round: round),
           const SizedBox(height: 24),
-          FilledButton(onPressed: () => context.go('/start'), child: Text(l10n.resultsPlayAgain)),
+          FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.resultsPlayAgain)),
           const SizedBox(height: 8),
           OutlinedButton(onPressed: () => context.go('/'), child: Text(l10n.resultsHome)),
         ],

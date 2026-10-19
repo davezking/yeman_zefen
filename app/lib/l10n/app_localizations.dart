@@ -1652,22 +1652,22 @@ abstract class AppLocalizations {
   /// **'You chose {name}'**
   String resultsYouChose(String name);
 
-  /// A game cannot start because no songs are installed
+  /// A game cannot start because no songs are on the phone and none can be fetched
   ///
   /// In en, this message translates to:
-  /// **'There are no songs on this phone yet. Download a pack first.'**
+  /// **'There are no songs to play yet. Connect to the internet and try again.'**
   String get sessionErrorNoSongs;
 
   /// A game cannot start: too few songs
   ///
   /// In en, this message translates to:
-  /// **'There aren\'t enough songs to make a round. Download another pack.'**
+  /// **'There aren\'t enough songs to make a round. Connect to the internet and try again.'**
   String get sessionErrorTooFewSongs;
 
   /// A game cannot start: too few different artists for artist questions
   ///
   /// In en, this message translates to:
-  /// **'There aren\'t enough different artists for artist questions. Choose Song questions or download another pack.'**
+  /// **'There aren\'t enough different artists for artist questions. Choose Song questions or connect to the internet.'**
   String get sessionErrorTooFewArtists;
 
   /// A game cannot start: the chosen era has no songs; era is the era's name
@@ -1679,7 +1679,7 @@ abstract class AppLocalizations {
   /// A game ended because no clip would play
   ///
   /// In en, this message translates to:
-  /// **'None of the {count} clips could be played. Download the pack again and try once more.'**
+  /// **'None of the {count} clips could be played. Check your connection and try once more.'**
   String sessionErrorClipsFailed(int count);
 
   /// A game failed for an unexpected reason; detail is the technical message

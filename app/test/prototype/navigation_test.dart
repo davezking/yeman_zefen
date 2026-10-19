@@ -12,7 +12,7 @@ import 'package:yeman_zefen/prototype/prototype_jumps.dart';
 import 'package:yeman_zefen/prototype/prototype_model.dart';
 import 'package:yeman_zefen/prototype/prototype_router.dart';
 import 'package:yeman_zefen/prototype/round_simulation.dart';
-import 'package:yeman_zefen/prototype/screens/home_screen.dart';
+import 'package:yeman_zefen/features/game/presentation/home_screen.dart';
 
 import 'screen_kit.dart';
 
