@@ -1,5 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import fixtures from "../../docs/fixtures/scoring.json";
 import payloadDoc from "../../docs/session-payload.md?raw";
 import { isoWeek } from "../src/lib/period";
 import { sessionPayloadSchema } from "../src/routes/v1/sessions";
@@ -229,11 +230,65 @@ describe("POST /v1/sessions: an honest session", () => {
     expect(await res.json()).toEqual({ score: 168, rounds: [{ points: 168, correct: true }, { points: 0, correct: false }], flagged: false });
   });
 
+  it("counts a Which Era? session on the all-eras boards only, under generation 0", async () => {
+    const body = honest({
+      mode: "generation",
+      generationId: 0,
+      rounds: [
+        { trackId: t(0), question: "era", optionIds: [1, 2, ERA, 5], chosenId: ERA, responseMs: 3000, hintUsed: false },
+      ],
+    });
+    await post("u-era-board", body, { provider: REGISTERED });
+    expect(await board("u-era-board")).toEqual(
+      [
+        { period: "all", generation_id: 0, points: 168 },
+        { period: isoWeek(Date.now()), generation_id: 0, points: 168 },
+      ].sort((x, y) => x.period.localeCompare(y.period)),
+    );
+  });
+
+  it("rejects a Which Era? session with a session era: it has no era filter", async () => {
+    const body = honest({
+      mode: "generation",
+      generationId: ERA,
+      rounds: [
+        { trackId: t(0), question: "era", optionIds: [1, 2, ERA, 5], chosenId: ERA, responseMs: 3000, hintUsed: false },
+      ],
+    });
+    const res = await post("u-era-filter", body, { provider: REGISTERED });
+    expect(res.status).toBe(422);
+    expect(await board("u-era-filter")).toEqual([]);
+  });
+
   it("requires a token", async () => {
     const res = await exports.default.fetch(
       new Request("https://api.test/v1/sessions", { method: "POST", body: JSON.stringify(honest()) }),
     );
     expect(res.status).toBe(401);
+  });
+});
+
+// Every worked example of docs/scoring.md, played as a one-round session: the server must give the
+// same points the app's scorer does, in every mode and difficulty (docs/fixtures/scoring.json).
+describe("scores like the app: every shared fixture round", () => {
+  it.each(fixtures.rounds)("$id", async (c) => {
+    const answerEra = c.mode === "generation";
+    const round: Round = answerEra
+      ? {
+          trackId: t(0),
+          question: "era",
+          optionIds: [1, 2, ERA, 5],
+          chosenId: c.correct ? ERA : 1,
+          responseMs: c.responseMs,
+          hintUsed: c.hintUsed,
+        }
+      : songRound(0, { chosenId: c.correct ? t(0) : t(1), responseMs: c.responseMs, hintUsed: c.hintUsed });
+    const body = honest({ mode: c.mode, difficulty: c.difficulty ?? "easy", rounds: [round] });
+    const res = await post(`u-fixture-${c.id}`, body, { provider: REGISTERED });
+    expect(res.status).toBe(200);
+    const result = (await res.json()) as { score: number; rounds: { points: number }[] };
+    expect(result.rounds[0]!.points).toBe(c.points);
+    expect(result.score).toBe(c.points);
   });
 });
 

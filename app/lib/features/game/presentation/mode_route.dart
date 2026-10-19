@@ -6,7 +6,7 @@ import '../../../prototype/models.dart' as proto;
 import '../application/play_setup.dart';
 import 'mode_select_screen.dart';
 
-/// Mode select with the saved choices. Era guessing is not offered until the round engine plays it.
+/// Mode select with the saved choices: Intro, Middle and Which Era?.
 class ModeRoute extends ConsumerWidget {
   const ModeRoute({super.key});
 
@@ -16,7 +16,7 @@ class ModeRoute extends ConsumerWidget {
     return ModeSelectScreen(
       mode: settings.mode,
       guess: settings.guess,
-      modes: const [proto.GameMode.intro, proto.GameMode.middle],
+      modes: proto.GameMode.values,
       onModeChanged: (mode) =>
           updatePlaySetup(ref, (s) => s.copyWith(mode: mode)),
       onGuessChanged: (guess) =>

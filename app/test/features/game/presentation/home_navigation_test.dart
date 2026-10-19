@@ -27,6 +27,9 @@ void main() {
 
   testWidgets('the leaderboard and settings open from home', (tester) async {
     final h = await pumpScreens(tester);
+    // Three modes sit above it now, so it may be below the fold.
+    await tester.ensureVisible(find.text('Leaderboard'));
+    await tester.pump();
     await tester.tap(find.text('Leaderboard'));
     await tester.pump();
     expect(h.location, '/leaderboard');

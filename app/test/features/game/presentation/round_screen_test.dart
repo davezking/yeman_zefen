@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/l10n/display_name.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 import 'package:yeman_zefen/features/game/presentation/round_route.dart';
@@ -92,6 +93,55 @@ void main() {
     testWidgets('there is no hint button until hints are wired (the ads task)', (tester) async {
       await pumpScreens(tester, location: '/play', state: playing(roundView()));
       expect(find.byIcon(Icons.lightbulb_outline_rounded), findsNothing);
+    });
+  });
+
+  group('Which Era?', () {
+    RoundView eraRound({RoundPhase phase = RoundPhase.answering, int? chosenId, int? correctId}) => RoundView(
+          number: 2,
+          total: 10,
+          kind: QuestionKind.era,
+          options: const [
+            AnswerOption(id: 1, name: DisplayName()),
+            AnswerOption(id: 2, name: DisplayName()),
+            AnswerOption(id: 3, name: DisplayName()),
+            AnswerOption(id: 5, name: DisplayName()),
+          ],
+          windowMs: 15000,
+          phase: phase,
+          attempt: 1,
+          chosenId: chosenId,
+          correctId: phase == RoundPhase.feedback ? correctId : null,
+          points: phase == RoundPhase.feedback ? 0 : null,
+          trackName: const DisplayName(latin: 'Song One'),
+          artistName: const DisplayName(latin: 'The Singer'),
+          clipPlaying: true,
+        );
+
+    testWidgets('asks which era, and the options are the eras in the UI language', (tester) async {
+      final h = await pumpScreens(tester, location: '/play', state: playing(eraRound()));
+      expect(find.text('Which era is this song from?'), findsOneWidget);
+      expect(find.byType(AnswerTile), findsNWidgets(4));
+      expect(find.text('The \'90s'), findsOneWidget);
+      expect(find.text('Modern'), findsOneWidget);
+
+      await tester.tap(find.text('Modern'));
+      expect(h.session.answered, 5);
+    });
+
+    testWidgets('a wrong answer names the song\'s real era', (tester) async {
+      await pumpScreens(
+        tester,
+        location: '/play',
+        state: playing(eraRound(phase: RoundPhase.feedback, chosenId: 5, correctId: 3)),
+      );
+      expect(find.textContaining('The \'90s'), findsWidgets);
+      expect(find.text('Your pick'), findsOneWidget);
+    });
+
+    testWidgets('the options are named in Amharic too', (tester) async {
+      await pumpScreens(tester, location: '/play', state: playing(eraRound()), device: const Locale('am'));
+      expect(find.text('ዘመናዊ'), findsOneWidget);
     });
   });
 

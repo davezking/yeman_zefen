@@ -82,11 +82,13 @@ class Scorer {
     return mode == GameMode.middle ? (base * 5 + 2) ~/ 4 : base;
   }
 
+  /// How much of the clip plays, in milliseconds: set by the difficulty, except in generation mode,
+  /// which always plays 10 s.
+  int clipMs(GameMode mode, Difficulty difficulty) =>
+      mode == GameMode.generation ? generationClipMs : difficulty.clipLengthMs;
+
   /// The time the player has to answer, in milliseconds: clip length plus 5 s.
-  int windowMs(GameMode mode, Difficulty difficulty) {
-    final clip = mode == GameMode.generation ? generationClipMs : difficulty.clipLengthMs;
-    return clip + windowExtraMs;
-  }
+  int windowMs(GameMode mode, Difficulty difficulty) => clipMs(mode, difficulty) + windowExtraMs;
 
   /// The speed bonus: `round(0.5 * base * max(0, 1 - responseMs / windowMs))`.
   int speedBonus({required int base, required int responseMs, required int windowMs}) {

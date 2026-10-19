@@ -232,7 +232,7 @@ proto.RoundView screenViewOf(
   final interrupted = round.phase == RoundPhase.interrupted;
 
   // The screen shows a track's title or artist by script; the name is already the right one.
-  proto.Track named(DisplayName song, DisplayName artist, {required int id}) {
+  proto.Track named(DisplayName song, DisplayName artist, {required int id, int generationId = 0}) {
     final title = l10n.nameOf(song, locale);
     final singer = l10n.nameOf(artist, locale);
     return proto.Track(
@@ -241,18 +241,22 @@ proto.RoundView screenViewOf(
       titleLatin: title,
       artistAm: singer,
       artistLatin: singer,
-      generationId: 0,
+      generationId: generationId,
       genre: proto.Genre.any,
     );
   }
 
   final options = [
     for (final o in round.options)
-      proto.RoundOption.track(
-        kind == proto.QuestionKind.artist
-            ? named(const DisplayName(), o.name, id: o.id)
-            : named(o.name, const DisplayName(), id: o.id),
-      ),
+      if (kind == proto.QuestionKind.era)
+        // Which Era?: the options are eras, which the screen names in the UI language.
+        proto.RoundOption.era(o.id)
+      else
+        proto.RoundOption.track(
+          kind == proto.QuestionKind.artist
+              ? named(const DisplayName(), o.name, id: o.id)
+              : named(o.name, const DisplayName(), id: o.id),
+        ),
   ];
   int indexOf(int? id) => id == null ? -1 : round.options.indexWhere((o) => o.id == id);
 
@@ -284,11 +288,17 @@ proto.RoundView screenViewOf(
     totalRounds: round.total,
     score: round.score,
     eraFilterId: config?.generationId ?? proto.EraId.all,
-    difficulty: config == null ? proto.Difficulty.medium : proto.Difficulty.values.byName(config.difficulty.name),
+    // Which Era? always plays 10 s, which is what Easy means.
+    difficulty: config == null
+        ? proto.Difficulty.medium
+        : kind == proto.QuestionKind.era
+            ? proto.Difficulty.easy
+            : proto.Difficulty.values.byName(config.difficulty.name),
     kind: kind,
     options: options,
     correctIndex: indexOf(round.correctId).clamp(0, options.isEmpty ? 0 : options.length - 1),
-    track: named(round.trackName, round.artistName, id: 0),
+    // For the reveal. In Which Era? that is the song's era, which is the correct answer.
+    track: named(round.trackName, round.artistName, id: 0, generationId: kind == proto.QuestionKind.era ? round.correctId ?? 0 : 0),
     phase: phase,
     clipPlaying: round.clipPlaying && !stopped,
     timeFraction: window == 0 ? 0 : leftMs / window,

@@ -11,6 +11,8 @@ import '../../packs/data/clip_providers.dart';
 import '../../packs/data/packs_providers.dart';
 import 'session_controller.dart';
 import '../data/game_library.dart';
+import '../domain/eras.dart';
+import '../domain/game_track.dart';
 import '../domain/session_config.dart' as domain;
 
 /// A song counts as playable for an era when a round can ask about it: this many at least, so
@@ -153,27 +155,34 @@ final playableSongsProvider = FutureProvider.autoDispose
       final base = await ref.watch(supportDirectoryProvider.future);
       final library = await loadGameLibrary(ref.watch(appDbProvider), base);
       final fetchable = await ref.watch(clipAccessProvider.future);
+      // Which Era? can only ask about a song that has a known era.
+      bool askable(GameTrack t) => mode != domain.GameMode.generation || eraIds.contains(t.generationId);
       final ids = library.playableIds(mode, includeFetchable: fetchable);
       final perEra = <int, int>{proto.EraId.all: 0};
       for (final track in library.tracks) {
-        if (!ids.contains(track.id)) continue;
+        if (!ids.contains(track.id) || !askable(track)) continue;
         perEra[proto.EraId.all] = perEra[proto.EraId.all]! + 1;
         final era = track.generationId;
         if (era != null) perEra[era] = (perEra[era] ?? 0) + 1;
       }
-      final onDevice = library
-          .playableIds(mode, includeFetchable: false)
+      final onDevice = library.tracks
+          .where((t) => askable(t) && library.hasClip(t.id, mode))
           .length;
       return PlayableSongs(perEra: perEra, onDevice: onDevice);
     });
 
-/// The round engine's mode for a chosen mode. Era guessing is not offered yet, so it plays Intro.
+/// The round engine's mode for a chosen mode. Which Era? is the generation-guess mode.
 domain.GameMode domainMode(proto.GameMode mode) => switch (mode) {
   proto.GameMode.intro => domain.GameMode.intro,
   proto.GameMode.middle => domain.GameMode.middle,
-  proto.GameMode.era => domain.GameMode.intro,
+  proto.GameMode.era => domain.GameMode.generation,
 };
 
+/// What a session plays for the choices in [s].
+///
+/// Which Era? has no era filter (the answer would be the filter) and no question choice, so its
+/// sessions are for all eras: they count on the all-eras leaderboards, under generation 0
+/// (`docs/scoring.md`). Its clip is always 10 s of the intro, whatever the difficulty says.
 domain.SessionConfig sessionConfigFor(proto.PlaySettings s) =>
     domain.SessionConfig(
       mode: domainMode(s.mode),
@@ -182,10 +191,12 @@ domain.SessionConfig sessionConfigFor(proto.PlaySettings s) =>
         proto.Difficulty.medium => domain.Difficulty.medium,
         proto.Difficulty.hard => domain.Difficulty.hard,
       },
-      generationId: s.generationId,
-      questions: s.guess == proto.GuessTarget.artist
-          ? domain.QuestionMix.artist
-          : domain.QuestionMix.song,
+      generationId: s.mode == proto.GameMode.era ? proto.EraId.all : s.generationId,
+      questions: switch (s.guess) {
+        proto.GuessTarget.song => domain.QuestionMix.song,
+        proto.GuessTarget.artist => domain.QuestionMix.artist,
+        proto.GuessTarget.mixed => domain.QuestionMix.mixed,
+      },
     );
 
 /// Applies [change] to the saved Play choices.
@@ -200,10 +211,16 @@ void updatePlaySetup(
 
 /// The choices Play uses: [settings], unless its era has too few songs right now, then all eras.
 /// [songs] is null while the counts load, and then [settings] is used as it is.
+///
+/// Which Era? has no era filter and always plays a 10 s clip, so it reads as all eras and Easy
+/// (10 s) everywhere: Home's line, the round's chips and the best score's key.
 proto.PlaySettings effectivePlaySettings(
   proto.PlaySettings settings,
   PlayableSongs? songs,
 ) {
+  if (settings.mode == proto.GameMode.era) {
+    return settings.copyWith(generationId: proto.EraId.all, difficulty: proto.Difficulty.easy);
+  }
   if (songs == null || !songs.disabledEras.contains(settings.generationId)) {
     return settings;
   }

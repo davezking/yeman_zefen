@@ -119,11 +119,21 @@ class _RoundRow extends StatelessWidget {
     return ListTile(
       key: Key('round-${round.number}'),
       leading: Icon(icon, color: color),
-      title: Text(l10n.nameOf(round.correctName, locale)),
+      // An era question names the song and the era it is from, so a wrong guess shows the answer.
+      title: Text(
+        round.correctEraId == null
+            ? l10n.nameOf(round.correctName, locale)
+            : '${l10n.nameOf(round.correctName, locale)} · ${l10n.eraLabel(round.correctEraId!)}',
+      ),
       subtitle: Text(
         round.chosenName == null
             ? l10n.feedbackTimeout
-            : (round.correct ? l10n.feedbackCorrect : l10n.resultsYouChose(l10n.nameOf(round.chosenName!, locale))),
+            : (round.correct
+                ? l10n.feedbackCorrect
+                // An era question's answer is an era, named in the UI language.
+                : l10n.resultsYouChose(
+                    round.chosenEraId != null ? l10n.eraLabel(round.chosenEraId!) : l10n.nameOf(round.chosenName!, locale),
+                  )),
       ),
       trailing: Text('${round.points}'),
     );

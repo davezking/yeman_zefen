@@ -17,7 +17,10 @@
     { "id": "E14", "mode": "intro", "difficulty": "easy", "correct": false, "responseMs": 150, "hintUsed": false, "base": 100, "windowMs": 15000, "bonus": 0, "points": 0, "valid": false },
     { "id": "E15", "mode": "generation", "difficulty": null, "correct": true, "responseMs": 3000, "hintUsed": false, "base": 120, "windowMs": 15000, "bonus": 48, "points": 168, "valid": true },
     { "id": "E16", "mode": "intro", "difficulty": "hard", "correct": true, "responseMs": 7000, "hintUsed": false, "base": 200, "windowMs": 8000, "bonus": 13, "points": 213, "valid": true },
-    { "id": "E17", "mode": "middle", "difficulty": "hard", "correct": true, "responseMs": 1000, "hintUsed": true, "base": 250, "windowMs": 8000, "bonus": 109, "points": 180, "valid": true }
+    { "id": "E17", "mode": "middle", "difficulty": "hard", "correct": true, "responseMs": 1000, "hintUsed": true, "base": 250, "windowMs": 8000, "bonus": 109, "points": 180, "valid": true },
+    { "id": "E18", "mode": "generation", "difficulty": null, "correct": false, "responseMs": 3000, "hintUsed": false, "base": 120, "windowMs": 15000, "bonus": 0, "points": 0, "valid": true },
+    { "id": "E19", "mode": "generation", "difficulty": null, "correct": true, "responseMs": 200, "hintUsed": false, "base": 120, "windowMs": 15000, "bonus": 59, "points": 179, "valid": true },
+    { "id": "E20", "mode": "generation", "difficulty": null, "correct": true, "responseMs": 3000, "hintUsed": true, "base": 120, "windowMs": 15000, "bonus": 48, "points": 84, "valid": true }
   ],
   "sessions": [
     {
@@ -55,6 +58,31 @@
       "points": [],
       "score": 0,
       "flagged": false
+    },
+    {
+      "id": "S4",
+      "mode": "generation",
+      "difficulty": null,
+      "answers": [
+        { "correct": true, "responseMs": 3000, "hintUsed": false },
+        { "correct": false, "responseMs": 3000, "hintUsed": false },
+        { "correct": true, "responseMs": 200, "hintUsed": false }
+      ],
+      "points": [168, 0, 179],
+      "score": 347,
+      "flagged": false
+    },
+    {
+      "id": "S5",
+      "mode": "generation",
+      "difficulty": null,
+      "answers": [
+        { "correct": true, "responseMs": 3000, "hintUsed": false },
+        { "correct": true, "responseMs": 199, "hintUsed": false }
+      ],
+      "points": [168, 0],
+      "score": 168,
+      "flagged": true
     }
   ]
 }

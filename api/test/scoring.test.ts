@@ -14,7 +14,7 @@ const difficultyOf = (d: string | null): Difficulty => (d ?? "easy") as Difficul
 
 describe("shared scoring fixture: rounds", () => {
   it("has every worked example", () => {
-    expect(fixtures.rounds.map((r) => r.id)).toEqual(Array.from({ length: 17 }, (_, i) => `E${i + 1}`));
+    expect(fixtures.rounds.map((r) => r.id)).toEqual(Array.from({ length: 20 }, (_, i) => `E${i + 1}`));
   });
 
   it.each(fixtures.rounds)("$id", (c: RoundCase) => {
