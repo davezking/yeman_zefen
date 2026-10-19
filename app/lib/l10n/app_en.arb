@@ -260,15 +260,21 @@
   "@resultsSyncing": {
     "description": "Results: the game was counted on the phone and the server's score has not arrived yet"
   },
+  "resultsSendLater": "Score saved. The server didn't answer, so it will be sent again shortly.",
+  "@resultsSendLater": {
+    "description": "Results: online, but the score could not be sent yet and will be retried"
+  },
   "resultsServerDiffers": "The server counted {score} points. Your phone counted {provisional}.",
   "@resultsServerDiffers": {
     "description": "Results: the server's score differs from the phone's count",
     "placeholders": {
       "score": {
-        "type": "int"
+        "type": "String",
+        "example": "1,200"
       },
       "provisional": {
-        "type": "int"
+        "type": "String",
+        "example": "1,150"
       }
     }
   },

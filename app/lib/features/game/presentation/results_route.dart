@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +11,7 @@ import '../../../prototype/labels.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
 import '../../account/ui/register_sheet.dart';
-import '../application/play_setup.dart';
+import '../application/play_setup.dart' show currentNetworkProvider;
 import '../application/session_controller.dart';
 import '../application/session_score.dart';
 import '../application/session_state.dart';
@@ -49,33 +51,49 @@ class ResultsRoute extends ConsumerWidget {
     final auth = ref.watch(authStateProvider).asData?.value ?? AuthState.signedOut;
     final signedIn = auth.hasUid && !auth.isAnonymous;
 
-    final sync = saved.serverScore != null
-        ? proto.ScoreSync.synced
-        : saved.parked
-            ? proto.ScoreSync.rejected
-            : (saved.queued && offline)
-                ? proto.ScoreSync.savedOffline
-                : proto.ScoreSync.provisional;
+    // "Checking your score…" only while an answer can actually come: the session is queued, the
+    // phone is online with an account to send it under, and no send has failed yet. A session
+    // that is not queued and has no server score was never saved (the save-error caption says
+    // so) or the server took it without a score: there is nothing to wait for.
+    final proto.ScoreSync sync;
+    if (saved.serverScore != null) {
+      sync = proto.ScoreSync.synced;
+    } else if (saved.parked) {
+      sync = proto.ScoreSync.rejected;
+    } else if (!saved.queued) {
+      sync = proto.ScoreSync.synced;
+    } else if (offline || !auth.hasUid) {
+      sync = proto.ScoreSync.savedOffline;
+    } else if (saved.retrying) {
+      sync = proto.ScoreSync.retrying;
+    } else {
+      sync = proto.ScoreSync.provisional;
+    }
+
+    // The server's score replaces the phone's, so "New best" is judged on the score shown.
+    final score = saved.serverScore ?? summary.totalScore;
+    final best = summary.bestBefore;
+    final newBest = saved.serverScore == null ? summary.isNewBest : (best == null ? summary.isNewBest : score > best);
 
     final view = proto.ResultsView(
-      score: saved.serverScore ?? summary.totalScore,
+      score: score,
       provisionalScore: summary.totalScore,
       rounds: [for (final r in summary.rounds) _roundOf(r, l10n, locale)],
       user: signedIn
           ? proto.UserInfo.signedIn(displayName: ref.watch(ownNameProvider).asData?.value ?? '')
           : const proto.UserInfo.guest(),
-      newBest: summary.isNewBest,
+      newBest: newBest,
       sync: sync,
       skipped: summary.skipped,
       flagged: summary.flagged,
       saveError: summary.saveError,
     );
 
-    final settings = ref.read(playSetupProvider);
     return ResultsScreen(
       view: view,
       onPlayAgain: () {
-        startPlaying(ref, effectivePlaySettings(settings, null));
+        // The same game again: the mode, era, difficulty and length that were just played.
+        unawaited(ref.read(sessionControllerProvider.notifier).start(summary.config));
         context.go('/play');
       },
       onChange: () => context.go('/setup'),
@@ -91,7 +109,8 @@ class ResultsRoute extends ConsumerWidget {
     // Names are resolved in the current language here, with the usual fallback for a name the
     // catalog does not have. The screen rebuilds on a language change, so the list follows it.
     final eraLine = r.kind == QuestionKind.era && r.correctEraId != null ? l10n.eraLabel(r.correctEraId!) : null;
-    final song = l10n.nameOf(r.correctName, locale);
+    // The song that played; for an artist question the answer is the singer, so not that.
+    final song = l10n.nameOf(r.trackName.isEmpty ? r.correctName : r.trackName, locale);
     final artist = eraLine ?? l10n.nameOf(r.artistName, locale);
     final track = proto.Track(
       id: '${r.number}',

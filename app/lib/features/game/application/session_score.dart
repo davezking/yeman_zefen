@@ -5,7 +5,7 @@ import '../../../core/db/app_db.dart';
 
 /// What the phone knows of a finished session's score on the server.
 class SessionScore {
-  const SessionScore({this.serverScore, this.queued = false, this.parked = false});
+  const SessionScore({this.serverScore, this.queued = false, this.parked = false, this.retrying = false});
 
   /// The score the server computed, once it has accepted the session. Null until then.
   final int? serverScore;
@@ -15,6 +15,10 @@ class SessionScore {
 
   /// The server refused the session for good (it cannot be checked), so it does not count.
   final bool parked;
+
+  /// A send already failed, so the queue waits before it tries again: the answer is not coming
+  /// right now.
+  final bool retrying;
 }
 
 /// The server's score for session [id], as the upload queue and the recent sessions show it. It
@@ -23,7 +27,7 @@ final sessionScoreProvider = StreamProvider.autoDispose.family<SessionScore, Str
   final db = ref.watch(appDbProvider);
   return db
       .customSelect(
-        'SELECT r.server_score AS server_score, p.id AS queued, p.parked AS parked '
+        'SELECT r.server_score AS server_score, p.id AS queued, p.parked AS parked, p.attempts AS attempts '
         'FROM (SELECT 1) '
         'LEFT JOIN recent_sessions r ON r.session_id = ? '
         'LEFT JOIN pending_sessions p ON p.id = ?',
@@ -37,6 +41,7 @@ final sessionScoreProvider = StreamProvider.autoDispose.family<SessionScore, Str
           serverScore: row.read<int?>('server_score'),
           queued: row.read<String?>('queued') != null,
           parked: row.read<bool?>('parked') ?? false,
+          retrying: (row.read<int?>('attempts') ?? 0) > 0,
         );
       });
 });

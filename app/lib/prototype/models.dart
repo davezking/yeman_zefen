@@ -409,6 +409,9 @@ enum ScoreSync {
 
   /// The server could not check the game, so it does not count for rankings.
   rejected,
+
+  /// Online, but the server did not answer this time: the game is queued and sent again later.
+  retrying,
 }
 
 class ResultsView {

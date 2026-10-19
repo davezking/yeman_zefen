@@ -824,11 +824,17 @@ abstract class AppLocalizations {
   /// **'Checking your score…'**
   String get resultsSyncing;
 
+  /// Results: online, but the score could not be sent yet and will be retried
+  ///
+  /// In en, this message translates to:
+  /// **'Score saved. The server didn\'t answer, so it will be sent again shortly.'**
+  String get resultsSendLater;
+
   /// Results: the server's score differs from the phone's count
   ///
   /// In en, this message translates to:
   /// **'The server counted {score} points. Your phone counted {provisional}.'**
-  String resultsServerDiffers(int score, int provisional);
+  String resultsServerDiffers(String score, String provisional);
 
   /// No description provided for @lbTitle.
   ///

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/auth/auth_service.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/core/net/network_kind.dart';
 import 'package:yeman_zefen/core/l10n/display_name.dart';
@@ -77,12 +78,72 @@ void main() {
     expect(find.text("Song 1 · The '90s"), findsOneWidget);
   });
 
+  testWidgets('an artist round names the song and its singer, not the singer twice', (tester) async {
+    const config = SessionConfig(mode: GameMode.intro, difficulty: Difficulty.medium);
+    await pumpScreens(
+      tester,
+      location: '/results',
+      state: const SessionState(
+        phase: SessionPhase.finished,
+        config: config,
+        summary: SessionSummary(
+          sessionId: 'test-session',
+          config: config,
+          totalScore: 0,
+          rounds: [
+            RoundSummary(
+              number: 1,
+              kind: QuestionKind.artist,
+              correctName: DisplayName(latin: 'Teddy Afro'),
+              trackName: DisplayName(latin: 'Tikur Sew'),
+              artistName: DisplayName(latin: 'Teddy Afro'),
+              chosenName: DisplayName(latin: 'Aster Aweke'),
+              correct: false,
+              points: 0,
+              valid: true,
+              responseMs: 3000,
+            ),
+          ],
+          skipped: 0,
+          flagged: false,
+          bestBefore: null,
+          isNewBest: false,
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(find.text('Tikur Sew · Teddy Afro'), findsOneWidget);
+  });
+
   group('the score from the server', () {
     testWidgets('is checked while the phone shows its own count', (tester) async {
-      await pumpScreens(tester, location: '/results', state: finishedState());
+      final h = await pumpScreens(tester, location: '/results', state: finishedState(), auth: _guest);
+      await _queue(h);
       await settle(tester);
       expect(find.text('Checking your score…'), findsOneWidget);
       expect(find.text('412'), findsOneWidget);
+    });
+
+    testWidgets('is not waited for when the game was not queued (not saved, or taken without a score)', (tester) async {
+      await pumpScreens(tester, location: '/results', state: finishedState(), auth: _guest);
+      await settle(tester);
+      expect(find.text('Checking your score…'), findsNothing);
+      expect(find.text('412'), findsOneWidget);
+    });
+
+    testWidgets('without an account to send it under, it is saved for later', (tester) async {
+      final h = await pumpScreens(tester, location: '/results', state: finishedState());
+      await _queue(h);
+      await settle(tester);
+      expect(find.text('Checking your score…'), findsNothing);
+      expect(find.text("Score saved. It will be sent when you're back online."), findsOneWidget);
+    });
+
+    testWidgets('after a failed send while online, it says it will be sent again', (tester) async {
+      final h = await pumpScreens(tester, location: '/results', state: finishedState(), auth: _guest);
+      await _queue(h, attempts: 1);
+      await settle(tester);
+      expect(find.text("Score saved. The server didn't answer, so it will be sent again shortly."), findsOneWidget);
     });
 
     testWidgets('replaces the phone\'s count in place, and says when they differ', (tester) async {
@@ -109,6 +170,26 @@ void main() {
       expect(find.text('The server counted 430 points. Your phone counted 412.'), findsOneWidget);
     });
 
+    testWidgets('judges "New best" on the server\'s score', (tester) async {
+      final h = await pumpScreens(tester, location: '/results', state: finishedState(bestBefore: 400, isNewBest: true));
+      await settle(tester);
+      expect(find.text('New personal best'), findsOneWidget);
+
+      final db = h.container.read(appDbProvider);
+      await db.into(db.recentSessions).insert(
+            RecentSessionsCompanion.insert(
+              sessionId: 'test-session',
+              playedAt: 1,
+              trackIdsJson: '[]',
+              serverScore: const Value(390),
+            ),
+          );
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await settle(tester);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('New personal best'), findsNothing);
+    });
+
     testWidgets('says the score is saved and sent later, while offline', (tester) async {
       final h = await pumpScreens(tester, location: '/results', state: finishedState(), network: NetworkKind.none);
       await settle(tester);
@@ -133,12 +214,14 @@ void main() {
   });
 
   group('the buttons', () {
-    testWidgets('Play again starts the same settings', (tester) async {
-      final h = await pumpScreens(tester, location: '/results', state: finishedState());
+    testWidgets('Play again starts the game that was just played', (tester) async {
+      const played = SessionConfig(mode: GameMode.middle, difficulty: Difficulty.hard, generationId: 3, rounds: 5);
+      final h = await pumpScreens(tester, location: '/results', state: finishedState(sessionConfig: played));
       await settle(tester);
       await tester.tap(find.text('Play again'));
       await settle(tester);
       expect(h.location, '/play');
+      expect(h.session.startedWith, played);
       // Leaving the results stops the screen's watch of the database; take the screen down so the
       // stream ends inside the test.
       await tester.pumpWidget(const SizedBox());
@@ -167,4 +250,15 @@ void main() {
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 600));
+}
+
+/// Signed in anonymously: an account the queue can send under.
+const _guest = AuthState(uid: 'guest-uid');
+
+/// Puts the session in the upload queue, as the controller's save does.
+Future<void> _queue(Harness h, {int attempts = 0}) {
+  final db = h.container.read(appDbProvider);
+  return db.into(db.pendingSessions).insert(
+        PendingSessionsCompanion.insert(id: 'test-session', payloadJson: '{}', createdAt: 1, attempts: Value(attempts)),
+      );
 }

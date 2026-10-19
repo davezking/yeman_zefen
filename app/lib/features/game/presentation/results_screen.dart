@@ -48,7 +48,8 @@ class ResultsScreen extends StatelessWidget {
     final v = view;
     final grouped = NumberFormat.decimalPattern(locale.toString());
 
-    // Where the score stands: counted on the phone and waiting for the server, saved to send later,
+    // Where the score stands: counted on the phone and waiting for the server, saved to send later
+    // (offline, or after the server did not answer),
     // refused by the server, or confirmed by it (and, if it differs from the phone's count, said so).
     final note = switch (v.sync) {
       ScoreSync.provisional => (Icons.sync_rounded, l10n.resultsSyncing),
@@ -57,11 +58,15 @@ class ResultsScreen extends StatelessWidget {
         l10n.resultsSavedOffline,
       ),
       ScoreSync.rejected => (Icons.info_outline_rounded, l10n.resultsNotRanked),
+      ScoreSync.retrying => (Icons.schedule_rounded, l10n.resultsSendLater),
       ScoreSync.synced
           when v.provisionalScore != null && v.provisionalScore != v.score =>
         (
           Icons.cloud_done_rounded,
-          l10n.resultsServerDiffers(v.score, v.provisionalScore!),
+          l10n.resultsServerDiffers(
+            grouped.format(v.score),
+            grouped.format(v.provisionalScore!),
+          ),
         ),
       ScoreSync.synced => null,
     };

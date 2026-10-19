@@ -110,6 +110,7 @@ class RoundSummary {
     required this.number,
     required this.kind,
     required this.correctName,
+    this.trackName = const DisplayName(),
     this.artistName = const DisplayName(),
     required this.chosenName,
     required this.correct,
@@ -125,6 +126,10 @@ class RoundSummary {
 
   /// The song or singer that was the answer. For an era question, the song that played.
   final DisplayName correctName;
+
+  /// The song that played, for "Song · Singer" in the results list. For an artist question the
+  /// answer ([correctName]) is the singer, so the list names the song from here.
+  final DisplayName trackName;
 
   /// The song's singer, for "Song · Singer". Empty for an era question's song without a catalog name.
   final DisplayName artistName;

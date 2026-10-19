@@ -426,7 +426,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultsSyncing => 'Checking your score…';
 
   @override
-  String resultsServerDiffers(int score, int provisional) {
+  String get resultsSendLater =>
+      'Score saved. The server didn\'t answer, so it will be sent again shortly.';
+
+  @override
+  String resultsServerDiffers(String score, String provisional) {
     return 'The server counted $score points. Your phone counted $provisional.';
   }
 

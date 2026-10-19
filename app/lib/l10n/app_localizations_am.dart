@@ -421,7 +421,10 @@ class AppLocalizationsAm extends AppLocalizations {
   String get resultsSyncing => 'ውጤትዎን በማረጋገጥ ላይ…';
 
   @override
-  String resultsServerDiffers(int score, int provisional) {
+  String get resultsSendLater => 'ውጤቱ ተቀምጧል። አገልጋዩ ስላልመለሰ በቅርቡ እንደገና ይላካል።';
+
+  @override
+  String resultsServerDiffers(String score, String provisional) {
     return 'አገልጋዩ $score ነጥብ ቆጥሯል። ስልክዎ $provisional ቆጥሯል።';
   }
 
