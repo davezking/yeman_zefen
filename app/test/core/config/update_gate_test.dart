@@ -8,6 +8,7 @@ import 'package:yeman_zefen/core/config/remote_config.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/core/net/network_kind.dart';
 import 'package:yeman_zefen/features/game/application/play_setup.dart';
+import 'package:yeman_zefen/features/packs/application/offline_play.dart';
 import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
 import 'package:yeman_zefen/core/config/update_required_screen.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
@@ -40,6 +41,7 @@ void main() {
           authStateProvider.overrideWith((ref) => Stream.value(AuthState.signedOut)),
           currentNetworkProvider.overrideWith((ref) => Stream.value(NetworkKind.unmetered)),
           installedPacksSummaryProvider.overrideWith((ref) => Stream.value(const InstalledPacksSummary(count: 0, bytes: 0))),
+          packUpdatesProvider.overrideWith((ref) => Stream.value(const <String>{})),
         ],
         child: const App(),
       ),

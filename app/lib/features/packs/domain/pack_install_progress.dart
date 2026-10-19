@@ -1,4 +1,4 @@
-enum PackInstallState { queued, downloading, verifying, installed, failed }
+enum PackInstallState { queued, downloading, verifying, installed, failed, cancelled }
 
 /// A snapshot of one pack's install. Byte counts include verified files and the
 /// in-flight part of files still downloading.
@@ -22,5 +22,7 @@ class PackInstallProgress {
   final String? error;
 
   bool get isTerminal =>
-      state == PackInstallState.installed || state == PackInstallState.failed;
+      state == PackInstallState.installed ||
+      state == PackInstallState.failed ||
+      state == PackInstallState.cancelled;
 }

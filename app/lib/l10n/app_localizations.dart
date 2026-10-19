@@ -938,11 +938,17 @@ abstract class AppLocalizations {
   /// **'Off saves data: only songs already on your phone play.'**
   String get packsMobilePrefetchHelp;
 
-  /// No description provided for @packsCache.
+  /// Offline play: how much the clip cache holds, and its cap
   ///
   /// In en, this message translates to:
-  /// **'Cache {size} MB'**
-  String packsCache(int size);
+  /// **'Cache {size} of {cap} MB'**
+  String packsCacheOfCap(int size, int cap);
+
+  /// Offline play: storage the songs take on the phone, by where they came from
+  ///
+  /// In en, this message translates to:
+  /// **'Songs use {total} MB here: built-in {builtIn} MB, packs {packs} MB, cache {cache} MB.'**
+  String packsStorageUsed(int total, int builtIn, int packs, int cache);
 
   /// No description provided for @packsClearCache.
   ///
@@ -1687,84 +1693,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong: {detail}'**
   String sessionErrorUnexpected(String detail);
-
-  /// Tooltip of a refresh button
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh'**
-  String get commonRefresh;
-
-  /// The list of packs could not be loaded
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t load the packs. Check your connection.'**
-  String get packsLoadError;
-
-  /// The pack list is empty
-  ///
-  /// In en, this message translates to:
-  /// **'No packs are published yet.'**
-  String get packsNone;
-
-  /// Pack row details
-  ///
-  /// In en, this message translates to:
-  /// **'{count} songs · {size} MB · v{version}'**
-  String packsMeta(int count, String size, int version);
-
-  /// Pack row details when an older version is on the phone
-  ///
-  /// In en, this message translates to:
-  /// **'{count} songs · {size} MB · v{version} (installed v{installed})'**
-  String packsMetaInstalled(int count, String size, int version, int installed);
-
-  /// Label of a pack button while it installs
-  ///
-  /// In en, this message translates to:
-  /// **'Installing'**
-  String get packsInstalling;
-
-  /// Button that updates an installed pack
-  ///
-  /// In en, this message translates to:
-  /// **'Update'**
-  String get packsUpdateButton;
-
-  /// Pack install state: queued
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting'**
-  String get packsStateWaiting;
-
-  /// Pack install state: downloading
-  ///
-  /// In en, this message translates to:
-  /// **'Downloading'**
-  String get packsStateDownloading;
-
-  /// Pack install state: verifying checksums
-  ///
-  /// In en, this message translates to:
-  /// **'Checking'**
-  String get packsStateChecking;
-
-  /// Pack install state: done
-  ///
-  /// In en, this message translates to:
-  /// **'Installed'**
-  String get packsStateInstalled;
-
-  /// Pack install state: failed
-  ///
-  /// In en, this message translates to:
-  /// **'Failed'**
-  String get packsStateFailed;
-
-  /// Pack install progress line; state is one of the packsState words
-  ///
-  /// In en, this message translates to:
-  /// **'{state} {done}/{total} files'**
-  String packsFilesProgress(String state, int done, int total);
 }
 
 class _AppLocalizationsDelegate

@@ -20,6 +20,7 @@ class AppBottomBar extends StatelessWidget {
     required this.onHome,
     required this.onPlay,
     required this.onSettings,
+    this.settingsBadgeLabel,
   });
 
   final NavTab current;
@@ -29,6 +30,10 @@ class AppBottomBar extends StatelessWidget {
   final VoidCallback onHome;
   final VoidCallback onPlay;
   final VoidCallback onSettings;
+
+  /// When set, Settings gets a dot (something there needs a look, such as a
+  /// pack update) and this is read after its label.
+  final String? settingsBadgeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +63,11 @@ class AppBottomBar extends StatelessWidget {
             _PlayButton(label: playLabel, onTap: onPlay),
             _NavButton(
               icon: Icons.tune_rounded,
-              label: settingsLabel,
+              label: settingsBadgeLabel == null
+                  ? settingsLabel
+                  : '$settingsLabel, $settingsBadgeLabel',
               current: current == NavTab.settings,
+              badge: settingsBadgeLabel != null,
               onTap: onSettings,
             ),
           ],
@@ -75,16 +83,18 @@ class _NavButton extends StatelessWidget {
     required this.label,
     required this.current,
     required this.onTap,
+    this.badge = false,
   });
 
   final IconData icon;
   final String label;
   final bool current;
+  final bool badge;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return RaisedSurface(
+    final button = RaisedSurface(
       onTap: onTap,
       selected: current,
       semanticLabel: label,
@@ -100,6 +110,26 @@ class _NavButton extends StatelessWidget {
             ? ColorTokens.primaryAccentOnDark
             : ColorTokens.textPrimary,
       ),
+    );
+    if (!badge) return button;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        button,
+        const PositionedDirectional(
+          top: SpacingTokens.n6,
+          end: SpacingTokens.n6,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: ColorTokens.paletteCoral,
+              ),
+              child: SizedBox.square(dimension: SpacingTokens.n10),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

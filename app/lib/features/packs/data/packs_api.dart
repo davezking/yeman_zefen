@@ -14,6 +14,7 @@ class PackListing {
     required this.trackCount,
     required this.totalBytes,
     required this.publishedAt,
+    this.generationId,
   });
 
   final String slug;
@@ -24,6 +25,9 @@ class PackListing {
   final int trackCount;
   final int totalBytes;
   final int publishedAt;
+
+  /// The era the pack is for, or null when it has none.
+  final int? generationId;
 
   factory PackListing.fromJson(Map<String, dynamic> json) {
     final names = json['names'] as Map<String, dynamic>;
@@ -36,6 +40,7 @@ class PackListing {
       trackCount: json['trackCount'] as int,
       totalBytes: json['totalBytes'] as int,
       publishedAt: json['publishedAt'] as int,
+      generationId: json['generationId'] as int?,
     );
   }
 }

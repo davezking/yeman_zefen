@@ -219,6 +219,9 @@ class SettingsScreen extends StatelessWidget {
           onHome: onHome,
           onPlay: onPlay,
           onSettings: () {},
+          settingsBadgeLabel: offlineUpdateAvailable
+              ? l10n.packsUpdateAvailable
+              : null,
         ),
       ),
     );

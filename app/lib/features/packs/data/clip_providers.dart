@@ -66,12 +66,14 @@ final clipsChangedProvider = StreamProvider.autoDispose<void>((ref) {
   return db.tableUpdates(TableUpdateQuery.onAllTables([db.clips, db.catalogTracks])).map((_) {});
 });
 
-/// Registers the starter clips, then keeps the catalog fresh: on start (when online) and every
+/// Registers the starter clips, then keeps the catalog fresh: on every start (when online), every
 /// 12 hours while the app runs, and again when the app returns to the foreground after that long.
+/// The refresh is also what notices a new version of an installed pack (the Settings badge). On
+/// start it runs even when the last one is recent: with nothing new it is a single small request.
 final catalogStarterProvider = Provider<void>((ref) {
   unawaited(ref.read(starterReadyProvider.future));
   final refresher = ref.watch(catalogRefresherProvider);
-  unawaited(refresher.refreshIfDue());
+  unawaited(refresher.refresh());
   final timer = Timer.periodic(CatalogRefresher.interval, (_) => unawaited(refresher.refresh()));
   final lifecycle = AppLifecycleListener(onResume: () => unawaited(refresher.refreshIfDue()));
   ref.onDispose(() {

@@ -7,6 +7,7 @@ import '../../../core/net/network_kind.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
+import '../../packs/application/offline_play.dart';
 import '../../settings/application/settings_providers.dart';
 import '../application/play_setup.dart';
 import '../application/session_controller.dart';
@@ -48,6 +49,7 @@ class HomeRoute extends ConsumerWidget {
       offline: offline,
       hasDownloadedPacks: (packs?.count ?? 0) > 0,
       builtInSongCount: songs?.onDevice ?? 0,
+      packUpdateAvailable: ref.watch(packUpdateAvailableProvider),
       modes: const [proto.GameMode.intro, proto.GameMode.middle],
       onPlay: () {
         startPlaying(ref, quick);

@@ -1,23 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/auth/auth_service.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
-import 'package:yeman_zefen/features/packs/data/packs_api.dart';
+import 'package:yeman_zefen/features/packs/data/catalog_refresher.dart';
 import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
 
 import '../game/presentation/screen_kit.dart';
 
 const _signedIn = AuthState(uid: 'u1', isAnonymous: false, providers: ['google.com']);
-
-PackListing _listing(String slug, int version) => PackListing(
-      slug: slug,
-      nameAm: 'a',
-      nameEn: 'Golden era',
-      version: version,
-      manifestUrl: 'https://cdn.test/$slug/v$version/manifest.json',
-      trackCount: 3,
-      totalBytes: 1,
-      publishedAt: 1,
-    );
 
 void main() {
   testWidgets('a guest sees the guest line and no sign-out row', (tester) async {
@@ -46,26 +35,42 @@ void main() {
     expect(row.value, '0');
   });
 
-  testWidgets('a newer pack on the list gets the update badge', (tester) async {
-    await pumpScreens(
-      tester,
-      location: '/settings',
-      installed: {'golden-era': 1},
-      packs: [_listing('golden-era', 2)],
-    );
-    await tester.pumpAndSettle();
+  Future<void> installedWithCatalog(Harness h, {required int installed, required int known}) async {
+    final db = h.container.read(appDbProvider);
+    await db.into(db.installedPacks).insert(
+          InstalledPacksCompanion.insert(
+            slug: 'golden-era',
+            version: installed,
+            manifestJson: '{}',
+            installedAt: 1,
+            totalBytes: 1,
+          ),
+        );
+    await db.into(db.appSettings).insert(
+          AppSettingsCompanion.insert(key: CatalogRefresher.versionKey('golden-era'), value: '$known'),
+        );
+    await h.tester.pumpAndSettle();
+  }
+
+  testWidgets('a newer version in the catalog badges Offline play and the Settings tab', (tester) async {
+    final h = await pumpScreens(tester, location: '/settings');
+    await installedWithCatalog(h, installed: 1, known: 2);
     expect(find.text('Update available'), findsOneWidget);
+    expect(find.bySemanticsLabel('Settings, Update available'), findsOneWidget);
   });
 
   testWidgets('no badge when the installed pack is current', (tester) async {
-    await pumpScreens(
-      tester,
-      location: '/settings',
-      installed: {'golden-era': 2},
-      packs: [_listing('golden-era', 2)],
-    );
-    await tester.pumpAndSettle();
+    final h = await pumpScreens(tester, location: '/settings');
+    await installedWithCatalog(h, installed: 2, known: 2);
     expect(find.text('Update available'), findsNothing);
+    expect(find.bySemanticsLabel('Settings, Update available'), findsNothing);
+  });
+
+  testWidgets('Home badges the Settings tab, and never asks to download', (tester) async {
+    final h = await pumpScreens(tester);
+    await installedWithCatalog(h, installed: 1, known: 2);
+    expect(find.bySemanticsLabel('Settings, Update available'), findsOneWidget);
+    expect(find.text('Download'), findsNothing);
   });
 
   testWidgets('Offline play opens the packs screen', (tester) async {

@@ -14,9 +14,13 @@ class PackService {
 
   /// Installs the version [listing] names. Throws if the manifest cannot be
   /// fetched or used, or if the install fails (the installed version is then
-  /// left as it was).
-  Future<void> install(PackListing listing) async {
+  /// left as it was). [isCancelled] is asked once the manifest is in, because
+  /// [PackInstaller.cancel] only reaches an install the installer has started.
+  Future<void> install(PackListing listing, {bool Function()? isCancelled}) async {
     final json = await api.fetchManifestJson(listing.manifestUrl);
+    if (isCancelled?.call() ?? false) {
+      throw const PackInstallException('cancelled', failure: PackInstallFailure.cancelled);
+    }
     final PackManifest manifest;
     try {
       manifest = PackManifest.parse(json);

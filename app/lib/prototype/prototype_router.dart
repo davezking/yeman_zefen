@@ -12,7 +12,7 @@ import 'round_simulation.dart';
 import '../features/game/presentation/home_screen.dart';
 import 'screens/message_screens.dart';
 import '../features/game/presentation/mode_select_screen.dart';
-import 'screens/offline_play_screen.dart';
+import '../features/packs/presentation/offline_play_screen.dart';
 import 'screens/onboarding_screens.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/game/presentation/setup_screen.dart';
@@ -445,7 +445,12 @@ class _OfflineRouteState extends State<_OfflineRoute> {
         onWifiOnly: (v) => model.update(() => model.wifiOnly = v),
         onMobilePrefetch: (v) => model.update(() => model.mobilePrefetch = v),
         onClearCache: () => model.update(
-          () => model.cache = CacheUsage(usedMb: 0, capMb: model.cache.capMb),
+          () => model.cache = CacheUsage(
+            usedMb: 0,
+            capMb: model.cache.capMb,
+            builtInMb: model.cache.builtInMb,
+            packsMb: model.cache.packsMb,
+          ),
         ),
         onDownload: model.download,
         onCancel: model.cancel,

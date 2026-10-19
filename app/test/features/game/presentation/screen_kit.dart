@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +20,7 @@ import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
+import 'package:yeman_zefen/features/packs/application/offline_play.dart';
 import 'package:yeman_zefen/features/packs/data/pack_service.dart';
 import 'package:yeman_zefen/features/packs/data/packs_api.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
@@ -118,7 +121,7 @@ class FakePackService implements PackService {
   Future<void> Function(PackListing listing)? onInstall;
 
   @override
-  Future<void> install(PackListing listing) async {
+  Future<void> install(PackListing listing, {bool Function()? isCancelled}) async {
     installs.add(listing);
     await onInstall?.call(listing);
   }
@@ -162,6 +165,8 @@ Future<Harness> pumpScreens(
   final router = buildRouter(initialLocation: location);
   final db = AppDb(NativeDatabase.memory());
   addTearDown(db.close);
+  final support = Directory.systemTemp.createTempSync('screens');
+  addTearDown(() => support.deleteSync(recursive: true));
   final container = ProviderContainer(
     overrides: [
       deviceLocaleProvider.overrideWithBuild((ref, _) => device),
@@ -179,6 +184,7 @@ Future<Harness> pumpScreens(
       ownNameProvider.overrideWith((ref) async => null),
       currentNetworkProvider.overrideWith((ref) => Stream.value(network)),
       appDbProvider.overrideWith((ref) => db),
+      supportDirectoryProvider.overrideWith((ref) async => support),
       installedPacksSummaryProvider.overrideWith((ref) => Stream.value(InstalledPacksSummary(count: installed.length, bytes: 0))),
       appVersionProvider.overrideWith((ref) async => '1.0.0'),
       bestScoreProvider.overrideWith((ref, key) => (bestScore ?? (_, _) async => null)(key.$1, key.$2)),
@@ -187,6 +193,20 @@ Future<Harness> pumpScreens(
         return packs;
       }),
       installedVersionsProvider.overrideWith((ref) => Stream.value(installed)),
+      // The installed packs, named as the list names them.
+      installedPacksProvider.overrideWith(
+        (ref) => Stream.value([
+          for (final e in installed.entries)
+            InstalledPackInfo(
+              slug: e.key,
+              version: e.value,
+              nameAm: packs.where((l) => l.slug == e.key).firstOrNull?.nameAm ?? e.key,
+              nameEn: packs.where((l) => l.slug == e.key).firstOrNull?.nameEn ?? e.key,
+              songCount: packs.where((l) => l.slug == e.key).firstOrNull?.trackCount ?? 0,
+              totalBytes: packs.where((l) => l.slug == e.key).firstOrNull?.totalBytes ?? 0,
+            ),
+        ]),
+      ),
       packServiceProvider.overrideWithValue(packService ?? FakePackService()),
       packInstallProgressProvider.overrideWith((ref, slug) => (progress ?? (_) => const Stream.empty())(slug)),
       // The results route asks for the register prompt. A signed-out device is never asked, so the

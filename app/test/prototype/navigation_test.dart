@@ -204,6 +204,8 @@ void main() {
 
     // The '90s pack is not installed: Download starts it, and it finishes.
     expect(model.packs.firstWhere((p) => p.id == 'p-90s').isOnPhone, isFalse);
+    await tester.ensureVisible(find.text('Download'));
+    await tester.pump();
     await tester.tap(find.text('Download'));
     await tester.pump();
     expect(

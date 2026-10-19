@@ -82,6 +82,9 @@ class PackCard extends StatelessWidget {
         : game.eraColor(generationId);
     final failed = status == PackStatus.failed;
 
+    // A long button label (an update's size, a large text size) gets at most
+    // 40% of the screen and wraps, so the pack's name keeps its room.
+    final trailingMaxWidth = MediaQuery.sizeOf(context).width * 0.4;
     final heading = Row(
       children: [
         IconTile(color: art),
@@ -114,7 +117,10 @@ class PackCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: SpacingTokens.n8),
-        _Trailing(card: this),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: trailingMaxWidth),
+          child: _Trailing(card: this),
+        ),
       ],
     );
 
@@ -253,7 +259,7 @@ class _Trailing extends StatelessWidget {
               ),
               const SizedBox(width: SpacingTokens.n4),
             ],
-            Text(card.statusLabel ?? '', style: style),
+            Flexible(child: Text(card.statusLabel ?? '', style: style)),
           ],
         );
       case PackStatus.failed:

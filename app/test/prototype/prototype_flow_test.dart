@@ -177,6 +177,10 @@ void main() {
       await start(tester, model);
       await openOffline(tester);
 
+      await tester.ensureVisible(find.text('Download'));
+
+      await tester.pump();
+
       await tester.tap(find.text('Download'));
       await tester.pumpAndSettle();
       expect(find.text('Download on mobile data?'), findsOneWidget);
@@ -188,6 +192,10 @@ void main() {
         model.packs.firstWhere((p) => p.id == 'p-90s').status,
         PackStatus.notInstalled,
       );
+
+      await tester.ensureVisible(find.text('Download'));
+
+      await tester.pump();
 
       await tester.tap(find.text('Download'));
       await tester.pumpAndSettle();
@@ -210,6 +218,10 @@ void main() {
       await start(tester, model);
       await openOffline(tester);
 
+      await tester.ensureVisible(find.text('Download'));
+
+      await tester.pump();
+
       await tester.tap(find.text('Download'));
       await tester.pump();
       expect(find.text('Download on mobile data?'), findsNothing);
@@ -230,6 +242,10 @@ void main() {
           ..failNextDownload = PackProblem.downloadFailed;
         await start(tester, model);
         await openOffline(tester);
+
+        await tester.ensureVisible(find.text('Download'));
+
+        await tester.pump();
 
         await tester.tap(find.text('Download'));
         await tester.pump(const Duration(seconds: 3));
@@ -295,6 +311,8 @@ void main() {
         find.text('Connect to the internet to download packs.'),
         findsOneWidget,
       );
+      await tester.ensureVisible(find.text('Download'));
+      await tester.pump();
       await tester.tap(find.text('Download'));
       await tester.pump();
       expect(
@@ -320,10 +338,12 @@ void main() {
       await tester.pump();
       expect(model.mobilePrefetch, isFalse);
 
-      expect(find.text('Cache 31 MB'), findsOneWidget);
+      expect(find.text('Cache 31 of 50 MB'), findsOneWidget);
+      await tester.ensureVisible(find.text('Clear cache'));
+      await tester.pump();
       await tester.tap(find.text('Clear cache'));
       await tester.pump();
-      expect(find.text('Cache 0 MB'), findsOneWidget);
+      expect(find.text('Cache 0 of 50 MB'), findsOneWidget);
       await finish(tester, model);
     });
   });

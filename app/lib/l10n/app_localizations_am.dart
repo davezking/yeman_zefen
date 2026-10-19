@@ -492,8 +492,13 @@ class AppLocalizationsAm extends AppLocalizations {
       'ሲጠፋ ዳታ ይቆጥባል፤ በስልክዎ ላይ ያሉ ዘፈኖች ብቻ ይጫወታሉ።';
 
   @override
-  String packsCache(int size) {
-    return 'ማቆያ $size ሜባ';
+  String packsCacheOfCap(int size, int cap) {
+    return 'ማቆያ $size ከ$cap ሜባ';
+  }
+
+  @override
+  String packsStorageUsed(int total, int builtIn, int packs, int cache) {
+    return 'ዘፈኖቹ እዚህ $total ሜባ ይይዛሉ፦ አብረው የመጡ $builtIn ሜባ፣ ጥቅሎች $packs ሜባ፣ ማቆያ $cache ሜባ።';
   }
 
   @override
@@ -933,55 +938,5 @@ class AppLocalizationsAm extends AppLocalizations {
   @override
   String sessionErrorUnexpected(String detail) {
     return 'የሆነ ችግር ተፈጥሯል፦ $detail';
-  }
-
-  @override
-  String get commonRefresh => 'ያድሱ';
-
-  @override
-  String get packsLoadError => 'ጥቅሎቹን መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ።';
-
-  @override
-  String get packsNone => 'እስካሁን የታተመ ጥቅል የለም።';
-
-  @override
-  String packsMeta(int count, String size, int version) {
-    return '$count ዘፈኖች · $size ሜባ · v$version';
-  }
-
-  @override
-  String packsMetaInstalled(
-    int count,
-    String size,
-    int version,
-    int installed,
-  ) {
-    return '$count ዘፈኖች · $size ሜባ · v$version (የተጫነው v$installed)';
-  }
-
-  @override
-  String get packsInstalling => 'በመጫን ላይ';
-
-  @override
-  String get packsUpdateButton => 'ያዘምኑ';
-
-  @override
-  String get packsStateWaiting => 'በመጠባበቅ ላይ';
-
-  @override
-  String get packsStateDownloading => 'በማውረድ ላይ';
-
-  @override
-  String get packsStateChecking => 'በማረጋገጥ ላይ';
-
-  @override
-  String get packsStateInstalled => 'ተጭኗል';
-
-  @override
-  String get packsStateFailed => 'አልተሳካም';
-
-  @override
-  String packsFilesProgress(String state, int done, int total) {
-    return '$state $done/$total ፋይሎች';
   }
 }

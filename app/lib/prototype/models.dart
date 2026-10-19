@@ -212,12 +212,20 @@ class PackItem {
   );
 }
 
-/// How full the clip cache is: prefetched clips, evicted oldest first.
+/// How full the clip cache is (prefetched clips, evicted oldest first), and
+/// what the built-in songs and the downloaded packs take besides.
 class CacheUsage {
-  const CacheUsage({required this.usedMb, required this.capMb});
+  const CacheUsage({
+    required this.usedMb,
+    required this.capMb,
+    this.builtInMb = 0,
+    this.packsMb = 0,
+  });
 
   final int usedMb;
   final int capMb;
+  final int builtInMb;
+  final int packsMb;
 }
 
 /// What the phone is connected to, for the pack-download rules.
