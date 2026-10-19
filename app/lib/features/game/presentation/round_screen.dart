@@ -338,6 +338,11 @@ class _Status extends StatelessWidget {
       case RoundPhase.answering:
         head = l10n.questionText(v.kind);
         color = ColorTokens.textPrimary;
+      case RoundPhase.correct when !v.valid:
+        // Too fast to be a person: right, but worth nothing, and the player is told why.
+        head = l10n.feedbackTooFast;
+        color = ColorTokens.textPrimary;
+        style = text.title;
       case RoundPhase.correct:
         head = '${l10n.feedbackCorrect} ${l10n.feedbackPoints(v.points)}';
         color = game.correct.heading;

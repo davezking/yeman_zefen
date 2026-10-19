@@ -312,6 +312,7 @@ class RoundView {
     this.hintUsed = false,
     this.points = 0,
     this.speedBonus = 0,
+    this.valid = true,
     this.feedbackSecondsLeft = 0,
     this.overlay = RoundOverlay.none,
     this.overlaySeconds = 0,
@@ -355,6 +356,10 @@ class RoundView {
   /// Points for this round, once answered.
   final int points;
   final int speedBonus;
+
+  /// False when the answer was faster than a person can react (under 200 ms): it scores 0 and the
+  /// screen says it does not count, instead of "Correct".
+  final bool valid;
 
   /// The "Tap to continue · 5 s" countdown, in the wrong and time-out states.
   final int feedbackSecondsLeft;

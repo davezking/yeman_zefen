@@ -174,6 +174,7 @@ List<DesignScreen> _buildDesignScreens() {
     int secondsLeft = 7,
     int feedbackSeconds = 0,
     int score = 420,
+    bool valid = true,
     // The longest names in the catalog, to push the tiles to their limit.
     List<int> trackIndexes = const [3, 0, 8, 11],
   }) => RoundView(
@@ -201,6 +202,7 @@ List<DesignScreen> _buildDesignScreens() {
     hintUsed: hintUsed,
     points: points,
     speedBonus: points > 100 ? points - 100 : 0,
+    valid: valid,
     feedbackSecondsLeft: feedbackSeconds,
     overlay: overlay,
     overlaySeconds: overlaySeconds,
@@ -464,6 +466,19 @@ List<DesignScreen> _buildDesignScreens() {
           picked: 0,
           kind: QuestionKind.era,
           feedbackSeconds: 4,
+        ),
+      ),
+    ),
+    DesignScreen(
+      'round-too-fast',
+      "round: answer too fast to count",
+      null,
+      () => round(
+        roundView(
+          phase: RoundPhase.correct,
+          picked: 1,
+          points: 0,
+          valid: false,
         ),
       ),
     ),

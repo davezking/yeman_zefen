@@ -31,6 +31,13 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
   Timer? _tick;
   var _leaveOpen = false;
 
+  /// The session ended while the "Leave this game?" question was open: the results wait for the
+  /// answer instead of replacing the question.
+  var _resultsWaiting = false;
+
+  /// The last round that was on screen, kept to draw behind the question when the session ends.
+  SessionState? _lastPlaying;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +84,11 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
 
   void _keepPlaying() {
     setState(() => _leaveOpen = false);
+    if (_resultsWaiting) {
+      _resultsWaiting = false;
+      context.go('/results');
+      return;
+    }
     _controller.resume();
   }
 
@@ -98,7 +110,11 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
   Widget build(BuildContext context) {
     ref.listen(sessionControllerProvider, (previous, next) {
       if (next.phase == SessionPhase.finished && previous?.phase != SessionPhase.finished) {
-        context.go('/results');
+        if (_leaveOpen) {
+          _resultsWaiting = true;
+        } else {
+          context.go('/results');
+        }
       }
       final round = next.round;
       final before = previous?.round;
@@ -113,7 +129,10 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
       }
     });
     final l10n = AppLocalizations.of(context);
-    final state = ref.watch(sessionControllerProvider);
+    var state = ref.watch(sessionControllerProvider);
+    if (state.phase == SessionPhase.playing && state.round != null) _lastPlaying = state;
+    // The session ended under the open question: the round stays behind it until it is answered.
+    if (_leaveOpen && state.phase == SessionPhase.finished && _lastPlaying != null) state = _lastPlaying!;
     final over = state.phase == SessionPhase.failed || state.phase == SessionPhase.idle;
     final round = state.round;
 
@@ -278,6 +297,7 @@ proto.RoundView screenViewOf(
     pickedIndex: indexOf(round.chosenId) < 0 ? null : indexOf(round.chosenId),
     points: round.points ?? 0,
     speedBonus: round.speedBonus,
+    valid: round.valid,
     feedbackSecondsLeft: (feedbackLeftMs / 1000).ceil(),
     overlay: leaveOpen
         ? proto.RoundOverlay.leaveDialog

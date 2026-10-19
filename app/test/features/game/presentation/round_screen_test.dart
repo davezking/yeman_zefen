@@ -134,6 +134,16 @@ void main() {
       expect(find.text("Time's up"), findsOneWidget);
     });
 
+    testWidgets('an answer that was too fast says it does not count, instead of Correct', (tester) async {
+      await pumpScreens(
+        tester,
+        location: '/play',
+        state: playing(roundView(phase: RoundPhase.feedback, chosenId: 12, correctId: 12, points: 0, valid: false)),
+      );
+      expect(find.text('Too fast to count. 0 points'), findsOneWidget);
+      expect(find.textContaining('Speed bonus'), findsNothing);
+    });
+
     testWidgets('options cannot be tapped during the pause', (tester) async {
       final h = await pumpScreens(
         tester,
@@ -238,6 +248,32 @@ void main() {
       expect(h.session.left, 0);
       expect(h.session.resumed, 1);
       expect(h.location, '/play');
+    });
+
+    testWidgets('a session that ends under the open question waits for the answer', (tester) async {
+      final h = await pumpScreens(tester, location: '/play', state: playing(roundView()));
+      await tester.tap(find.bySemanticsLabel('Leave game'));
+      await settle(tester);
+
+      h.session.show(SessionState(
+        phase: SessionPhase.finished,
+        config: config,
+        summary: const SessionSummary(
+          config: config,
+          totalScore: 900,
+          rounds: [],
+          skipped: 0,
+          flagged: false,
+          bestBefore: null,
+          isNewBest: false,
+        ),
+      ));
+      await settle(tester);
+      expect(h.location, '/play', reason: 'the results do not replace the question');
+
+      await tester.tap(find.text('Keep playing'));
+      await settle(tester);
+      expect(h.location, '/results');
     });
 
     testWidgets('leaving stops the session and goes to the start screen', (tester) async {
