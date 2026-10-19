@@ -7,6 +7,7 @@ import '../../../core/db/app_db.dart';
 import '../../../core/http/api_providers.dart';
 import '../domain/pack_install_progress.dart';
 import 'clip_downloader.dart';
+import 'clip_providers.dart';
 import 'pack_installer.dart';
 import 'pack_service.dart';
 import 'packs_api.dart';
@@ -28,6 +29,8 @@ final packInstallerProvider = Provider<PackInstaller>((ref) {
     db: ref.watch(appDbProvider),
     downloader: ref.watch(clipDownloaderProvider),
     supportDirectory: getApplicationSupportDirectory,
+    // The shared store, so a removed pack's clips join the same cache the sessions trim.
+    store: ref.watch(clipStoreProvider),
   );
   ref.onDispose(installer.dispose);
   return installer;

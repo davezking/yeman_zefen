@@ -10,6 +10,7 @@ import '../../../core/l10n/locale_provider.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
 import '../../game/application/play_setup.dart';
+import '../../packs/application/offline_play.dart';
 import '../application/settings_providers.dart';
 import 'settings_screen.dart';
 
@@ -45,8 +46,7 @@ class SettingsRoute extends ConsumerWidget {
           : const proto.UserInfo.guest(),
       offlinePackCount: packs?.count ?? 0,
       offlineSizeMb: packs?.megabytes ?? 0,
-      offlineUpdateAvailable:
-          ref.watch(packUpdateAvailableProvider).asData?.value ?? false,
+      offlineUpdateAvailable: ref.watch(packUpdateAvailableProvider),
       version: ref.watch(appVersionProvider).asData?.value ?? '',
       onLanguage: (code) =>
           ref.read(localeChoiceProvider.notifier).choose(Locale(code)),

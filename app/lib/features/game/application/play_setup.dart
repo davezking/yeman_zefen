@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/db/app_db.dart';
 import '../../../core/net/network_kind.dart';
 import '../../../prototype/models.dart' as proto;
+import '../../packs/application/offline_play.dart';
 import '../../packs/data/clip_providers.dart';
 import '../../packs/data/packs_providers.dart';
 import 'session_controller.dart';
@@ -109,7 +110,7 @@ final clipAccessProvider = FutureProvider.autoDispose<bool>((ref) async {
   final network = current.hasValue ? current.requireValue : await ref.watch(currentNetworkProvider.future);
   return switch (network) {
     NetworkKind.unmetered => true,
-    NetworkKind.cellular => ref.watch(clipSettingsProvider).prefetchOnMobile(),
+    NetworkKind.cellular => ref.watch(mobilePrefetchProvider.future),
     NetworkKind.none => false,
   };
 });

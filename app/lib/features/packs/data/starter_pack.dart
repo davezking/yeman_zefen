@@ -12,6 +12,10 @@ import 'pack_manifest.dart';
 /// writes it: `manifest.json`, then each clip as `clips/{trackId}-{intro|middle}.mp3`.
 const starterAssetDir = 'assets/starter';
 
+/// The slug of the pack the starter clips come from. It is built into the app, so Settings →
+/// Offline play does not list it.
+const starterPackSlug = 'starter';
+
 /// Puts the bundled starter clips on the device and into the catalog, so the first round of a
 /// first launch needs no network.
 ///

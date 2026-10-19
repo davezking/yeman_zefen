@@ -252,7 +252,7 @@ const mockPacks = <PackItem>[
 ];
 
 /// Clip-cache use: prefetched clips, capped at 50 MB by default.
-const mockCache = CacheUsage(usedMb: 31, capMb: 50);
+const mockCache = CacheUsage(usedMb: 31, capMb: 50, builtInMb: 8, packsMb: 27);
 
 /// A guest who has played before.
 const mockGuest = UserInfo.guest(bestScore: 1240);

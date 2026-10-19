@@ -497,8 +497,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Off saves data: only songs already on your phone play.';
 
   @override
-  String packsCache(int size) {
-    return 'Cache $size MB';
+  String packsCacheOfCap(int size, int cap) {
+    return 'Cache $size of $cap MB';
+  }
+
+  @override
+  String packsStorageUsed(int total, int builtIn, int packs, int cache) {
+    return 'Songs use $total MB here: built-in $builtIn MB, packs $packs MB, cache $cache MB.';
   }
 
   @override
@@ -944,56 +949,5 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String sessionErrorUnexpected(String detail) {
     return 'Something went wrong: $detail';
-  }
-
-  @override
-  String get commonRefresh => 'Refresh';
-
-  @override
-  String get packsLoadError =>
-      'Couldn\'t load the packs. Check your connection.';
-
-  @override
-  String get packsNone => 'No packs are published yet.';
-
-  @override
-  String packsMeta(int count, String size, int version) {
-    return '$count songs · $size MB · v$version';
-  }
-
-  @override
-  String packsMetaInstalled(
-    int count,
-    String size,
-    int version,
-    int installed,
-  ) {
-    return '$count songs · $size MB · v$version (installed v$installed)';
-  }
-
-  @override
-  String get packsInstalling => 'Installing';
-
-  @override
-  String get packsUpdateButton => 'Update';
-
-  @override
-  String get packsStateWaiting => 'Waiting';
-
-  @override
-  String get packsStateDownloading => 'Downloading';
-
-  @override
-  String get packsStateChecking => 'Checking';
-
-  @override
-  String get packsStateInstalled => 'Installed';
-
-  @override
-  String get packsStateFailed => 'Failed';
-
-  @override
-  String packsFilesProgress(String state, int done, int total) {
-    return '$state $done/$total files';
   }
 }

@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/app_db.dart';
-import '../../packs/domain/pack_update.dart';
-import '../../packs/data/packs_api.dart';
-import '../../packs/data/packs_providers.dart';
 
 /// A yes-or-no setting, saved in `app_settings` under [key]. Until it is loaded, and when it was
 /// never chosen, it is [fallback].
@@ -96,24 +93,4 @@ final installedPacksSummaryProvider = StreamProvider<InstalledPacksSummary>((
           bytes: rows.fold(0, (sum, r) => sum + r.totalBytes),
         ),
       );
-});
-
-/// True when a pack on the listing is newer than the one installed. Offline, or when the list
-/// cannot be fetched, there is no badge.
-final packUpdateAvailableProvider = FutureProvider.autoDispose<bool>((
-  ref,
-) async {
-  final List<PackListing> listings;
-  try {
-    listings = await ref.watch(packListingsProvider.future);
-  } catch (_) {
-    return false;
-  }
-  final installed = await ref.watch(installedVersionsProvider.future);
-  return listings.any(
-    (l) => isUpdateAvailable(
-      installedVersion: installed[l.slug],
-      listedVersion: l.version,
-    ),
-  );
 });

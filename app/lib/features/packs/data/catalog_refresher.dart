@@ -27,7 +27,11 @@ class CatalogRefresher {
   static const interval = Duration(hours: 12);
 
   static const refreshedAtKey = 'catalog_refreshed_at';
-  static String _versionKey(String slug) => 'catalog_pack:$slug';
+
+  /// Where the version of each pack whose manifest is in the catalog is saved. Settings compares it
+  /// with the installed version to show that an update is available.
+  static const versionKeyPrefix = 'catalog_pack:';
+  static String versionKey(String slug) => '$versionKeyPrefix$slug';
 
   Future<String?> _get(String key) async {
     final row = await (db.select(db.appSettings)..where((t) => t.key.equals(key))).getSingleOrNull();
@@ -60,7 +64,7 @@ class CatalogRefresher {
     }
     var allOk = true;
     for (final listing in listings) {
-      final known = int.tryParse(await _get(_versionKey(listing.slug)) ?? '');
+      final known = int.tryParse(await _get(versionKey(listing.slug)) ?? '');
       if (known != null && known >= listing.version) continue;
       try {
         final json = await api.fetchManifestJson(listing.manifestUrl);
@@ -70,7 +74,7 @@ class CatalogRefresher {
         }
         await db.transaction(() async {
           await store.upsertCatalog(manifest.tracks);
-          await _set(_versionKey(listing.slug), '${manifest.version}');
+          await _set(versionKey(listing.slug), '${manifest.version}');
         });
       } catch (e) {
         allOk = false;

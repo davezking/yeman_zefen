@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
-import '../../core/theme/app_text.dart';
-import '../../core/theme/theme_context.dart';
-import '../../core/theme/tokens.dart';
-import '../../core/widgets/widgets.dart';
-import '../../l10n/app_localizations.dart';
-import '../models.dart';
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../prototype/models.dart';
 
 /// Settings › Offline play: the two data toggles, what is on the phone (the
 /// built-in songs, downloaded packs, the clip cache) and the packs available
@@ -160,9 +160,18 @@ class OfflinePlayScreen extends StatelessWidget {
           ),
           _OnPhoneHeader(
             title: l10n.packsOnPhone,
-            cache: l10n.packsCache(cache.usedMb),
+            cache: l10n.packsCacheOfCap(cache.usedMb, cache.capMb),
             clearLabel: l10n.packsClearCache,
             onClear: onClearCache,
+          ),
+          Text(
+            l10n.packsStorageUsed(
+              cache.builtInMb + cache.packsMb + cache.usedMb,
+              cache.builtInMb,
+              cache.packsMb,
+              cache.usedMb,
+            ),
+            style: text.caption.copyWith(color: ColorTokens.textSecondary),
           ),
           PackCard(
             name: l10n.packsBuiltIn,
@@ -310,9 +319,14 @@ class _OnPhoneHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                cache,
-                style: text.caption.copyWith(color: ColorTokens.textSecondary),
+              // Wraps rather than overflows next to the button on a narrow phone.
+              Flexible(
+                child: Text(
+                  cache,
+                  style: text.caption.copyWith(
+                    color: ColorTokens.textSecondary,
+                  ),
+                ),
               ),
               const SizedBox(width: SpacingTokens.n8),
               SecondaryButton(

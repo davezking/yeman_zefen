@@ -9,7 +9,7 @@ import 'package:yeman_zefen/features/game/presentation/home_screen.dart';
 import 'package:yeman_zefen/features/leaderboard/ui/leaderboard_screen.dart';
 import 'package:yeman_zefen/prototype/screens/message_screens.dart';
 import 'package:yeman_zefen/features/game/presentation/mode_select_screen.dart';
-import 'package:yeman_zefen/prototype/screens/offline_play_screen.dart';
+import 'package:yeman_zefen/features/packs/presentation/offline_play_screen.dart';
 import 'package:yeman_zefen/prototype/screens/onboarding_screens.dart';
 import 'package:yeman_zefen/prototype/screens/results_screen.dart';
 import 'package:yeman_zefen/prototype/screens/round_screen.dart';

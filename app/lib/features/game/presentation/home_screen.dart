@@ -27,6 +27,7 @@ class HomeScreen extends StatelessWidget {
     this.hasDownloadedPacks = false,
     this.builtInSongCount = 0,
     this.modes = GameMode.values,
+    this.packUpdateAvailable = false,
   });
 
   /// The modes offered as rows. The app offers only the modes its round engine can play.
@@ -43,6 +44,9 @@ class HomeScreen extends StatelessWidget {
   /// Any pack is installed; the offline banner then says "downloaded" songs too.
   final bool hasDownloadedPacks;
   final int builtInSongCount;
+
+  /// An installed pack has an update: the Settings tab gets a badge. Home never asks to download it.
+  final bool packUpdateAvailable;
 
   final VoidCallback onPlay;
 
@@ -154,6 +158,9 @@ class HomeScreen extends StatelessWidget {
           onHome: () {},
           onPlay: onPlay,
           onSettings: onSettings,
+          settingsBadgeLabel: packUpdateAvailable
+              ? l10n.packsUpdateAvailable
+              : null,
         ),
       ),
     );

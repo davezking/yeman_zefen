@@ -140,7 +140,14 @@
   "packsWifiOnly": "ጥቅሎችን በዋይፋይ ብቻ ያውርዱ",
   "packsMobilePrefetch": "ቀጣይ ዘፈኖችን በሞባይል ዳታ ያውርዱ",
   "packsMobilePrefetchHelp": "ሲጠፋ ዳታ ይቆጥባል፤ በስልክዎ ላይ ያሉ ዘፈኖች ብቻ ይጫወታሉ።",
-  "packsCache": "ማቆያ {size} ሜባ",
+  "packsCacheOfCap": "ማቆያ {size} ከ{cap} ሜባ",
+  "@packsCacheOfCap": {
+    "description": "REVIEW. Offline play: how much the clip cache holds, and its cap"
+  },
+  "packsStorageUsed": "ዘፈኖቹ እዚህ {total} ሜባ ይይዛሉ፦ አብረው የመጡ {builtIn} ሜባ፣ ጥቅሎች {packs} ሜባ፣ ማቆያ {cache} ሜባ።",
+  "@packsStorageUsed": {
+    "description": "REVIEW. Offline play: storage the songs take on the phone, by where they came from"
+  },
   "packsClearCache": "ማቆያውን ያጽዱ",
   "packsBuiltIn": "አብረው የመጡ ዘፈኖች",
   "packsBuiltInMeta": "{count} ዘፈኖች · ከመተግበሪያው ጋር",
@@ -342,57 +349,5 @@
   "sessionErrorUnexpected": "የሆነ ችግር ተፈጥሯል፦ {detail}",
   "@sessionErrorUnexpected": {
     "description": "Approved by a native speaker. A game failed for an unexpected reason; detail is the technical message"
-  },
-  "commonRefresh": "ያድሱ",
-  "@commonRefresh": {
-    "description": "Approved by a native speaker. Tooltip of a refresh button"
-  },
-  "packsLoadError": "ጥቅሎቹን መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ።",
-  "@packsLoadError": {
-    "description": "Approved by a native speaker. The list of packs could not be loaded"
-  },
-  "packsNone": "እስካሁን የታተመ ጥቅል የለም።",
-  "@packsNone": {
-    "description": "Approved by a native speaker. The pack list is empty"
-  },
-  "packsMeta": "{count} ዘፈኖች · {size} ሜባ · v{version}",
-  "@packsMeta": {
-    "description": "Approved by a native speaker. Pack row details"
-  },
-  "packsMetaInstalled": "{count} ዘፈኖች · {size} ሜባ · v{version} (የተጫነው v{installed})",
-  "@packsMetaInstalled": {
-    "description": "Approved by a native speaker. Pack row details when an older version is on the phone"
-  },
-  "packsInstalling": "በመጫን ላይ",
-  "@packsInstalling": {
-    "description": "Approved by a native speaker. Label of a pack button while it installs"
-  },
-  "packsUpdateButton": "ያዘምኑ",
-  "@packsUpdateButton": {
-    "description": "Approved by a native speaker. Button that updates an installed pack"
-  },
-  "packsStateWaiting": "በመጠባበቅ ላይ",
-  "@packsStateWaiting": {
-    "description": "Approved by a native speaker. Pack install state: queued"
-  },
-  "packsStateDownloading": "በማውረድ ላይ",
-  "@packsStateDownloading": {
-    "description": "Approved by a native speaker. Pack install state: downloading"
-  },
-  "packsStateChecking": "በማረጋገጥ ላይ",
-  "@packsStateChecking": {
-    "description": "Approved by a native speaker. Pack install state: verifying checksums"
-  },
-  "packsStateInstalled": "ተጭኗል",
-  "@packsStateInstalled": {
-    "description": "Approved by a native speaker. Pack install state: done"
-  },
-  "packsStateFailed": "አልተሳካም",
-  "@packsStateFailed": {
-    "description": "Approved by a native speaker. Pack install state: failed"
-  },
-  "packsFilesProgress": "{state} {done}/{total} ፋይሎች",
-  "@packsFilesProgress": {
-    "description": "Approved by a native speaker. Pack install progress line; state is one of the packsState words"
   }
 }

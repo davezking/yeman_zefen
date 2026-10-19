@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value, BooleanExpressionOperators;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -40,6 +41,9 @@ void main() {
   }
 
   bool fileExists(String relative) => File(p.join(base.path, relative)).existsSync();
+
+  Future<bool> fileHasBytes(String relative, List<int> bytes) async =>
+      sha256Hex(await File(p.join(base.path, relative)).readAsBytes()) == sha256Hex(bytes);
 
   test('downloads, verifies and registers every track', () async {
     await install();
@@ -381,5 +385,132 @@ void main() {
     await install();
     final first = await installer.progressFor('golden-era').first;
     expect(first.state, PackInstallState.installed);
+  });
+
+  group('reusing clips already on the phone', () {
+    Future<void> cache(int trackId, ClipKind kind, List<int> bytes) async {
+      final path = ClipStore.streamPath(trackId, kind);
+      File(p.join(base.path, path))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(bytes);
+      await db.into(db.clips).insert(
+            ClipsCompanion.insert(
+              trackId: trackId,
+              kind: kind.name,
+              path: path,
+              bytes: bytes.length,
+              source: ClipSource.stream,
+              lastPlayedAt: 1,
+            ),
+          );
+    }
+
+    test('a clip cached from streaming is copied into the pack, not downloaded again', () async {
+      final url = clipUrl(2, 'intro', 1);
+      await cache(2, ClipKind.intro, bodyFor(url));
+
+      await install();
+
+      expect(downloader.calls, isNot(contains(url)));
+      expect(downloader.calls, hasLength(5));
+      final row = await (db.select(db.clips)..where((c) => c.trackId.equals(2) & c.kind.equals('intro'))).getSingle();
+      expect((row.source, row.path), (ClipSource.pack, 'packs/golden-era/v1/2-intro.mp3'));
+      expect(fileExists('packs/golden-era/v1/2-intro.mp3'), isTrue);
+      expect(fileExists(ClipStore.streamPath(2, ClipKind.intro)), isFalse);
+    });
+
+    test('a cached clip that does not match the manifest is downloaded', () async {
+      final url = clipUrl(2, 'intro', 1);
+      await cache(2, ClipKind.intro, [1, 2, 3]);
+
+      await install();
+
+      expect(downloader.calls, contains(url));
+      expect(await fileHasBytes('packs/golden-era/v1/2-intro.mp3', bodyFor(url)), isTrue);
+    });
+  });
+
+  group('cancel', () {
+    test('stops the install before its files, and registers nothing', () async {
+      final events = <PackInstallProgress>[];
+      final sub = installer.progressFor('golden-era').listen(events.add);
+      addTearDown(sub.cancel);
+
+      final run = install();
+      installer.cancel('golden-era');
+
+      await expectLater(
+        run,
+        throwsA(isA<PackInstallException>().having((e) => e.failure, 'failure', PackInstallFailure.cancelled)),
+      );
+      expect(downloader.calls, isEmpty);
+      expect(await db.select(db.installedPacks).get(), isEmpty);
+      expect(await db.select(db.clips).get(), isEmpty);
+      await pumpEventQueue();
+      expect(events.last.state, PackInstallState.cancelled);
+      expect(events.last.isTerminal, isTrue);
+    });
+
+    test('a cancelled update leaves the installed version playable', () async {
+      await install(version: 1);
+      final run = install(version: 2);
+      installer.cancel('golden-era');
+      await expectLater(run, throwsA(isA<PackInstallException>()));
+
+      expect(await installer.installedVersion('golden-era'), 1);
+      final clips = await db.select(db.clips).get();
+      expect(clips, hasLength(6));
+      expect(clips.every((c) => fileExists(c.path)), isTrue);
+    });
+
+    test('does not reach the next install of the same pack', () async {
+      final first = install();
+      installer.cancel('golden-era');
+      await expectLater(first, throwsA(isA<PackInstallException>()));
+
+      await install();
+      expect(await installer.installedVersion('golden-era'), 1);
+    });
+  });
+
+  group('remove', () {
+    test('drops the pack and moves its clips into the stream cache, keeping when they were played', () async {
+      await install();
+      await (db.update(db.clips)..where((c) => c.trackId.equals(1)))
+          .write(const ClipsCompanion(lastPlayedAt: Value(42)));
+
+      await installer.remove('golden-era');
+
+      expect(await db.select(db.installedPacks).get(), isEmpty);
+      expect(await db.select(db.localTracks).get(), isEmpty);
+      final clips = await db.select(db.clips).get();
+      expect(clips, hasLength(6));
+      for (final c in clips) {
+        expect(c.source, ClipSource.stream);
+        expect(c.path, ClipStore.streamPath(c.trackId, ClipKind.values.byName(c.kind)));
+        expect(fileExists(c.path), isTrue);
+      }
+      expect(clips.where((c) => c.trackId == 1).map((c) => c.lastPlayedAt), everyElement(42));
+      expect(Directory(p.join(base.path, 'packs', 'golden-era')).existsSync(), isFalse);
+      // The catalog still knows the tracks, so they can be streamed again.
+      expect(await db.select(db.catalogTracks).get(), hasLength(3));
+    });
+
+    test('a clip another installed pack has stays a pack clip there', () async {
+      final other = manifestJson(slug: 'other-pack', tracks: 2);
+      await installer.install(manifestOf(other), other, expectedSlug: 'other-pack', expectedVersion: 1);
+      await install(tracks: 3);
+
+      await installer.remove('golden-era');
+
+      final clips = await db.select(db.clips).get();
+      expect(
+        clips.where((c) => c.trackId != 3).map((c) => (c.source, c.path)),
+        everyElement(isA<(String, String)>().having((r) => r.$1, 'source', ClipSource.pack)
+            .having((r) => r.$2, 'path', startsWith('packs/other-pack/v1/'))),
+      );
+      expect(clips.where((c) => c.trackId == 3).map((c) => c.source), everyElement(ClipSource.stream));
+      expect(await installer.installedVersion('other-pack'), 1);
+    });
   });
 }

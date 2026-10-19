@@ -305,10 +305,32 @@
   "packsWifiOnly": "Download packs on Wi-Fi only",
   "packsMobilePrefetch": "Download upcoming songs on mobile data",
   "packsMobilePrefetchHelp": "Off saves data: only songs already on your phone play.",
-  "packsCache": "Cache {size} MB",
-  "@packsCache": {
+  "packsCacheOfCap": "Cache {size} of {cap} MB",
+  "@packsCacheOfCap": {
+    "description": "Offline play: how much the clip cache holds, and its cap",
     "placeholders": {
       "size": {
+        "type": "int"
+      },
+      "cap": {
+        "type": "int"
+      }
+    }
+  },
+  "packsStorageUsed": "Songs use {total} MB here: built-in {builtIn} MB, packs {packs} MB, cache {cache} MB.",
+  "@packsStorageUsed": {
+    "description": "Offline play: storage the songs take on the phone, by where they came from",
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "builtIn": {
+        "type": "int"
+      },
+      "packs": {
+        "type": "int"
+      },
+      "cache": {
         "type": "int"
       }
     }
@@ -652,94 +674,6 @@
     "placeholders": {
       "detail": {
         "type": "String"
-      }
-    }
-  },
-  "commonRefresh": "Refresh",
-  "@commonRefresh": {
-    "description": "Tooltip of a refresh button"
-  },
-  "packsLoadError": "Couldn't load the packs. Check your connection.",
-  "@packsLoadError": {
-    "description": "The list of packs could not be loaded"
-  },
-  "packsNone": "No packs are published yet.",
-  "@packsNone": {
-    "description": "The pack list is empty"
-  },
-  "packsMeta": "{count} songs · {size} MB · v{version}",
-  "@packsMeta": {
-    "description": "Pack row details",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "size": {
-        "type": "String"
-      },
-      "version": {
-        "type": "int"
-      }
-    }
-  },
-  "packsMetaInstalled": "{count} songs · {size} MB · v{version} (installed v{installed})",
-  "@packsMetaInstalled": {
-    "description": "Pack row details when an older version is on the phone",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "size": {
-        "type": "String"
-      },
-      "version": {
-        "type": "int"
-      },
-      "installed": {
-        "type": "int"
-      }
-    }
-  },
-  "packsInstalling": "Installing",
-  "@packsInstalling": {
-    "description": "Label of a pack button while it installs"
-  },
-  "packsUpdateButton": "Update",
-  "@packsUpdateButton": {
-    "description": "Button that updates an installed pack"
-  },
-  "packsStateWaiting": "Waiting",
-  "@packsStateWaiting": {
-    "description": "Pack install state: queued"
-  },
-  "packsStateDownloading": "Downloading",
-  "@packsStateDownloading": {
-    "description": "Pack install state: downloading"
-  },
-  "packsStateChecking": "Checking",
-  "@packsStateChecking": {
-    "description": "Pack install state: verifying checksums"
-  },
-  "packsStateInstalled": "Installed",
-  "@packsStateInstalled": {
-    "description": "Pack install state: done"
-  },
-  "packsStateFailed": "Failed",
-  "@packsStateFailed": {
-    "description": "Pack install state: failed"
-  },
-  "packsFilesProgress": "{state} {done}/{total} files",
-  "@packsFilesProgress": {
-    "description": "Pack install progress line; state is one of the packsState words",
-    "placeholders": {
-      "state": {
-        "type": "String"
-      },
-      "done": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
       }
     }
   }

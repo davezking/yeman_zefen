@@ -158,7 +158,7 @@ void main() {
           );
         });
 
-        testWidgets('packs: long names and an install in progress', (tester) async {
+        testWidgets('offline play: long names and an update in progress', (tester) async {
           final hold = Completer<void>();
           addTearDown(() => hold.isCompleted ? null : hold.complete());
           await pump(
@@ -178,10 +178,13 @@ void main() {
               ),
             ),
           );
-          await tester.tap(find.byType(FilledButton));
+          final update = find.textContaining(RegExp(r'^(Update|ያዘምኑ) ·'));
+          await tester.ensureVisible(update);
+          await tester.pump();
+          await tester.tap(update);
           await tester.pump();
           await tester.pump();
-          expect(find.byKey(const Key('install-progress')), findsOneWidget);
+          expect(find.textContaining('25%'), findsOneWidget);
           expect(tester.takeException(), isNull);
         });
       });

@@ -214,7 +214,8 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `packs.wifiOnly` | Download packs on Wi-Fi only | ጥቅሎችን በዋይፋይ ብቻ ያውርዱ |
 | `packs.mobilePrefetch` | Download upcoming songs on mobile data | ቀጣይ ዘፈኖችን በሞባይል ዳታ ያውርዱ |
 | `packs.mobilePrefetch.help` | Off saves data: only songs already on your phone play. | ሲጠፋ ዳታ ይቆጥባል፤ በስልክዎ ላይ ያሉ ዘፈኖች ብቻ ይጫወታሉ። |
-| `packs.cache` | Cache {size} MB | ማቆያ {size} ሜባ |
+| `packs.cacheOfCap` | Cache {size} of {cap} MB | ማቆያ {size} ከ{cap} ሜባ |
+| `packs.storageUsed` | Songs use {total} MB here: built-in {builtIn} MB, packs {packs} MB, cache {cache} MB. | ዘፈኖቹ እዚህ {total} ሜባ ይይዛሉ፦ አብረው የመጡ {builtIn} ሜባ፣ ጥቅሎች {packs} ሜባ፣ ማቆያ {cache} ሜባ። |
 | `packs.clearCache` | Clear cache | ማቆያውን ያጽዱ |
 | `packs.builtIn` | Built-in songs | አብረው የመጡ ዘፈኖች |
 | `packs.builtIn.meta` | {count} songs · comes with the app | {count} ዘፈኖች · ከመተግበሪያው ጋር |
@@ -238,6 +239,8 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `packs.mobileData.wait` | Wait for Wi-Fi | ዋይፋይ ይጠብቁ |
 | `packs.storageFull` | Not enough space. Free up {size} MB and try again. | በቂ ቦታ የለም። {size} ሜባ ነፃ አድርገው እንደገና ይሞክሩ። |
 | `packs.offline` | Connect to the internet to download packs. | ጥቅሎችን ለማውረድ ከኢንተርኔት ጋር ይገናኙ። |
+
+> **Storage line** (added in Phase 4 · Sprint 1). Offline play now shows the cache with its cap (`packs.cacheOfCap`, which replaces `packs.cache`) and what the songs take by source (`packs.storageUsed`). **Amharic not yet reviewed:** both are marked `REVIEW` in `app_am.arb`.
 
 ## Sign in and register
 

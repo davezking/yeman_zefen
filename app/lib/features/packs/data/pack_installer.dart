@@ -11,9 +11,28 @@ import 'clip_downloader.dart';
 import 'clip_store.dart';
 import 'pack_manifest.dart';
 
+/// Why an install failed, as far as the player is told.
+enum PackInstallFailure {
+  /// A download did not finish, or the manifest could not be used.
+  other,
+
+  /// A file kept failing its checksum after every re-fetch.
+  checksum,
+
+  /// The phone ran out of space.
+  storageFull,
+
+  /// The player cancelled it.
+  cancelled,
+}
+
 class PackInstallException implements Exception {
-  const PackInstallException(this.message);
+  const PackInstallException(this.message, {this.failure = PackInstallFailure.other, this.missingBytes});
   final String message;
+  final PackInstallFailure failure;
+
+  /// For [PackInstallFailure.storageFull]: the bytes the install still had to write.
+  final int? missingBytes;
 
   @override
   String toString() => 'PackInstallException: $message';
@@ -33,9 +52,10 @@ class PackInstaller {
     required this.supportDirectory,
     this.maxParallelDownloads = 4,
     this.maxDownloadAttempts = 3,
+    ClipStore? store,
     Future<void> Function(Directory dir)? deleteDirectory,
   })  : _deleteDirectory = deleteDirectory ?? _deleteRecursively,
-        _store = ClipStore(db: db, supportDirectory: supportDirectory);
+        _store = store ?? ClipStore(db: db, supportDirectory: supportDirectory);
 
   final AppDb db;
   final ClipDownloader downloader;
@@ -55,8 +75,11 @@ class PackInstaller {
     if (await dir.exists()) await dir.delete(recursive: true);
   }
 
-  /// The install running or queued for each slug.
+  /// The install or removal running or queued for each slug.
   final _running = <String, Future<void>>{};
+
+  /// Installs not yet finished, by slug, so [cancel] can stop them.
+  final _pending = <String, List<_Run>>{};
 
   final _controller = StreamController<PackInstallProgress>.broadcast();
   final _latest = <String, PackInstallProgress>{};
@@ -92,15 +115,36 @@ class PackInstaller {
     required String expectedSlug,
     required int expectedVersion,
   }) {
-    final previous = _running[expectedSlug] ?? Future<void>.value();
-    final run = previous.then(
-      (_) => _install(manifest, manifestJson, expectedSlug, expectedVersion),
-    );
+    final token = _Run();
+    (_pending[expectedSlug] ??= []).add(token);
+    return _enqueue(expectedSlug, () async {
+      try {
+        await _install(manifest, manifestJson, expectedSlug, expectedVersion, token);
+      } finally {
+        _pending[expectedSlug]?.remove(token);
+      }
+    });
+  }
+
+  /// Stops the installs of [slug] that are running or queued. Clips that already verified stay
+  /// in the folder, so downloading the pack again continues from there. An update that is
+  /// cancelled leaves the installed version as it was.
+  void cancel(String slug) {
+    for (final run in _pending[slug] ?? const <_Run>[]) {
+      run.cancelled = true;
+    }
+  }
+
+  /// Runs [action] after everything queued for [slug], because two at once would write the
+  /// same files.
+  Future<void> _enqueue(String slug, Future<void> Function() action) {
+    final previous = _running[slug] ?? Future<void>.value();
+    final run = previous.then((_) => action());
     // The queue moves on whether this one succeeds or fails.
     final settled = run.then<void>((_) {}, onError: (Object _) {});
-    _running[expectedSlug] = settled;
+    _running[slug] = settled;
     unawaited(settled.then((_) {
-      if (identical(_running[expectedSlug], settled)) _running.remove(expectedSlug);
+      if (identical(_running[slug], settled)) _running.remove(slug);
     }));
     return run;
   }
@@ -110,6 +154,7 @@ class PackInstaller {
     String manifestJson,
     String expectedSlug,
     int expectedVersion,
+    _Run token,
   ) async {
     final slug = manifest.slug;
     String? problem;
@@ -126,8 +171,8 @@ class PackInstaller {
     final paths = _TrackPaths.of(manifest);
     final files = [
       for (final t in manifest.tracks) ...[
-        _ClipFile(relativePath: paths.intro(t.id), clip: t.intro),
-        _ClipFile(relativePath: paths.middle(t.id), clip: t.middle),
+        _ClipFile(trackId: t.id, kind: ClipKind.intro, relativePath: paths.intro(t.id), clip: t.intro),
+        _ClipFile(trackId: t.id, kind: ClipKind.middle, relativePath: paths.middle(t.id), clip: t.middle),
       ],
     ];
     final tracker = _Tracker(
@@ -146,13 +191,26 @@ class PackInstaller {
       previousVersion = await installedVersion(slug);
 
       await _forEachLimited(files, maxParallelDownloads, (file) {
+        _checkCancelled(token);
         return _fetchVerified(base, file, tracker);
       });
+      _checkCancelled(token);
       replacedStream = await _register(manifest, manifestJson, paths);
     } catch (e) {
-      final message = e is PackInstallException ? e.message : '$e';
-      _emit(tracker.snapshot(PackInstallState.failed, error: message));
-      throw PackInstallException(message);
+      final failure = switch (e) {
+        PackInstallException() => e,
+        FileSystemException(osError: OSError(errorCode: _noSpaceLeft)) => PackInstallException(
+            '$e',
+            failure: PackInstallFailure.storageFull,
+            missingBytes: tracker.bytesTotal - tracker.bytesDone,
+          ),
+        _ => PackInstallException('$e'),
+      };
+      final state = failure.failure == PackInstallFailure.cancelled
+          ? PackInstallState.cancelled
+          : PackInstallState.failed;
+      _emit(tracker.snapshot(state, error: failure.message));
+      throw failure;
     }
 
     // The new version is installed. The old folder is removed only now, so a
@@ -174,11 +232,23 @@ class PackInstaller {
     _emit(tracker.snapshot(PackInstallState.installed));
   }
 
+  /// ENOSPC on Linux and Android, and on iOS and macOS.
+  static const _noSpaceLeft = 28;
+
+  static void _checkCancelled(_Run token) {
+    if (token.cancelled) {
+      throw const PackInstallException('cancelled', failure: PackInstallFailure.cancelled);
+    }
+  }
+
   /// Downloads [file] and checks its SHA-256. Re-fetches on a mismatch, up to
   /// [maxDownloadAttempts] downloads. A file that already verifies is kept, so
-  /// an install that was interrupted continues where it stopped.
+  /// an install that was interrupted continues where it stopped, and a copy of the
+  /// clip already on the phone (prefetched, or in the version being updated) is
+  /// used instead of a download when it matches.
   Future<void> _fetchVerified(Directory base, _ClipFile file, _Tracker tracker) async {
     final target = File(p.join(base.path, file.relativePath));
+    if (!await target.exists()) await _copyFromPhone(base, file, target);
     var downloads = 0;
     while (true) {
       if (await target.exists()) {
@@ -192,6 +262,7 @@ class PackInstaller {
       if (downloads == maxDownloadAttempts) {
         throw PackInstallException(
           'checksum mismatch for ${file.relativePath} after $downloads downloads',
+          failure: PackInstallFailure.checksum,
         );
       }
       downloads++;
@@ -206,6 +277,79 @@ class PackInstaller {
         ),
       );
     }
+  }
+
+  /// Copies the clip already on the phone for [file]'s track, if there is one, to [target]. The
+  /// caller checks the copy against the manifest's SHA-256 like a download, so a clip that
+  /// changed since is simply downloaded. Copied, not moved: the clip stays playable from where it
+  /// is until the pack is registered.
+  Future<void> _copyFromPhone(Directory base, _ClipFile file, File target) async {
+    final row = await (db.select(db.clips)
+          ..where((c) => c.trackId.equals(file.trackId) & c.kind.equals(file.kind.name)))
+        .getSingleOrNull();
+    if (row == null || row.path == file.relativePath) return;
+    final source = File(p.join(base.path, row.path));
+    try {
+      if (!await source.exists()) return;
+      await target.parent.create(recursive: true);
+      await source.copy(target.path);
+    } on FileSystemException catch (e) {
+      if (e.osError?.errorCode == _noSpaceLeft) rethrow;
+      // Anything else: the clip is downloaded instead.
+    }
+  }
+
+  /// Removes an installed pack and frees its space. A clip that another installed pack also has
+  /// is pointed at that pack's file. Every other clip moves into the stream cache, where the
+  /// prefetcher can still use it and the cache cap applies (the caller trims the cache). Waits for
+  /// an install of the same pack to finish first.
+  Future<void> remove(String slug) => _enqueue(slug, () => _remove(slug));
+
+  Future<void> _remove(String slug) async {
+    final base = await supportDirectory();
+    final prefix = 'packs/$slug/';
+    final packClips = await (db.select(db.clips)
+          ..where((c) => c.source.equals(ClipSource.pack) & c.path.like('$prefix%')))
+        .get();
+    final elsewhere = {
+      for (final t in await (db.select(db.localTracks)
+            ..where((t) => t.id.isIn({for (final c in packClips) c.trackId}) & t.packSlug.equals(slug).not()))
+          .get())
+        t.id,
+    };
+
+    // The files move first. If the app stops before the rows change, a row points at a missing
+    // file, which the game already handles by forgetting the clip.
+    final moved = <Clip>[];
+    for (final clip in packClips) {
+      if (elsewhere.contains(clip.trackId)) continue;
+      final kind = ClipKind.values.byName(clip.kind);
+      final to = ClipStore.streamPath(clip.trackId, kind);
+      try {
+        final target = File(p.join(base.path, to));
+        await target.parent.create(recursive: true);
+        await File(p.join(base.path, clip.path)).rename(target.path);
+        moved.add(clip.copyWith(path: to, source: ClipSource.stream));
+      } on FileSystemException {
+        // Gone already, or it cannot move: the clip is dropped with the pack.
+      }
+    }
+
+    final previous = {for (final c in packClips) c.trackId};
+    await db.transaction(() async {
+      await (db.delete(db.clips)..where((c) => c.source.equals(ClipSource.pack) & c.path.like('$prefix%'))).go();
+      await (db.delete(db.localTracks)..where((t) => t.packSlug.equals(slug))).go();
+      await (db.delete(db.installedPacks)..where((t) => t.slug.equals(slug))).go();
+      // Keeps when each clip was last played, which is what the cache evicts by.
+      await db.batch((b) => b.insertAll(db.clips, moved, mode: InsertMode.insertOrReplace));
+      await _keepOtherPacksClips(slug, previous.intersection(elsewhere));
+    });
+    try {
+      await _deleteDirectory(Directory(p.join(base.path, 'packs', slug)));
+    } catch (_) {
+      // The rows are gone; a folder that stays only takes space.
+    }
+    _latest.remove(slug);
   }
 
   /// Registers the pack in one transaction. The previous row and its tracks are
@@ -270,17 +414,18 @@ class PackInstaller {
           source: ClipSource.pack,
         );
       }
-      await _keepOtherPacksClips(m, {for (final c in previous) c.trackId}.difference(ids.toSet()));
+      await _keepOtherPacksClips(m.slug, {for (final c in previous) c.trackId}.difference(ids.toSet()));
       return replaced;
     });
   }
 
-  /// A track this version dropped can still be in another installed pack. Its clip row pointed at
-  /// this pack's files and is gone, so it is pointed at the other pack's files instead.
-  Future<void> _keepOtherPacksClips(PackManifest m, Set<int> dropped) async {
+  /// A track this pack dropped (an update without it, or the pack removed) can still be in another
+  /// installed pack. Its clip row pointed at this pack's files and is gone, so it is pointed at the
+  /// other pack's files instead.
+  Future<void> _keepOtherPacksClips(String slug, Set<int> dropped) async {
     if (dropped.isEmpty) return;
     final others = await (db.select(db.localTracks)
-          ..where((t) => t.id.isIn(dropped) & t.packSlug.equals(m.slug).not()))
+          ..where((t) => t.id.isIn(dropped) & t.packSlug.equals(slug).not()))
         .get();
     final catalog = {
       for (final t in await (db.select(db.catalogTracks)..where((t) => t.id.isIn(dropped))).get()) t.id: t,
@@ -350,9 +495,16 @@ class _TrackPaths {
 }
 
 class _ClipFile {
-  const _ClipFile({required this.relativePath, required this.clip});
+  const _ClipFile({required this.trackId, required this.kind, required this.relativePath, required this.clip});
+  final int trackId;
+  final ClipKind kind;
   final String relativePath;
   final ManifestClip clip;
+}
+
+/// One install: [PackInstaller.cancel] marks it, and it stops before its next file.
+class _Run {
+  var cancelled = false;
 }
 
 /// Keeps per-file byte counts and turns them into progress snapshots.
@@ -373,12 +525,14 @@ class _Tracker {
   final _doneFiles = <String>{};
   PackInstallState _state = PackInstallState.queued;
 
+  int get bytesDone => _fileBytes.values.fold(0, (a, b) => a + b);
+
   PackInstallProgress snapshot(PackInstallState state, {String? error}) {
     _state = state;
     return PackInstallProgress(
       slug: slug,
       state: state,
-      bytesDone: _fileBytes.values.fold(0, (a, b) => a + b),
+      bytesDone: bytesDone,
       bytesTotal: bytesTotal,
       filesDone: _doneFiles.length,
       filesTotal: filesTotal,
