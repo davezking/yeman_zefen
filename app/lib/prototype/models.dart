@@ -272,6 +272,10 @@ enum RoundOverlay {
 
   /// "Leave this game?"
   leaveDialog,
+
+  /// The app came back from the background, or a call took the audio: the clip plays again
+  /// when the player resumes, and the time already used still counts.
+  paused,
 }
 
 /// One of the four answers: a track (its song or its singer is the text) or,

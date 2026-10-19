@@ -92,6 +92,8 @@ Boards are 840 × 900 and hold two 360 × 780 phones: English on the left, Amhar
 - **Behavior**: closes itself after `timing.hintSheetMax` (8 s), same as No thanks. Watch ad plays a rewarded ad (timer still paused, full-screen ad with `ad.rewardCaption` while it loads); when the ad completes, two wrong tiles fade to `color.answer.removedOpacity`, become untappable, and the hint button is replaced by `feedback.hintUsed`. If the ad is closed early: `ad.notFinished`, no hint. If no ad is available: `ad.unavailable`, sheet closes. One hint per round. The rewarded ad is the player's choice (AdMob policy); interstitials are not.
 - Scoring: the round's points are halved; paused time is excluded from `response_ms` (`docs/scoring.md`).
 
+**Paused notice** (added in Phase 4 · Sprint 2). When the app comes back from the background, or a call took the audio, the round is stopped (timer pill `round.timerPaused`, reels still) under a centered dialog on the scrim: title `roundPausedTitle`, body `roundPausedBody` (the clip plays again, the time already used still counts) and one primary button `roundResume`. These are production-only strings (see the note on production strings in `copy.md`); the Amharic title is marked `REVIEW`. Resume plays the clip again and the answer window carries on from what was left. It is the same dialog component as "Leave this game?", with no second button. Screenshots: `round-resume-notice-*`.
+
 ## 15 · Round: next song loading — `H18-NextSongLoading`
 
 - Rare state from `docs/architecture.md` (play-first delivery): the next round's clip isn't on the phone and no swap is possible.

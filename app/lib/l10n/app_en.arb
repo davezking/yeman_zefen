@@ -582,6 +582,10 @@
   "@roundPausedBody": {
     "description": "Shown when a call or another app interrupted the round"
   },
+  "roundPausedTitle": "Paused",
+  "@roundPausedTitle": {
+    "description": "Title of the notice shown when the app comes back to a round that was paused"
+  },
   "roundResume": "Resume",
   "@roundResume": {
     "description": "Button that resumes an interrupted round"

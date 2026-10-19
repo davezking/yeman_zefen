@@ -1604,6 +1604,12 @@ abstract class AppLocalizations {
   /// **'Paused. The clip plays again when you resume. The time you already used still counts.'**
   String get roundPausedBody;
 
+  /// Title of the notice shown when the app comes back to a round that was paused
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get roundPausedTitle;
+
   /// Button that resumes an interrupted round
   ///
   /// In en, this message translates to:

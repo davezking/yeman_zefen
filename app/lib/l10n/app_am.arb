@@ -290,6 +290,10 @@
   "@roundPausedBody": {
     "description": "Approved by a native speaker. Shown when a call or another app interrupted the round"
   },
+  "roundPausedTitle": "ቆሟል",
+  "@roundPausedTitle": {
+    "description": "REVIEW. Title of the notice shown when the app comes back to a round that was paused"
+  },
   "roundResume": "ይቀጥሉ",
   "@roundResume": {
     "description": "Approved by a native speaker. Button that resumes an interrupted round"

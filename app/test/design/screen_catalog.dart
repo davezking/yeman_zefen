@@ -12,7 +12,7 @@ import 'package:yeman_zefen/features/game/presentation/mode_select_screen.dart';
 import 'package:yeman_zefen/features/packs/presentation/offline_play_screen.dart';
 import 'package:yeman_zefen/prototype/screens/onboarding_screens.dart';
 import 'package:yeman_zefen/prototype/screens/results_screen.dart';
-import 'package:yeman_zefen/prototype/screens/round_screen.dart';
+import 'package:yeman_zefen/features/game/presentation/round_screen.dart';
 import 'package:yeman_zefen/features/settings/presentation/settings_screen.dart';
 import 'package:yeman_zefen/features/game/presentation/setup_screen.dart';
 import 'package:yeman_zefen/features/account/ui/sign_in_sheet.dart';
@@ -539,6 +539,14 @@ List<DesignScreen> _buildDesignScreens() {
       "round: paused in the background",
       null,
       () => round(roundView(paused: true, playing: false)),
+    ),
+    DesignScreen(
+      'round-resume-notice',
+      "round: paused notice with Resume (back from the background or a call)",
+      null,
+      () => round(
+        roundView(overlay: RoundOverlay.paused, paused: true, playing: false),
+      ),
     ),
     DesignScreen(
       'results-guest-new-best',

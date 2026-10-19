@@ -23,6 +23,7 @@ class SessionEnvironment {
     required this.rng,
     this.networkProbe,
     this.feedbackDuration = const Duration(seconds: 1),
+    this.wrongFeedbackDuration = const Duration(seconds: 5),
   });
 
   factory SessionEnvironment.real() {
@@ -64,6 +65,10 @@ class SessionEnvironment {
     return await isOffline() ? NetworkKind.none : NetworkKind.unmetered;
   }
 
-  /// How long the right or wrong result stays on screen before the next round.
+  /// How long a right answer stays on screen before the next round.
   final Duration feedbackDuration;
+
+  /// How long a wrong answer or a time-out stays on screen: long enough to read the right answer.
+  /// A tap ends it sooner ([SessionController.skipFeedback]).
+  final Duration wrongFeedbackDuration;
 }
