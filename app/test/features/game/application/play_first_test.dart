@@ -69,6 +69,8 @@ void main() {
     expect(kit.state.phase, SessionPhase.finished);
     expect(kit.state.summary!.rounds, hasLength(10));
     expect(kit.state.summary!.skipped, 0);
+    // The results name each song that played, for artist questions too.
+    expect(kit.state.summary!.rounds.where((r) => r.trackName.isEmpty), isEmpty);
     expect(played.toSet(), hasLength(10));
     expect(kit.downloader.calls, isEmpty, reason: 'offline: nothing is fetched');
     expect(waitTimers(), isEmpty);

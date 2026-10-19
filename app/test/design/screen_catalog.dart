@@ -11,7 +11,7 @@ import 'package:yeman_zefen/prototype/screens/message_screens.dart';
 import 'package:yeman_zefen/features/game/presentation/mode_select_screen.dart';
 import 'package:yeman_zefen/features/packs/presentation/offline_play_screen.dart';
 import 'package:yeman_zefen/prototype/screens/onboarding_screens.dart';
-import 'package:yeman_zefen/prototype/screens/results_screen.dart';
+import 'package:yeman_zefen/features/game/presentation/results_screen.dart';
 import 'package:yeman_zefen/features/game/presentation/round_screen.dart';
 import 'package:yeman_zefen/features/settings/presentation/settings_screen.dart';
 import 'package:yeman_zefen/features/game/presentation/setup_screen.dart';

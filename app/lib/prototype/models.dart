@@ -409,6 +409,9 @@ enum ScoreSync {
 
   /// The server could not check the game, so it does not count for rankings.
   rejected,
+
+  /// Online, but the server did not answer this time: the game is queued and sent again later.
+  retrying,
 }
 
 class ResultsView {
@@ -418,13 +421,30 @@ class ResultsView {
     required this.user,
     this.newBest = false,
     this.sync = ScoreSync.provisional,
+    this.provisionalScore,
+    this.skipped = 0,
+    this.flagged = false,
+    this.saveError,
   });
 
+  /// The score on screen: the server's once it has answered, the phone's count before that.
   final int score;
+
+  /// The phone's count, kept to say when the server's differs from it.
+  final int? provisionalScore;
   final List<RoundResult> rounds;
   final UserInfo user;
   final bool newBest;
   final ScoreSync sync;
+
+  /// Rounds left out because a clip could not be played.
+  final int skipped;
+
+  /// Some answers were too fast to count.
+  final bool flagged;
+
+  /// Set when the game could not be saved on the phone.
+  final String? saveError;
 
   int get correctCount => rounds.where((r) => r.correct).length;
 }

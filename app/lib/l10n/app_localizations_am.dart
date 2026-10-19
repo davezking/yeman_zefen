@@ -418,6 +418,17 @@ class AppLocalizationsAm extends AppLocalizations {
   String get resultsNotRanked => 'ይህ ጨዋታ ሊረጋገጥ ስላልቻለ ለደረጃ አይቆጠርም።';
 
   @override
+  String get resultsSyncing => 'ውጤትዎን በማረጋገጥ ላይ…';
+
+  @override
+  String get resultsSendLater => 'ውጤቱ ተቀምጧል። አገልጋዩ ስላልመለሰ በቅርቡ እንደገና ይላካል።';
+
+  @override
+  String resultsServerDiffers(String score, String provisional) {
+    return 'አገልጋዩ $score ነጥብ ቆጥሯል። ስልክዎ $provisional ቆጥሯል።';
+  }
+
+  @override
   String get lbTitle => 'የደረጃ ሰንጠረዥ';
 
   @override

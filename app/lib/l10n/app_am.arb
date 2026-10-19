@@ -120,6 +120,26 @@
   "resultsWeeklyRank": "በዚህ ሳምንት {rank}ኛ ነዎት",
   "resultsSavedOffline": "ውጤቱ ተቀምጧል። ኢንተርኔት ሲገኝ ይላካል።",
   "resultsNotRanked": "ይህ ጨዋታ ሊረጋገጥ ስላልቻለ ለደረጃ አይቆጠርም።",
+  "resultsSyncing": "ውጤትዎን በማረጋገጥ ላይ…",
+  "@resultsSyncing": {
+    "description": "REVIEW. Results: the game was counted on the phone and the server's score has not arrived yet"
+  },
+  "resultsSendLater": "ውጤቱ ተቀምጧል። አገልጋዩ ስላልመለሰ በቅርቡ እንደገና ይላካል።",
+  "@resultsSendLater": {
+    "description": "REVIEW. Results: online, but the score could not be sent yet and will be retried"
+  },
+  "resultsServerDiffers": "አገልጋዩ {score} ነጥብ ቆጥሯል። ስልክዎ {provisional} ቆጥሯል።",
+  "@resultsServerDiffers": {
+    "description": "REVIEW. Results: the server's score differs from the phone's count",
+    "placeholders": {
+      "score": {
+        "type": "String"
+      },
+      "provisional": {
+        "type": "String"
+      }
+    }
+  },
   "lbTitle": "የደረጃ ሰንጠረዥ",
   "lbWeekly": "የዚህ ሳምንት",
   "lbAllTime": "የምንጊዜም",

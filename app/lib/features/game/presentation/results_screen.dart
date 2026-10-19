@@ -1,141 +1,362 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_text.dart';
+import '../../../core/theme/theme_context.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../prototype/labels.dart';
-import '../application/session_controller.dart';
-import '../application/session_state.dart';
-import '../domain/session_config.dart';
-import 'session_texts.dart';
+import '../../../prototype/models.dart';
 
-/// The total score and each round. Plain widgets: the designed version
-/// replaces this in Phase 4.
-class ResultsScreen extends ConsumerWidget {
-  const ResultsScreen({super.key});
+/// Results: the total, how many were right, a new-best badge, where the score
+/// stands, and one row per round. Then Play again, Change era or mode, Home.
+///
+/// Variants, all from [ResultsView]: guest (a dark row opens the sign-in sheet)
+/// or signed in (this week's rank); new best; and the score's state: still
+/// the phone's own count, the server's, saved for later (offline) or not
+/// counted for rankings.
+class ResultsScreen extends StatelessWidget {
+  const ResultsScreen({
+    super.key,
+    required this.view,
+    required this.onPlayAgain,
+    required this.onChange,
+    required this.onHome,
+    required this.onSignIn,
+    required this.onLeaderboard,
+  });
+
+  final ResultsView view;
+  final VoidCallback onPlayAgain;
+
+  /// "Change era or mode": back to setup.
+  final VoidCallback onChange;
+  final VoidCallback onHome;
+
+  /// The guest row was tapped.
+  final VoidCallback onSignIn;
+
+  /// The signed-in rank row was tapped.
+  final VoidCallback onLeaderboard;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final summary = ref.watch(sessionControllerProvider).summary;
+    final text = context.text;
+    final locale = Localizations.localeOf(context);
+    final v = view;
+    final grouped = NumberFormat.decimalPattern(locale.toString());
 
-    if (summary == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.resultsTitle)),
-        body: Center(
+    // Where the score stands: counted on the phone and waiting for the server, saved to send later
+    // (offline, or after the server did not answer),
+    // refused by the server, or confirmed by it (and, if it differs from the phone's count, said so).
+    final note = switch (v.sync) {
+      ScoreSync.provisional => (Icons.sync_rounded, l10n.resultsSyncing),
+      ScoreSync.savedOffline => (
+        Icons.cloud_off_rounded,
+        l10n.resultsSavedOffline,
+      ),
+      ScoreSync.rejected => (Icons.info_outline_rounded, l10n.resultsNotRanked),
+      ScoreSync.retrying => (Icons.schedule_rounded, l10n.resultsSendLater),
+      ScoreSync.synced
+          when v.provisionalScore != null && v.provisionalScore != v.score =>
+        (
+          Icons.cloud_done_rounded,
+          l10n.resultsServerDiffers(
+            grouped.format(v.score),
+            grouped.format(v.provisionalScore!),
+          ),
+        ),
+      ScoreSync.synced => null,
+    };
+
+    final rankLine = v.user.isGuest
+        ? l10n.resultsGuestRank
+        : (v.user.weeklyRank != null
+              ? l10n.resultsWeeklyRank(v.user.weeklyRank!)
+              : l10n.lbNotRanked);
+
+    return Scaffold(
+      body: HeroScaffold(
+        denseText: true,
+        heroPadding: const EdgeInsets.fromLTRB(
+          SpacingTokens.n20,
+          SpacingTokens.n32,
+          SpacingTokens.n20,
+          SpacingTokens.n24,
+        ),
+        bodyPadding: const EdgeInsets.fromLTRB(
+          SpacingTokens.n16,
+          SpacingTokens.n24,
+          SpacingTokens.n16,
+          SpacingTokens.n16,
+        ),
+        bodyGap: SpacingTokens.n10,
+        hero: Semantics(
+          container: true,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.resultsNone),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.startTitle)),
+              Text(
+                l10n.resultsTitle,
+                style: text.bodySmall.copyWith(
+                  color: ColorTokens.textSecondary,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.n6),
+              AnimatedCount(
+                value: v.score,
+                fromZero: true,
+                builder: (context, shown) =>
+                    Text(grouped.format(shown), style: text.score),
+              ),
+              const SizedBox(height: SpacingTokens.n6),
+              Text(
+                l10n.resultsCorrectCount(v.correctCount, v.rounds.length),
+                style: text.bodyLarge,
+              ),
+              if (v.newBest) ...[
+                const SizedBox(height: SpacingTokens.n6),
+                ScoreBadge.best(label: l10n.resultsNewBest),
+              ],
             ],
           ),
         ),
-      );
-    }
+        body: [
+          _RankRow(
+            label: rankLine,
+            onTap: v.user.isGuest ? onSignIn : onLeaderboard,
+          ),
+          if (note != null)
+            Semantics(
+              liveRegion: true,
+              key: const Key('score-note'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    note.$1,
+                    size: SizeTokens.icon,
+                    color: ColorTokens.textSecondary,
+                  ),
+                  const SizedBox(width: SpacingTokens.n8),
+                  Expanded(
+                    child: Text(
+                      note.$2,
+                      style: text.caption.copyWith(
+                        color: ColorTokens.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (v.skipped > 0)
+            Text(
+              l10n.resultsSkipped(v.skipped),
+              key: const Key('skipped'),
+              style: text.caption.copyWith(color: ColorTokens.textSecondary),
+            ),
+          if (v.flagged)
+            Text(
+              l10n.resultsFlagged,
+              key: const Key('flagged'),
+              style: text.caption.copyWith(color: ColorTokens.textSecondary),
+            ),
+          if (v.saveError != null)
+            Text(
+              l10n.resultsSaveError(v.saveError!),
+              key: const Key('save-error'),
+              style: text.caption.copyWith(color: ColorTokens.textError),
+            ),
+          Semantics(
+            header: true,
+            child: Padding(
+              padding: const EdgeInsets.only(top: SpacingTokens.n2),
+              child: Text(
+                l10n.resultsRounds,
+                style: AppTextStyles.withWeight(
+                  text.bodySmall,
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          for (var i = 0; i < v.rounds.length; i++)
+            _RoundRow(
+              number: v.rounds[i].number ?? i + 1,
+              result: v.rounds[i],
+              line: l10n.trackLine(v.rounds[i].track, locale),
+              correctLabel: l10n.feedbackCorrect,
+              wrongLabel: l10n.feedbackWrong,
+              points: v.rounds[i].correct
+                  ? l10n.feedbackPoints(v.rounds[i].points)
+                  : '0',
+            ),
+        ],
+        footer: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PrimaryButton(label: l10n.resultsPlayAgain, onPressed: onPlayAgain),
+            const SizedBox(height: SpacingTokens.n10),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SecondaryButton(
+                      label: l10n.resultsChange,
+                      small: true,
+                      expand: true,
+                      onPressed: onChange,
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.n10),
+                  Expanded(
+                    child: SecondaryButton(
+                      label: l10n.resultsHome,
+                      small: true,
+                      expand: true,
+                      onPressed: onHome,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    final config = summary.config;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.resultsTitle), automaticallyImplyLeading: false),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+/// The dark row under the total: sign in to rank (guest), or this week's rank.
+class _RankRow extends StatelessWidget {
+  const _RankRow({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return RaisedSurface(
+      onTap: onTap,
+      semanticLabel: label,
+      expand: true,
+      minHeight: SizeTokens.secondaryButtonMinHeight,
+      borderRadius: BorderRadius.circular(RadiusTokens.card),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.n14,
+        vertical: SpacingTokens.n10,
+      ),
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [ColorTokens.paletteSlate, ColorTokens.surfaceDark],
+      ),
+      shadows: ElevationTokens.dark,
+      child: Row(
         children: [
-          Text(
-            '${summary.totalScore}',
-            key: const Key('total-score'),
-            style: Theme.of(context).textTheme.displayMedium,
-            textAlign: TextAlign.center,
+          const Icon(
+            Icons.emoji_events_outlined,
+            size: SizeTokens.iconLarge,
+            color: ColorTokens.primaryAccentOnDark,
           ),
-          Text(
-            l10n.homeQuickPlaySettings(
-              l10n.eraLabel(config.generationId),
-              switch (config.mode) {
-                GameMode.intro => l10n.homeQuickPlayModeIntro,
-                GameMode.middle => l10n.homeQuickPlayModeMiddle,
-                GameMode.generation => l10n.homeQuickPlayModeEra,
-              },
-              switch (config.difficulty) {
-                Difficulty.easy => l10n.difficultyEasyShort,
-                Difficulty.medium => l10n.difficultyMediumShort,
-                Difficulty.hard => l10n.difficultyHardShort,
-              },
+          const SizedBox(width: SpacingTokens.n10),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTextStyles.withWeight(
+                context.text.label,
+                FontWeight.w600,
+              ).copyWith(color: ColorTokens.textOnDark),
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          if (summary.isNewBest)
-            Text(l10n.resultsNewBest, key: const Key('new-best'), textAlign: TextAlign.center)
-          else if (summary.bestBefore != null)
-            Text(l10n.bestScore(summary.bestBefore!), key: const Key('best'), textAlign: TextAlign.center),
-          if (summary.skipped > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                l10n.resultsSkipped(summary.skipped),
-                key: const Key('skipped'),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          if (summary.flagged)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(l10n.resultsFlagged, key: const Key('flagged'), textAlign: TextAlign.center),
-            ),
-          if (summary.saveError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                l10n.resultsSaveError(summary.saveError!),
-                key: const Key('save-error'),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          const Divider(height: 32),
-          for (final round in summary.rounds) _RoundRow(round: round),
-          const SizedBox(height: 24),
-          FilledButton(onPressed: () => context.go('/setup'), child: Text(l10n.resultsPlayAgain)),
-          const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => context.go('/'), child: Text(l10n.resultsHome)),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: SizeTokens.iconLarge,
+            color: ColorTokens.textOnDark,
+          ),
         ],
       ),
     );
   }
 }
 
+/// One round: its number, a check or an X (with its color), "Song · Artist"
+/// and the points.
 class _RoundRow extends StatelessWidget {
-  const _RoundRow({required this.round});
+  const _RoundRow({
+    required this.number,
+    required this.result,
+    required this.line,
+    required this.correctLabel,
+    required this.wrongLabel,
+    required this.points,
+  });
 
-  final RoundSummary round;
+  final int number;
+  final RoundResult result;
+  final String line;
+  final String correctLabel;
+  final String wrongLabel;
+  final String points;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final locale = Localizations.localeOf(context);
-    final icon = round.chosenName == null
-        ? Icons.timer_off
-        : (round.correct ? Icons.check_circle : Icons.cancel);
-    final color = round.correct ? Colors.green : Colors.red;
-    return ListTile(
-      key: Key('round-${round.number}'),
-      leading: Icon(icon, color: color),
-      // An era question names the song and the era it is from, so a wrong guess shows the answer.
-      title: Text(
-        round.correctEraId == null
-            ? l10n.nameOf(round.correctName, locale)
-            : '${l10n.nameOf(round.correctName, locale)} · ${l10n.eraLabel(round.correctEraId!)}',
+    final text = context.text;
+    final game = context.game;
+    final ok = result.correct;
+    final color = ok ? game.correct.heading : game.wrong.heading;
+    final numbers = AppTextStyles.withWeight(
+      AppTextStyles.latin(text.label),
+      FontWeight.w700,
+    );
+    return Semantics(
+      key: Key('round-$number'),
+      container: true,
+      label: '$number, ${ok ? correctLabel : wrongLabel}, $line, $points',
+      child: ExcludeSemantics(
+        child: RaisedSurface(
+          expand: true,
+          minHeight: SizeTokens.chipMinHeight + SpacingTokens.n8,
+          borderRadius: BorderRadius.circular(RadiusTokens.small),
+          padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.n12),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [ColorTokens.surfaceCard, ColorTokens.surfaceCardEnd],
+          ),
+          shadows: edgeShadow(
+            ColorTokens.surfaceCardEdge,
+            dy: SpacingTokens.n4,
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: SpacingTokens.n20,
+                child: Text(number.toString(), style: numbers),
+              ),
+              Icon(
+                ok ? Icons.check_rounded : Icons.close_rounded,
+                size: SizeTokens.iconSmall,
+                color: color,
+              ),
+              const SizedBox(width: SpacingTokens.n8),
+              Expanded(
+                child: Text(
+                  line,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.withWeight(text.label, FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.n8),
+              Text(points, style: numbers),
+            ],
+          ),
+        ),
       ),
-      subtitle: Text(
-        round.chosenName == null
-            ? l10n.feedbackTimeout
-            : (round.correct
-                ? l10n.feedbackCorrect
-                // An era question's answer is an era, named in the UI language.
-                : l10n.resultsYouChose(
-                    round.chosenEraId != null ? l10n.eraLabel(round.chosenEraId!) : l10n.nameOf(round.chosenName!, locale),
-                  )),
-      ),
-      trailing: Text('${round.points}'),
     );
   }
 }

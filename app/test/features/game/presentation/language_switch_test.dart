@@ -74,13 +74,13 @@ void main() {
 
     testWidgets('the results list changes script', (tester) async {
       final h = await pumpScreens(tester, location: '/results', state: finishedState());
-      expect(find.text('Song 1'), findsOneWidget);
+      expect(find.textContaining('Song 1'), findsOneWidget);
 
       await h.container.read(localeChoiceProvider.notifier).choose(amharic);
       await tester.pump();
 
-      expect(find.text('ዘፈን'), findsOneWidget);
-      expect(find.text('Song 1'), findsNothing);
+      expect(find.textContaining('ዘፈን'), findsOneWidget);
+      expect(find.textContaining('Song 1'), findsNothing);
     });
 
     testWidgets('a round in Amharic still lands in English when switched back', (tester) async {
@@ -104,11 +104,11 @@ void main() {
       location: '/results',
       state: finishedState(unnamed: true),
     );
-    expect(find.text('Unknown'), findsWidgets);
+    expect(find.textContaining('Unknown'), findsWidgets);
 
     await h.container.read(localeChoiceProvider.notifier).choose(amharic);
     await tester.pump();
-    expect(find.text('ያልታወቀ'), findsWidgets);
+    expect(find.textContaining('ያልታወቀ'), findsWidgets);
   });
 }
 

@@ -37,6 +37,7 @@ void main() {
       File('lib/features/leaderboard/ui/leaderboard_screen.dart'),
       File('lib/features/packs/presentation/offline_play_screen.dart'),
       File('lib/features/game/presentation/round_screen.dart'),
+      File('lib/features/game/presentation/results_screen.dart'),
     ];
 
     test('there are screens to scan', () => expect(files.length, 11));

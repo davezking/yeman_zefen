@@ -818,6 +818,24 @@ abstract class AppLocalizations {
   /// **'This game couldn\'t be checked, so it won\'t count toward rankings.'**
   String get resultsNotRanked;
 
+  /// Results: the game was counted on the phone and the server's score has not arrived yet
+  ///
+  /// In en, this message translates to:
+  /// **'Checking your score…'**
+  String get resultsSyncing;
+
+  /// Results: online, but the score could not be sent yet and will be retried
+  ///
+  /// In en, this message translates to:
+  /// **'Score saved. The server didn\'t answer, so it will be sent again shortly.'**
+  String get resultsSendLater;
+
+  /// Results: the server's score differs from the phone's count
+  ///
+  /// In en, this message translates to:
+  /// **'The server counted {score} points. Your phone counted {provisional}.'**
+  String resultsServerDiffers(String score, String provisional);
+
   /// No description provided for @lbTitle.
   ///
   /// In en, this message translates to:

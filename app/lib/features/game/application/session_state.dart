@@ -110,6 +110,8 @@ class RoundSummary {
     required this.number,
     required this.kind,
     required this.correctName,
+    this.trackName = const DisplayName(),
+    this.artistName = const DisplayName(),
     required this.chosenName,
     required this.correct,
     required this.points,
@@ -124,6 +126,13 @@ class RoundSummary {
 
   /// The song or singer that was the answer. For an era question, the song that played.
   final DisplayName correctName;
+
+  /// The song that played, for "Song · Singer" in the results list. For an artist question the
+  /// answer ([correctName]) is the singer, so the list names the song from here.
+  final DisplayName trackName;
+
+  /// The song's singer, for "Song · Singer". Empty for an era question's song without a catalog name.
+  final DisplayName artistName;
 
   /// Null when the window ran out.
   final DisplayName? chosenName;
@@ -140,6 +149,7 @@ class RoundSummary {
 
 class SessionSummary {
   const SessionSummary({
+    required this.sessionId,
     required this.config,
     required this.totalScore,
     required this.rounds,
@@ -150,6 +160,8 @@ class SessionSummary {
     this.saveError,
   });
 
+  /// The id the session was saved under. The server's score for it is looked up by this id.
+  final String sessionId;
   final SessionConfig config;
   final int totalScore;
   final List<RoundSummary> rounds;
