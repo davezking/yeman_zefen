@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { REPORTS_PER_DAY } from "../src/routes/v1/reports";
+import { MAX_REPORTERS, REPORTS_PER_DAY } from "../src/routes/v1/reports";
 import { countingDb, installFirebaseJwks, makeArtist, makeTrack, player, removeFirebaseJwks, resetCatalog, signFirebaseToken } from "./helpers";
 
 beforeAll(installFirebaseJwks);
@@ -35,12 +35,15 @@ describe("POST /v1/reports/clip", () => {
     const [item, ...rest] = await items();
     expect(rest).toHaveLength(0);
     expect(item).toMatchObject({ entity_id: t.id, reason: "missing_audio", status: "open" });
-    expect(JSON.parse(item!.details_json)).toMatchObject({
+    const details = JSON.parse(item!.details_json);
+    expect(details).toMatchObject({
       source: "player",
       reports: 1,
+      reporters: ["u-1"],
       clips: { intro: 1 },
       errors: { decode_error: 1 },
     });
+    expect(details.firstReportedAt).toBe(details.lastReportedAt);
   });
 
   it("gathers later reports of the track in the same open item", async () => {
@@ -50,11 +53,15 @@ describe("POST /v1/reports/clip", () => {
     await report("u-2", { trackId: t.id, clipType: "intro", error: "decode_error" });
     const all = await items();
     expect(all).toHaveLength(1);
-    expect(JSON.parse(all[0]!.details_json)).toMatchObject({
+    const details = JSON.parse(all[0]!.details_json);
+    expect(details).toMatchObject({
       reports: 3,
       clips: { intro: 2, middle: 1 },
       errors: { decode_error: 2, too_short: 1 },
     });
+    // u-2 reported twice but is one player.
+    expect(details.reporters).toEqual(["u-1", "u-2"]);
+    expect(details.firstReportedAt).toBeLessThanOrEqual(details.lastReportedAt);
   });
 
   it("opens a new item once the old one is resolved, and leaves ingest's items alone", async () => {
@@ -80,6 +87,22 @@ describe("POST /v1/reports/clip", () => {
     expect(await items()).toEqual([]);
   });
 
+  it(`keeps at most ${MAX_REPORTERS} distinct reporters on an item`, async () => {
+    const t = await track();
+    const full = JSON.stringify({
+      source: "player", reports: MAX_REPORTERS, reporters: Array.from({ length: MAX_REPORTERS }, (_, i) => `p-${i}`),
+      clips: { intro: MAX_REPORTERS }, errors: { decode_error: MAX_REPORTERS }, firstReportedAt: 1, lastReportedAt: 1,
+    });
+    await env.DB.prepare(
+      "INSERT INTO review_items (entity_type, entity_id, reason, details_json, status) VALUES ('track', ?1, 'missing_audio', ?2, 'open')",
+    ).bind(t.id, full).run();
+    await report("u-late", { trackId: t.id, clipType: "intro", error: "decode_error" });
+    const details = JSON.parse((await items())[0]!.details_json);
+    expect(details.reporters).toHaveLength(MAX_REPORTERS);
+    expect(details.reports).toBe(MAX_REPORTERS + 1);
+    expect(details.firstReportedAt).toBe(1);
+  });
+
   it(`allows ${REPORTS_PER_DAY} reports per player per day`, async () => {
     const t = await track();
     for (let i = 0; i < REPORTS_PER_DAY; i++) {
@@ -88,6 +111,10 @@ describe("POST /v1/reports/clip", () => {
     const over = await report("u-many", { trackId: t.id, clipType: "intro", error: "decode_error" });
     expect(over.status).toBe(429);
     expect(await over.json()).toMatchObject({ error: { code: "rate_limited" } });
+    // Until the next UTC midnight.
+    const retryAfter = Number(over.headers.get("retry-after"));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(86_400);
     // The refused report changed nothing.
     expect(JSON.parse((await items())[0]!.details_json).reports).toBe(REPORTS_PER_DAY);
     // Another player is not limited by it.
