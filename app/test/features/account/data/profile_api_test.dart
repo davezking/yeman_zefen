@@ -96,12 +96,12 @@ void main() {
   });
 
   group('emailErrorFor', () {
-    test('maps Firebase codes to the two email messages', () {
+    test('maps Firebase codes to what the email form says', () {
       expect(emailErrorFor('invalid-email'), EmailError.email);
       expect(emailErrorFor('weak-password'), EmailError.password);
       expect(emailErrorFor('wrong-password'), EmailError.password);
       expect(emailErrorFor('invalid-credential'), EmailError.password);
-      expect(emailErrorFor('something-else'), EmailError.none);
+      expect(emailErrorFor('something-else'), EmailError.failed);
     });
   });
 }

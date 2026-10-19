@@ -276,6 +276,12 @@ void main() {
     );
     await tester.tap(find.text('Delete my account'));
     await settle(tester);
+    // A second step, before anything is deleted.
+    expect(model.user.isGuest, isFalse);
+    await tester.tap(
+      find.descendant(of: find.byType(AppDialog), matching: find.text('Delete account')),
+    );
+    await settle(tester);
     expect(model.user.isGuest, isTrue);
     expect(model.user.bestScore, isNull);
     expect(find.text('Delete account'), findsNothing);

@@ -1244,6 +1244,30 @@ abstract class AppLocalizations {
   /// **'That name is taken. Try another.'**
   String get authNameErrorTaken;
 
+  /// Toast after signing in to an existing account: the guest's history was merged into it
+  ///
+  /// In en, this message translates to:
+  /// **'Progress combined: your guest scores were added to your account.'**
+  String get authMerged;
+
+  /// Sign-in failed because the phone is offline
+  ///
+  /// In en, this message translates to:
+  /// **'No internet connection. Connect and try again.'**
+  String get authErrorNetwork;
+
+  /// Email sign-in: Firebase blocked further attempts for a while
+  ///
+  /// In en, this message translates to:
+  /// **'Too many tries. Wait a few minutes and try again.'**
+  String get authErrorTooMany;
+
+  /// Sign-in failed for a reason the player cannot fix by retyping
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in didn\'t work. Try again.'**
+  String get authErrorGeneric;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:
@@ -1295,7 +1319,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSignOutConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Sign out? Your scores stay saved to your account.'**
+  /// **'Sign out? Your scores stay saved to your account. Sign in again to see your rank on the leaderboard.'**
   String get settingsSignOutConfirm;
 
   /// No description provided for @settingsDelete.
@@ -1315,6 +1339,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete my account'**
   String get settingsDeleteConfirm;
+
+  /// Settings account row: the providers linked to the account, e.g. 'Google · Email'
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in with {providers}'**
+  String settingsSignedInWith(String providers);
+
+  /// The email sign-in provider's name, in the account row
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get settingsProviderEmail;
+
+  /// Toast after signing out
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out. You\'re playing as a guest.'**
+  String get settingsSignedOut;
+
+  /// Shown while signing out (queued games are sent first)
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out…'**
+  String get settingsSigningOut;
+
+  /// Second step of the delete confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account now?'**
+  String get settingsDeleteFinalTitle;
+
+  /// Second step of the delete confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Your account, display name and leaderboard scores will be gone for good.'**
+  String get settingsDeleteFinalBody;
+
+  /// Shown while the account is being deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting your account…'**
+  String get settingsDeleting;
+
+  /// Toast after the account was deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Your account was deleted. You\'re playing as a guest.'**
+  String get settingsDeleted;
+
+  /// Deletion failed before anything was deleted
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t delete your account. Check your connection and try again.'**
+  String get settingsDeleteFailed;
+
+  /// The server data is gone but the sign-in account is not; deleting again finishes it
+  ///
+  /// In en, this message translates to:
+  /// **'Your scores were deleted, but the account wasn\'t. Try again to finish.'**
+  String get settingsDeleteIncomplete;
+
+  /// Password prompt before deleting an email account
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm it\'s you'**
+  String get settingsReauthTitle;
+
+  /// Password prompt before deleting an email account
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password to delete your account.'**
+  String get settingsReauthBody;
+
+  /// The player confirmed with a different Google or Apple account than the one being deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with the account you\'re deleting.'**
+  String get settingsReauthMismatch;
+
+  /// Deletion needs a fresh sign-in, but none of the account's providers is offered on this phone
+  ///
+  /// In en, this message translates to:
+  /// **'To delete this account, sign in to it on a phone that offers its sign-in method.'**
+  String get settingsReauthUnavailable;
 
   /// No description provided for @settingsAdPrivacy.
   ///

@@ -15,6 +15,7 @@ class AppDialog extends StatelessWidget {
     required this.onConfirm,
     this.cancelLabel,
     this.onCancel,
+    this.content,
   });
 
   final String title;
@@ -26,6 +27,9 @@ class AppDialog extends StatelessWidget {
   /// that has to be acknowledged, such as "Resume").
   final String? cancelLabel;
   final VoidCallback? onCancel;
+
+  /// Shown under [body], before the buttons (a text field, say).
+  final Widget? content;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +60,10 @@ class AppDialog extends StatelessWidget {
                 body,
                 style: text.body.copyWith(color: ColorTokens.textSecondary),
               ),
+              if (content != null) ...[
+                const SizedBox(height: SpacingTokens.n16),
+                content!,
+              ],
               const SizedBox(height: SpacingTokens.n20),
               PrimaryButton(label: confirmLabel, onPressed: onConfirm),
               if (cancelLabel != null) ...[

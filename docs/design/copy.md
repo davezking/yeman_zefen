@@ -269,6 +269,10 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `auth.name.save` | Save name | ስሙን ያስቀምጡ |
 | `auth.name.error.short` | Use at least 2 characters. | ቢያንስ 2 ፊደላት ይጠቀሙ። |
 | `auth.name.error.taken` | That name is taken. Try another. | ይህ ስም ተይዟል። ሌላ ይሞክሩ። |
+| `auth.merged` | Progress combined: your guest scores were added to your account. | እድገትዎ ተዋህዷል፦ የእንግዳ ውጤቶችዎ ወደ መለያዎ ተጨምረዋል። |
+| `auth.error.network` | No internet connection. Connect and try again. | የኢንተርኔት ግንኙነት የለም። ተገናኝተው እንደገና ይሞክሩ። |
+| `auth.error.tooMany` | Too many tries. Wait a few minutes and try again. | በጣም ብዙ ሙከራዎች ተደርገዋል። ጥቂት ደቂቃዎች ጠብቀው እንደገና ይሞክሩ። |
+| `auth.error.generic` | Sign-in didn't work. Try again. | መግባት አልተሳካም። እንደገና ይሞክሩ። |
 
 > **Display-name step** (added in Phase 2 · Sprint 2). Step 4 had no screen for choosing the name that shows on the leaderboard, so the six `auth.name.*` rows are new. **Reviewed by a native speaker.**
 
@@ -284,16 +288,32 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `settings.guest` | Playing as a guest | በእንግድነት እየተጫወቱ ነው |
 | `settings.signIn` | Sign in | ይግቡ |
 | `settings.signOut` | Sign out | ይውጡ |
-| `settings.signOut.confirm` | Sign out? Your scores stay saved to your account. | ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ። |
+| `settings.signOut.confirm` | Sign out? Your scores stay saved to your account. Sign in again to see your rank on the leaderboard. | ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ። በደረጃ ሰንጠረዡ ላይ ደረጃዎን ለማየት እንደገና ይግቡ። |
 | `settings.delete` | Delete account | መለያ ይሰርዙ |
 | `settings.delete.body` | This permanently deletes your account and your leaderboard scores. It can't be undone. | ይህ መለያዎንና የደረጃ ውጤቶችዎን እስከመጨረሻው ይሰርዛል። መመለስ አይቻልም። |
 | `settings.delete.confirm` | Delete my account | መለያዬን ይሰርዙ |
+| `settings.signedInWith` | Signed in with {providers} | በ{providers} ገብተዋል |
+| `settings.provider.email` | Email | ኢሜይል |
+| `settings.signedOut` | Signed out. You're playing as a guest. | ወጥተዋል። አሁን በእንግድነት እየተጫወቱ ነው። |
+| `settings.signingOut` | Signing out… | በመውጣት ላይ… |
+| `settings.delete.final.title` | Delete your account now? | መለያዎ አሁን ይሰረዝ? |
+| `settings.delete.final.body` | Your account, display name and leaderboard scores will be gone for good. | መለያዎ፣ የሚታይ ስምዎና የደረጃ ውጤቶችዎ እስከመጨረሻው ይጠፋሉ። |
+| `settings.deleting` | Deleting your account… | መለያዎ በመሰረዝ ላይ ነው… |
+| `settings.deleted` | Your account was deleted. You're playing as a guest. | መለያዎ ተሰርዟል። አሁን በእንግድነት እየተጫወቱ ነው። |
+| `settings.delete.failed` | We couldn't delete your account. Check your connection and try again. | መለያዎን መሰረዝ አልተቻለም። ግንኙነትዎን አረጋግጠው እንደገና ይሞክሩ። |
+| `settings.delete.incomplete` | Your scores were deleted, but the account wasn't. Try again to finish. | ውጤቶችዎ ተሰርዘዋል፤ መለያው ግን አልተሰረዘም። ለመጨረስ እንደገና ይሞክሩ። |
+| `settings.reauth.title` | Confirm it's you | እርስዎ መሆንዎን ያረጋግጡ |
+| `settings.reauth.body` | Enter your password to delete your account. | መለያዎን ለመሰረዝ የይለፍ ቃልዎን ያስገቡ። |
+| `settings.reauth.mismatch` | Sign in with the account you're deleting. | እየሰረዙት ባለው መለያ ይግቡ። |
+| `settings.reauth.unavailable` | To delete this account, sign in to it on a phone that offers its sign-in method. | ይህን መለያ ለመሰረዝ የመለያው የመግቢያ ዘዴ ባለበት ስልክ ላይ ይግቡ። |
 | `settings.adPrivacy` | Ad privacy choices | የማስታወቂያ ግላዊነት ምርጫዎች |
 | `settings.offline` | Offline play · {count, plural, =1{1 pack} other{{count} packs}} · {size} MB | ያለ ኢንተርኔት መጫወት · {count, plural, =1{1 ጥቅል} other{{count} ጥቅሎች}} · {size} ሜባ |
 | `settings.privacy` | Privacy policy | የግላዊነት ፖሊሲ |
 | `settings.about` | About and licenses | ስለ መተግበሪያው እና ፈቃዶች |
 | `settings.version` | Version {version} | ስሪት {version} |
 | `settings.musicCredit` | Music used under license from [ASSOCIATION NAME]. | ሙዚቃዎቹ ጥቅም ላይ የዋሉት በ[የማህበሩ ስም] ፈቃድ ነው። |
+
+> **Account actions** (added in Phase 4 · Sprint 3). Sign-out (with its progress line), account deletion (a second confirm step, the password prompt Firebase needs for an old sign-in, the message for a sign-in method this phone does not offer, and its outcomes) and the linked providers are new `settings.*` rows, and `settings.signOut.confirm` now says that the leaderboard rank needs a sign-in. The four `auth.merged` and `auth.error.*` rows after the display-name step polish the sign-in errors. **Amharic not yet reviewed:** these are marked `REVIEW` in `app_am.arb`.
 
 ## Ads and consent
 

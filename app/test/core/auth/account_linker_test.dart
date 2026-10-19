@@ -83,6 +83,21 @@ class FakeFirebase implements AuthBackend {
 
   @override
   Future<void> sendPasswordResetEmail(String email) async => log.add('reset:$email');
+
+  @override
+  Future<void> signOut() async => _current = AuthState.signedOut;
+
+  @override
+  Future<Duration?> signInAge() async => null;
+
+  @override
+  Future<void> revokeAppleToken(String authorizationCode) => throw UnimplementedError();
+
+  @override
+  Future<void> reauthenticate(AuthCredential credential) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteUser() => throw UnimplementedError();
 }
 
 class FakeCredentials implements CredentialSource {
@@ -99,6 +114,9 @@ class FakeCredentials implements CredentialSource {
 
   @override
   Future<AuthCredential?> apple() async => null;
+
+  @override
+  Future<void> signOut() async {}
 }
 
 class FakeApi implements AccountApi {
@@ -121,6 +139,9 @@ class FakeApi implements AccountApi {
 
   @override
   Future<void> merge(String anonymousIdToken) => _call('merge($anonymousIdToken)');
+
+  @override
+  Future<void> deleteMe() => _call('deleteMe');
 }
 
 class MemoryStore implements PendingAccountStore {

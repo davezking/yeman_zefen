@@ -22,6 +22,9 @@ abstract class CredentialSource {
   bool get appleAvailable;
   Future<AuthCredential?> google();
   Future<AuthCredential?> apple();
+
+  /// Forgets the provider account picked on this device, so the next sign-in asks again.
+  Future<void> signOut();
 }
 
 class PlatformCredentialSource implements CredentialSource {
@@ -35,13 +38,18 @@ class PlatformCredentialSource implements CredentialSource {
   bool get appleAvailable =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || (AppConfig.appleOnAndroid && defaultTargetPlatform == TargetPlatform.android));
 
-  @override
-  Future<AuthCredential?> google() async {
+  Future<GoogleSignIn> _google() async {
     final signIn = GoogleSignIn.instance;
     if (!_googleReady) {
       await signIn.initialize(serverClientId: AppConfig.googleServerClientId);
       _googleReady = true;
     }
+    return signIn;
+  }
+
+  @override
+  Future<AuthCredential?> google() async {
+    final signIn = await _google();
     try {
       final account = await signIn.authenticate();
       final idToken = account.authentication.idToken;
@@ -50,6 +58,16 @@ class PlatformCredentialSource implements CredentialSource {
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) return null;
       throw AuthFailure('google-${e.code.name}', e.description);
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    if (!googleAvailable) return;
+    try {
+      await (await _google()).signOut();
+    } on Exception {
+      // Nothing to forget, or the plugin is unavailable: the next sign-in shows the picker anyway.
     }
   }
 
@@ -93,6 +111,10 @@ abstract class AccountApi {
 
   /// `POST /v1/me/merge`: moves the guest's sessions into the signed-in account.
   Future<void> merge(String anonymousIdToken);
+
+  /// `DELETE /v1/me`: removes the account's profile and leaderboard rows and anonymizes its
+  /// sessions. Repeating it is harmless.
+  Future<void> deleteMe();
 }
 
 class HttpAccountApi implements AccountApi {
@@ -106,6 +128,9 @@ class HttpAccountApi implements AccountApi {
   @override
   Future<void> merge(String anonymousIdToken) =>
       client.postJson('/v1/me/merge', body: {'anonymousIdToken': anonymousIdToken});
+
+  @override
+  Future<void> deleteMe() => client.deleteJson('/v1/me');
 }
 
 /// A server step still to send. [anonymousIdToken] is set for a merge. [targetUid] is the account

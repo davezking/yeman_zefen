@@ -12,8 +12,9 @@ import '../../../prototype/models.dart';
 /// `showAppBottomSheet`) over Results or the leaderboard.
 ///
 /// While [status] is [SignInStatus.signingIn] every button is off and the one
-/// for [signingInWith] shows a spinner. [SignInStatus.linkFailed] adds the
-/// message that the player's scores could not be attached yet.
+/// for [signingInWith] shows a spinner. [SignInStatus.linkFailed],
+/// [SignInStatus.offline] and [SignInStatus.failed] add a note saying what went
+/// wrong.
 class SignInSheet extends StatelessWidget {
   const SignInSheet({
     super.key,
@@ -101,38 +102,8 @@ class SignInSheet extends StatelessWidget {
           ],
         ),
         const SizedBox(height: SpacingTokens.n12),
-        if (status == SignInStatus.linkFailed) ...[
-          Semantics(
-            liveRegion: true,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: ColorTokens.surfaceErrorCard,
-                borderRadius: BorderRadius.circular(RadiusTokens.small),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(SpacingTokens.n12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      size: SizeTokens.icon,
-                      color: ColorTokens.textError,
-                    ),
-                    const SizedBox(width: SpacingTokens.n8),
-                    Expanded(
-                      child: Text(
-                        l10n.authLinkFailed,
-                        style: text.label.copyWith(
-                          color: ColorTokens.textError,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        if (_statusMessage(l10n, status) case final message?) ...[
+          ErrorNote(message: message),
           const SizedBox(height: SpacingTokens.n12),
         ],
         if (showApple) ...[
@@ -153,6 +124,54 @@ class SignInSheet extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+String? _statusMessage(AppLocalizations l10n, SignInStatus status) => switch (status) {
+  SignInStatus.linkFailed => l10n.authLinkFailed,
+  SignInStatus.offline => l10n.authErrorNetwork,
+  SignInStatus.failed => l10n.authErrorGeneric,
+  SignInStatus.idle || SignInStatus.signingIn => null,
+};
+
+/// A red note with a warning icon, announced to screen readers when it appears.
+class ErrorNote extends StatelessWidget {
+  const ErrorNote({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.text;
+    return Semantics(
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: ColorTokens.surfaceErrorCard,
+          borderRadius: BorderRadius.circular(RadiusTokens.small),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.n12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: SizeTokens.icon,
+                color: ColorTokens.textError,
+              ),
+              const SizedBox(width: SpacingTokens.n8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: text.label.copyWith(color: ColorTokens.textError),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -231,7 +250,7 @@ class _EmailSignInSheetState extends State<EmailSignInSheet> {
               ],
             ),
             const SizedBox(height: SpacingTokens.n16),
-            _Field(
+            AuthField(
               controller: _email,
               label: l10n.authEmailLabel,
               error: widget.error == EmailError.email
@@ -242,7 +261,7 @@ class _EmailSignInSheetState extends State<EmailSignInSheet> {
               enabled: !widget.busy,
             ),
             const SizedBox(height: SpacingTokens.n12),
-            _Field(
+            AuthField(
               controller: _password,
               label: l10n.authPasswordLabel,
               error: widget.error == EmailError.password
@@ -253,6 +272,10 @@ class _EmailSignInSheetState extends State<EmailSignInSheet> {
               enabled: !widget.busy,
             ),
             const SizedBox(height: SpacingTokens.n16),
+            if (_formMessage(l10n, widget.error) case final message?) ...[
+              ErrorNote(message: message),
+              const SizedBox(height: SpacingTokens.n12),
+            ],
             PrimaryButton(
               label: widget.creating ? l10n.commonNext : l10n.authEmailSubmit,
               onPressed: widget.busy
@@ -293,6 +316,14 @@ class _EmailSignInSheetState extends State<EmailSignInSheet> {
     );
   }
 }
+
+/// The email form's errors that are not about one field.
+String? _formMessage(AppLocalizations l10n, EmailError error) => switch (error) {
+  EmailError.offline => l10n.authErrorNetwork,
+  EmailError.tooMany => l10n.authErrorTooMany,
+  EmailError.failed => l10n.authErrorGeneric,
+  EmailError.none || EmailError.email || EmailError.password => null,
+};
 
 /// After the first sign-in: the name other players see on the leaderboard.
 class DisplayNameSheet extends StatefulWidget {
@@ -350,7 +381,7 @@ class _DisplayNameSheetState extends State<DisplayNameSheet> {
               style: text.body.copyWith(color: ColorTokens.textSecondary),
             ),
             const SizedBox(height: SpacingTokens.n16),
-            _Field(
+            AuthField(
               controller: _name,
               label: l10n.authNameLabel,
               error: error,
@@ -370,9 +401,11 @@ class _DisplayNameSheetState extends State<DisplayNameSheet> {
 }
 
 /// A text field in the app's style: a white card with its label above the
-/// text, and the error in red under it (with an icon, not color alone).
-class _Field extends StatelessWidget {
-  const _Field({
+/// text, and the error in red under it (with an icon, not color alone). Used by
+/// the sign-in sheets and the password prompt before an account deletion.
+class AuthField extends StatelessWidget {
+  const AuthField({
+    super.key,
     required this.controller,
     required this.label,
     this.error,
@@ -380,6 +413,8 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.autofillHints,
     this.enabled = true,
+    this.autofocus = false,
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
@@ -389,6 +424,8 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final Iterable<String>? autofillHints;
   final bool enabled;
+  final bool autofocus;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -407,6 +444,8 @@ class _Field extends StatelessWidget {
         TextField(
           controller: controller,
           enabled: enabled,
+          autofocus: autofocus,
+          onSubmitted: onSubmitted,
           obscureText: obscure,
           keyboardType: keyboardType,
           autofillHints: autofillHints,

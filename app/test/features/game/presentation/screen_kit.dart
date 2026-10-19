@@ -14,6 +14,7 @@ import 'package:yeman_zefen/core/theme/app_theme.dart';
 import 'package:yeman_zefen/features/account/register_prompt_controller.dart';
 import 'package:drift/native.dart';
 import 'package:yeman_zefen/core/net/network_kind.dart';
+import 'package:yeman_zefen/features/account/data/account_manager.dart';
 import 'package:yeman_zefen/features/account/data/profile_api.dart';
 import 'package:yeman_zefen/features/game/application/play_setup.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
@@ -185,6 +186,7 @@ Future<Harness> pumpScreens(
   Locale device = const Locale('en'),
   double textScale = 1.0,
   bool themed = true,
+  AccountManager? accountManager,
 }) async {
   final router = buildRouter(initialLocation: location);
   final db = AppDb(NativeDatabase.memory());
@@ -244,6 +246,7 @@ Future<Harness> pumpScreens(
           nowMs: () => 0,
         ),
       ),
+      if (accountManager != null) accountManagerProvider.overrideWithValue(accountManager),
     ],
   );
   addTearDown(container.dispose);

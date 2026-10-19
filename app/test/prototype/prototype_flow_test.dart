@@ -625,7 +625,7 @@ void main() {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Sign out? Your scores stay saved to your account.'),
+      find.textContaining('Sign out? Your scores stay saved to your account.'),
       findsOneWidget,
     );
     await tester.tap(find.text('Cancel'));
@@ -636,6 +636,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('permanently deletes'), findsOneWidget);
     await tester.tap(find.text('Delete my account'));
+    await tester.pumpAndSettle();
+    expect(model.user.isGuest, isFalse);
+    await tester.tap(
+      find.descendant(of: find.byType(AppDialog), matching: find.text('Delete account')),
+    );
     await tester.pumpAndSettle();
     expect(model.user.isGuest, isTrue);
     await finish(tester, model);

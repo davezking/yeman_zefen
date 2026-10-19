@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Who the player is, as far as Firebase knows.
 class AuthState {
-  const AuthState({this.uid, this.isAnonymous = true, this.providers = const []});
+  const AuthState({this.uid, this.isAnonymous = true, this.providers = const [], this.email});
 
   /// No identity yet: first launch while offline, before sign-in succeeds.
   static const signedOut = AuthState();
@@ -20,6 +20,10 @@ class AuthState {
   /// Empty for a guest.
   final List<String> providers;
 
+  /// The account's email address, when it has one (an email account, or a Google or Apple
+  /// account that shares it). Needed to confirm a password before a deletion.
+  final String? email;
+
   bool get hasUid => uid != null;
 
   @override
@@ -27,10 +31,11 @@ class AuthState {
       other is AuthState &&
       other.uid == uid &&
       other.isAnonymous == isAnonymous &&
+      other.email == email &&
       _sameList(other.providers, providers);
 
   @override
-  int get hashCode => Object.hash(uid, isAnonymous, Object.hashAll(providers));
+  int get hashCode => Object.hash(uid, isAnonymous, email, Object.hashAll(providers));
 
   @override
   String toString() => 'AuthState(uid: $uid, isAnonymous: $isAnonymous, providers: $providers)';
@@ -68,6 +73,26 @@ abstract class AuthBackend {
 
   /// Throws [AuthFailure].
   Future<void> sendPasswordResetEmail(String email);
+
+  /// Signs the user out on this device. [current] is [AuthState.signedOut] afterwards.
+  Future<void> signOut();
+
+  /// How long ago the signed-in user last proved who they are (signed in or re-authenticated):
+  /// a freshly issued ID token's `iat` minus its `auth_time`, both set by Firebase, so the phone's
+  /// clock does not matter. Null when signed out or when no token could be fetched (offline).
+  Future<Duration?> signInAge();
+
+  /// Revokes the app's Sign in with Apple tokens, as Apple requires when an account is deleted.
+  /// [authorizationCode] comes from an Apple sign-in moments before. Throws [AuthFailure].
+  Future<void> revokeAppleToken(String authorizationCode);
+
+  /// Proves again that the signed-in user owns [credential]'s account, as Firebase asks before a
+  /// deletion. Throws [AuthFailure] (`wrong-password`, `user-mismatch`, ...).
+  Future<void> reauthenticate(AuthCredential credential);
+
+  /// Deletes the signed-in user from Firebase and signs out. Throws [AuthFailure], with
+  /// `requires-recent-login` when the last sign-in is too old.
+  Future<void> deleteUser();
 }
 
 /// The credential belongs to another Firebase account (`credential-already-in-use`, or
@@ -94,6 +119,10 @@ class AuthFailure implements Exception {
   String toString() => 'AuthFailure($code${message == null ? '' : ': $message'})';
 }
 
+/// Firebase's codes for a password that does not match the account.
+bool isWrongPassword(String code) =>
+    code == 'wrong-password' || code == 'invalid-credential' || code == 'invalid-login-credentials';
+
 class FirebaseAuthBackend implements AuthBackend {
   FirebaseAuthBackend([FirebaseAuth? auth]) : _auth = auth ?? FirebaseAuth.instance;
 
@@ -105,6 +134,7 @@ class FirebaseAuthBackend implements AuthBackend {
           uid: user.uid,
           isAnonymous: user.isAnonymous,
           providers: [for (final info in user.providerData) info.providerId],
+          email: user.email,
         );
 
   @override
@@ -149,6 +179,52 @@ class FirebaseAuthBackend implements AuthBackend {
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
+    }
+  }
+
+  @override
+  Future<void> signOut() => _auth.signOut();
+
+  @override
+  Future<Duration?> signInAge() async {
+    try {
+      final token = await _auth.currentUser?.getIdTokenResult(true);
+      final issued = token?.issuedAtTime;
+      final signedIn = token?.authTime;
+      return issued == null || signedIn == null ? null : issued.difference(signedIn);
+    } on FirebaseAuthException {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> revokeAppleToken(String authorizationCode) async {
+    try {
+      await _auth.revokeTokenWithAuthorizationCode(authorizationCode);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
+    }
+  }
+
+  @override
+  Future<void> reauthenticate(AuthCredential credential) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure('no-current-user');
+    try {
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
+    }
+  }
+
+  @override
+  Future<void> deleteUser() async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure('no-current-user');
+    try {
+      await user.delete();
     } on FirebaseAuthException catch (e) {
       throw AuthFailure(e.code, e.message);
     }

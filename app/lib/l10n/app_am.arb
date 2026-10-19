@@ -214,6 +214,22 @@
   "authNameSave": "ስሙን ያስቀምጡ",
   "authNameErrorShort": "ቢያንስ 2 ፊደላት ይጠቀሙ።",
   "authNameErrorTaken": "ይህ ስም ተይዟል። ሌላ ይሞክሩ።",
+  "authMerged": "እድገትዎ ተዋህዷል፦ የእንግዳ ውጤቶችዎ ወደ መለያዎ ተጨምረዋል።",
+  "@authMerged": {
+    "description": "REVIEW. Toast after signing in to an existing account: the guest's history was merged into it"
+  },
+  "authErrorNetwork": "የኢንተርኔት ግንኙነት የለም። ተገናኝተው እንደገና ይሞክሩ።",
+  "@authErrorNetwork": {
+    "description": "REVIEW. Sign-in failed because the phone is offline"
+  },
+  "authErrorTooMany": "በጣም ብዙ ሙከራዎች ተደርገዋል። ጥቂት ደቂቃዎች ጠብቀው እንደገና ይሞክሩ።",
+  "@authErrorTooMany": {
+    "description": "REVIEW. Email sign-in: Firebase blocked further attempts for a while"
+  },
+  "authErrorGeneric": "መግባት አልተሳካም። እንደገና ይሞክሩ።",
+  "@authErrorGeneric": {
+    "description": "REVIEW. Sign-in failed for a reason the player cannot fix by retyping"
+  },
   "settingsTitle": "ቅንብሮች",
   "settingsLanguage": "ቋንቋ",
   "settingsSound": "የድምፅ ውጤቶች",
@@ -222,10 +238,74 @@
   "settingsGuest": "በእንግድነት እየተጫወቱ ነው",
   "settingsSignIn": "ይግቡ",
   "settingsSignOut": "ይውጡ",
-  "settingsSignOutConfirm": "ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ።",
+  "settingsSignOutConfirm": "ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ። በደረጃ ሰንጠረዡ ላይ ደረጃዎን ለማየት እንደገና ይግቡ።",
+  "@settingsSignOutConfirm": {
+    "description": "REVIEW. Sign-out confirm; now also says the leaderboard rank needs a sign-in"
+  },
   "settingsDelete": "መለያ ይሰርዙ",
   "settingsDeleteBody": "ይህ መለያዎንና የደረጃ ውጤቶችዎን እስከመጨረሻው ይሰርዛል። መመለስ አይቻልም።",
   "settingsDeleteConfirm": "መለያዬን ይሰርዙ",
+  "settingsSignedInWith": "በ{providers} ገብተዋል",
+  "@settingsSignedInWith": {
+    "description": "REVIEW. Settings account row: the providers linked to the account, e.g. 'Google · Email'",
+    "placeholders": {
+      "providers": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsProviderEmail": "ኢሜይል",
+  "@settingsProviderEmail": {
+    "description": "REVIEW. The email sign-in provider's name, in the account row"
+  },
+  "settingsSignedOut": "ወጥተዋል። አሁን በእንግድነት እየተጫወቱ ነው።",
+  "@settingsSignedOut": {
+    "description": "REVIEW. Toast after signing out"
+  },
+  "settingsSigningOut": "በመውጣት ላይ…",
+  "@settingsSigningOut": {
+    "description": "REVIEW. Shown while signing out (queued games are sent first)"
+  },
+  "settingsDeleteFinalTitle": "መለያዎ አሁን ይሰረዝ?",
+  "@settingsDeleteFinalTitle": {
+    "description": "REVIEW. Second step of the delete confirm"
+  },
+  "settingsDeleteFinalBody": "መለያዎ፣ የሚታይ ስምዎና የደረጃ ውጤቶችዎ እስከመጨረሻው ይጠፋሉ።",
+  "@settingsDeleteFinalBody": {
+    "description": "REVIEW. Second step of the delete confirm"
+  },
+  "settingsDeleting": "መለያዎ በመሰረዝ ላይ ነው…",
+  "@settingsDeleting": {
+    "description": "REVIEW. Shown while the account is being deleted"
+  },
+  "settingsDeleted": "መለያዎ ተሰርዟል። አሁን በእንግድነት እየተጫወቱ ነው።",
+  "@settingsDeleted": {
+    "description": "REVIEW. Toast after the account was deleted"
+  },
+  "settingsDeleteFailed": "መለያዎን መሰረዝ አልተቻለም። ግንኙነትዎን አረጋግጠው እንደገና ይሞክሩ።",
+  "@settingsDeleteFailed": {
+    "description": "REVIEW. Deletion failed before anything was deleted"
+  },
+  "settingsDeleteIncomplete": "ውጤቶችዎ ተሰርዘዋል፤ መለያው ግን አልተሰረዘም። ለመጨረስ እንደገና ይሞክሩ።",
+  "@settingsDeleteIncomplete": {
+    "description": "REVIEW. The server data is gone but the sign-in account is not; deleting again finishes it"
+  },
+  "settingsReauthTitle": "እርስዎ መሆንዎን ያረጋግጡ",
+  "@settingsReauthTitle": {
+    "description": "REVIEW. Password prompt before deleting an email account"
+  },
+  "settingsReauthBody": "መለያዎን ለመሰረዝ የይለፍ ቃልዎን ያስገቡ።",
+  "@settingsReauthBody": {
+    "description": "REVIEW. Password prompt before deleting an email account"
+  },
+  "settingsReauthMismatch": "እየሰረዙት ባለው መለያ ይግቡ።",
+  "@settingsReauthMismatch": {
+    "description": "REVIEW. The player confirmed with a different Google or Apple account than the one being deleted"
+  },
+  "settingsReauthUnavailable": "ይህን መለያ ለመሰረዝ የመለያው የመግቢያ ዘዴ ባለበት ስልክ ላይ ይግቡ።",
+  "@settingsReauthUnavailable": {
+    "description": "REVIEW. Deletion needs a fresh sign-in, but none of the account's providers is offered on this phone"
+  },
   "settingsAdPrivacy": "የማስታወቂያ ግላዊነት ምርጫዎች",
   "settingsOffline": "ያለ ኢንተርኔት መጫወት · {count, plural, =1{1 ጥቅል} other{{count} ጥቅሎች}} · {size} ሜባ",
   "settingsPrivacy": "የግላዊነት ፖሊሲ",
