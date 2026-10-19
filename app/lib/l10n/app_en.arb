@@ -511,6 +511,10 @@
   "@settingsSignedOut": {
     "description": "Toast after signing out"
   },
+  "settingsSigningOut": "Signing out…",
+  "@settingsSigningOut": {
+    "description": "Shown while signing out (queued games are sent first)"
+  },
   "settingsDeleteFinalTitle": "Delete your account now?",
   "@settingsDeleteFinalTitle": {
     "description": "Second step of the delete confirm"
@@ -546,6 +550,10 @@
   "settingsReauthMismatch": "Sign in with the account you're deleting.",
   "@settingsReauthMismatch": {
     "description": "The player confirmed with a different Google or Apple account than the one being deleted"
+  },
+  "settingsReauthUnavailable": "To delete this account, sign in to it on a phone that offers its sign-in method.",
+  "@settingsReauthUnavailable": {
+    "description": "Deletion needs a fresh sign-in, but none of the account's providers is offered on this phone"
   },
   "settingsAdPrivacy": "Ad privacy choices",
   "settingsOffline": "Offline play · {count, plural, =1{1 pack} other{{count} packs}} · {size} MB",

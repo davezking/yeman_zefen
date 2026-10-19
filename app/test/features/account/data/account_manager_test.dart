@@ -9,15 +9,15 @@ import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/core/http/api_client.dart';
 import 'package:yeman_zefen/features/account/data/account_manager.dart';
 
-final _now = DateTime.utc(2026, 10, 1, 12);
-
 /// Firebase as the manager sees it: one signed-in user, when they last signed in, and whether
 /// a deletion wants a fresher sign-in.
 class FakeFirebase implements AuthBackend {
   FakeFirebase(this._current);
 
   AuthState _current;
-  DateTime? signedInAt = _now;
+
+  /// How long ago the user last signed in, by Firebase's clock; null when it cannot be read.
+  Duration? signInAge_ = Duration.zero;
   final log = <String>[];
 
   /// The password of the email account.
@@ -68,7 +68,10 @@ class FakeFirebase implements AuthBackend {
   }
 
   @override
-  Future<DateTime?> lastSignInAt() async => signedInAt;
+  Future<Duration?> signInAge() async => signInAge_;
+
+  @override
+  Future<void> revokeAppleToken(String authorizationCode) async => log.add('revokeApple:$authorizationCode');
 
   @override
   Future<void> reauthenticate(AuthCredential credential) async {
@@ -78,9 +81,9 @@ class FakeFirebase implements AuthBackend {
     } else {
       final token = (credential as OAuthCredential).idToken;
       log.add('reauth:${credential.providerId}:$token');
-      if (token != googleSubject) throw const AuthFailure('user-mismatch');
+      if (credential.providerId == 'google.com' && token != googleSubject) throw const AuthFailure('user-mismatch');
     }
-    signedInAt = _now;
+    signInAge_ = Duration.zero;
     staleDeletes = 0;
   }
 
@@ -108,8 +111,10 @@ class FakeCredentials implements CredentialSource {
   @override
   bool get googleAvailable => true;
 
+  bool appleOffered = false;
+
   @override
-  bool get appleAvailable => false;
+  bool get appleAvailable => appleOffered;
 
   @override
   Future<AuthCredential?> google() async {
@@ -119,7 +124,10 @@ class FakeCredentials implements CredentialSource {
   }
 
   @override
-  Future<AuthCredential?> apple() async => null;
+  Future<AuthCredential?> apple() async {
+    firebase.log.add('picker:apple');
+    return pick == null ? null : OAuthProvider('apple.com').credential(idToken: 'apple-1', rawNonce: 'n', accessToken: 'code-1');
+  }
 
   @override
   Future<void> signOut() async => firebase.log.add('forgetGoogle');
@@ -168,7 +176,6 @@ void main() {
           return flush();
         },
         flushTimeout: const Duration(milliseconds: 20),
-        now: () => _now,
       );
 
   void setUp_(AuthState who) {
@@ -178,7 +185,8 @@ void main() {
     db = AppDb(NativeDatabase.memory());
     auth = AuthService(backend: firebase, onlineChanges: const Stream.empty());
     flushes = 0;
-    flush = () async => firebase.log.add('flush');
+    // Says how many sessions were still queued when it ran.
+    flush = () async => firebase.log.add('flush:${(await db.select(db.pendingSessions).get()).length}');
   }
 
   tearDown(() async {
@@ -207,8 +215,30 @@ void main() {
       setUp_(_google);
       await manager().signOut();
       await pumpEventQueue();
-      expect(firebase.log, ['flush', 'signOut', 'forgetGoogle', 'anonymous']);
+      expect(firebase.log, ['flush:0', 'signOut', 'forgetGoogle', 'anonymous']);
       expect(firebase.current, const AuthState(uid: 'guest-new'));
+    });
+
+    test("drops the account's local bests, and keeps a pending link step for its own account", () async {
+      setUp_(_google);
+      await seedLocal();
+      flush = () async {};
+      await manager().signOut();
+      expect(await localCounts(), [1, 0, 1]);
+    });
+
+    test('a second sign-out while one runs waits for it', () async {
+      setUp_(_google);
+      final gate = Completer<void>();
+      flush = () => gate.future;
+      final m = manager();
+      final first = m.signOut();
+      final second = m.signOut();
+      gate.complete();
+      await Future.wait([first, second]);
+      await pumpEventQueue();
+      expect(firebase.log.where((e) => e == 'signOut'), hasLength(1));
+      expect(flushes, 1);
     });
 
     test('does not wait long for sessions that cannot go', () async {
@@ -232,21 +262,22 @@ void main() {
       await seedLocal();
       expect(await manager().deleteAccount(askPassword: noPassword), DeleteOutcome.deleted);
       await pumpEventQueue();
-      expect(firebase.log, ['DELETE /v1/me as u-1', 'delete', 'forgetGoogle', 'anonymous']);
+      // The queue is emptied before the send it waits for, so nothing reaches the server after.
+      expect(firebase.log, ['flush:0', 'DELETE /v1/me as u-1', 'delete', 'forgetGoogle', 'anonymous']);
       expect(await localCounts(), [0, 0, 0]);
       expect(firebase.current.uid, 'guest-new');
     });
 
     test('an old sign-in signs in again with Google before anything is deleted', () async {
       setUp_(_google);
-      firebase.signedInAt = _now.subtract(const Duration(minutes: 10));
+      firebase.signInAge_ = const Duration(minutes: 10);
       expect(await manager().deleteAccount(askPassword: noPassword), DeleteOutcome.deleted);
-      expect(firebase.log.take(4), ['picker:google', 'reauth:google.com:g-1', 'DELETE /v1/me as u-1', 'delete']);
+      expect(firebase.log.take(5), ['picker:google', 'reauth:google.com:g-1', 'flush:0', 'DELETE /v1/me as u-1', 'delete']);
     });
 
     test('no known sign-in time counts as old', () async {
       setUp_(_google);
-      firebase.signedInAt = null;
+      firebase.signInAge_ = null;
       await manager().deleteAccount(askPassword: noPassword);
       expect(firebase.log.first, 'picker:google');
     });
@@ -254,7 +285,7 @@ void main() {
     test('closing the sign-in changes nothing', () async {
       setUp_(_google);
       await seedLocal();
-      firebase.signedInAt = _now.subtract(const Duration(minutes: 10));
+      firebase.signInAge_ = const Duration(minutes: 10);
       credentials.pick = null;
       expect(await manager().deleteAccount(askPassword: noPassword), DeleteOutcome.cancelled);
       expect(firebase.log, ['picker:google']);
@@ -264,7 +295,7 @@ void main() {
 
     test('another Google account is refused before anything is deleted', () async {
       setUp_(_google);
-      firebase.signedInAt = _now.subtract(const Duration(minutes: 10));
+      firebase.signInAge_ = const Duration(minutes: 10);
       credentials.pick = 'g-other';
       await expectLater(
         manager().deleteAccount(askPassword: noPassword),
@@ -275,7 +306,7 @@ void main() {
 
     test('an email account asks for its password, again after a wrong one', () async {
       setUp_(_email);
-      firebase.signedInAt = _now.subtract(const Duration(minutes: 10));
+      firebase.signInAge_ = const Duration(minutes: 10);
       final asked = <bool>[];
       final answers = ['nope', 'secret1'];
       final outcome = await manager().deleteAccount(
@@ -286,24 +317,24 @@ void main() {
       );
       expect(outcome, DeleteOutcome.deleted);
       expect(asked, [false, true]);
-      expect(firebase.log.take(3), ['reauth:password', 'reauth:password', 'DELETE /v1/me as u-1']);
+      expect(firebase.log.take(4), ['reauth:password', 'reauth:password', 'flush:0', 'DELETE /v1/me as u-1']);
     });
 
     test('cancelling the password changes nothing', () async {
       setUp_(_email);
-      firebase.signedInAt = _now.subtract(const Duration(minutes: 10));
+      firebase.signInAge_ = const Duration(minutes: 10);
       final outcome = await manager().deleteAccount(askPassword: ({required wrongPassword}) async => null);
       expect(outcome, DeleteOutcome.cancelled);
       expect(firebase.log, isEmpty);
     });
 
-    test('a server that cannot be reached changes nothing', () async {
+    test('a server that cannot be reached leaves the account; only its unsent sessions are gone', () async {
       setUp_(_google);
       await seedLocal();
       api.failWith = const NetworkException('offline');
       await expectLater(manager().deleteAccount(askPassword: noPassword), throwsA(isA<NetworkException>()));
-      expect(firebase.log, ['DELETE /v1/me as u-1']);
-      expect(await localCounts(), [1, 1, 1]);
+      expect(firebase.log, ['flush:0', 'DELETE /v1/me as u-1']);
+      expect(await localCounts(), [0, 1, 1]);
       expect(firebase.current, _google);
     });
 
@@ -311,7 +342,7 @@ void main() {
       setUp_(_google);
       firebase.staleDeletes = 1;
       expect(await manager().deleteAccount(askPassword: noPassword), DeleteOutcome.deleted);
-      expect(firebase.log.take(5), ['DELETE /v1/me as u-1', 'delete', 'picker:google', 'reauth:google.com:g-1', 'delete']);
+      expect(firebase.log.skip(1).take(5), ['DELETE /v1/me as u-1', 'delete', 'picker:google', 'reauth:google.com:g-1', 'delete']);
     });
 
     test('closing that later sign-in leaves the account signed in, to finish by deleting again', () async {
@@ -332,6 +363,30 @@ void main() {
         manager().deleteAccount(askPassword: noPassword),
         throwsA(isA<DeleteIncompleteException>().having((e) => e.cause, 'cause', isA<AuthFailure>())),
       );
+    });
+
+    test('an Apple account signs in with Apple even when recent, and revokes its tokens', () async {
+      setUp_(const AuthState(uid: 'u-1', isAnonymous: false, providers: ['apple.com']));
+      credentials.appleOffered = true;
+      expect(await manager().deleteAccount(askPassword: noPassword), DeleteOutcome.deleted);
+      expect(firebase.log.take(6), [
+        'picker:apple',
+        'reauth:apple.com:apple-1',
+        'flush:0',
+        'DELETE /v1/me as u-1',
+        'revokeApple:code-1',
+        'delete',
+      ]);
+    });
+
+    test('an account whose providers this phone does not offer cannot be confirmed', () async {
+      setUp_(const AuthState(uid: 'u-1', isAnonymous: false, providers: ['apple.com']));
+      firebase.signInAge_ = const Duration(minutes: 10);
+      await expectLater(
+        manager().deleteAccount(askPassword: noPassword),
+        throwsA(isA<AuthFailure>().having((e) => e.code, 'code', 'reauth-unavailable')),
+      );
+      expect(firebase.log, isEmpty);
     });
 
     test('a guest cannot delete', () async {

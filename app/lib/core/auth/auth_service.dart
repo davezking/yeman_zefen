@@ -77,9 +77,14 @@ abstract class AuthBackend {
   /// Signs the user out on this device. [current] is [AuthState.signedOut] afterwards.
   Future<void> signOut();
 
-  /// When the signed-in user last proved who they are (signed in or re-authenticated), from the
-  /// ID token's `auth_time`. Null when signed out or when it cannot be read.
-  Future<DateTime?> lastSignInAt();
+  /// How long ago the signed-in user last proved who they are (signed in or re-authenticated):
+  /// a freshly issued ID token's `iat` minus its `auth_time`, both set by Firebase, so the phone's
+  /// clock does not matter. Null when signed out or when no token could be fetched (offline).
+  Future<Duration?> signInAge();
+
+  /// Revokes the app's Sign in with Apple tokens, as Apple requires when an account is deleted.
+  /// [authorizationCode] comes from an Apple sign-in moments before. Throws [AuthFailure].
+  Future<void> revokeAppleToken(String authorizationCode);
 
   /// Proves again that the signed-in user owns [credential]'s account, as Firebase asks before a
   /// deletion. Throws [AuthFailure] (`wrong-password`, `user-mismatch`, ...).
@@ -113,6 +118,10 @@ class AuthFailure implements Exception {
   @override
   String toString() => 'AuthFailure($code${message == null ? '' : ': $message'})';
 }
+
+/// Firebase's codes for a password that does not match the account.
+bool isWrongPassword(String code) =>
+    code == 'wrong-password' || code == 'invalid-credential' || code == 'invalid-login-credentials';
 
 class FirebaseAuthBackend implements AuthBackend {
   FirebaseAuthBackend([FirebaseAuth? auth]) : _auth = auth ?? FirebaseAuth.instance;
@@ -179,11 +188,23 @@ class FirebaseAuthBackend implements AuthBackend {
   Future<void> signOut() => _auth.signOut();
 
   @override
-  Future<DateTime?> lastSignInAt() async {
+  Future<Duration?> signInAge() async {
     try {
-      return (await _auth.currentUser?.getIdTokenResult())?.authTime;
+      final token = await _auth.currentUser?.getIdTokenResult(true);
+      final issued = token?.issuedAtTime;
+      final signedIn = token?.authTime;
+      return issued == null || signedIn == null ? null : issued.difference(signedIn);
     } on FirebaseAuthException {
       return null;
+    }
+  }
+
+  @override
+  Future<void> revokeAppleToken(String authorizationCode) async {
+    try {
+      await _auth.revokeTokenWithAuthorizationCode(authorizationCode);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(e.code, e.message);
     }
   }
 

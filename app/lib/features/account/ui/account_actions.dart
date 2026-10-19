@@ -10,18 +10,31 @@ import '../../../l10n/app_localizations.dart';
 import '../data/account_manager.dart';
 import 'sign_in_sheet.dart';
 
-/// Signs the player out, then says they are a guest now.
+/// Signs the player out, then says they are a guest now. A "signing out" dialog covers the screen
+/// while queued sessions are sent first, which can take a few seconds offline.
 Future<void> signOut(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.maybeOf(context);
-  final message = AppLocalizations.of(context).settingsSignedOut;
+  final navigator = Navigator.of(context, rootNavigator: true);
+  _showBusy(context, l10n.settingsSigningOut);
+  String message;
   try {
     await ref.read(accountManagerProvider).signOut();
+    message = l10n.settingsSignedOut;
   } on Exception {
-    // Firebase signs out locally and does not fail in practice; the account row says either way.
-    return;
+    message = l10n.errorGenericTitle;
+  } finally {
+    navigator.pop();
   }
   _toast(messenger, message);
 }
+
+void _showBusy(BuildContext context, String message) => showDialog<void>(
+  context: context,
+  barrierDismissible: false,
+  barrierColor: ColorTokens.backgroundScrim,
+  builder: (_) => _BusyDialog(message: message),
+);
 
 /// Deletes the account, after the confirms the settings screen asked for. A "deleting" dialog
 /// covers the screen meanwhile; the sign-in that proves it is the player opens over it.
@@ -29,12 +42,7 @@ Future<void> deleteAccount(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.maybeOf(context);
   final navigator = Navigator.of(context, rootNavigator: true);
-  showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    barrierColor: ColorTokens.backgroundScrim,
-    builder: (_) => _BusyDialog(message: l10n.settingsDeleting),
-  );
+  _showBusy(context, l10n.settingsDeleting);
   String? message;
   try {
     final outcome = await ref
@@ -43,8 +51,9 @@ Future<void> deleteAccount(BuildContext context, WidgetRef ref) async {
     if (outcome == DeleteOutcome.deleted) message = l10n.settingsDeleted;
   } on Exception catch (e) {
     message = deleteErrorMessage(l10n, e);
+  } finally {
+    navigator.pop();
   }
-  navigator.pop();
   if (message != null) _toast(messenger, message);
 }
 
@@ -57,6 +66,7 @@ String deleteErrorMessage(AppLocalizations l10n, Exception error) {
     return switch (error.code) {
       'network-request-failed' => l10n.authErrorNetwork,
       'too-many-requests' => l10n.authErrorTooMany,
+      'reauth-unavailable' => l10n.settingsReauthUnavailable,
       _ => l10n.settingsDeleteFailed,
     };
   }

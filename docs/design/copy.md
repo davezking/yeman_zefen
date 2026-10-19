@@ -295,6 +295,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `settings.signedInWith` | Signed in with {providers} | በ{providers} ገብተዋል |
 | `settings.provider.email` | Email | ኢሜይል |
 | `settings.signedOut` | Signed out. You're playing as a guest. | ወጥተዋል። አሁን በእንግድነት እየተጫወቱ ነው። |
+| `settings.signingOut` | Signing out… | በመውጣት ላይ… |
 | `settings.delete.final.title` | Delete your account now? | መለያዎ አሁን ይሰረዝ? |
 | `settings.delete.final.body` | Your account, display name and leaderboard scores will be gone for good. | መለያዎ፣ የሚታይ ስምዎና የደረጃ ውጤቶችዎ እስከመጨረሻው ይጠፋሉ። |
 | `settings.deleting` | Deleting your account… | መለያዎ በመሰረዝ ላይ ነው… |
@@ -304,6 +305,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `settings.reauth.title` | Confirm it's you | እርስዎ መሆንዎን ያረጋግጡ |
 | `settings.reauth.body` | Enter your password to delete your account. | መለያዎን ለመሰረዝ የይለፍ ቃልዎን ያስገቡ። |
 | `settings.reauth.mismatch` | Sign in with the account you're deleting. | እየሰረዙት ባለው መለያ ይግቡ። |
+| `settings.reauth.unavailable` | To delete this account, sign in to it on a phone that offers its sign-in method. | ይህን መለያ ለመሰረዝ የመለያው የመግቢያ ዘዴ ባለበት ስልክ ላይ ይግቡ። |
 | `settings.adPrivacy` | Ad privacy choices | የማስታወቂያ ግላዊነት ምርጫዎች |
 | `settings.offline` | Offline play · {count, plural, =1{1 pack} other{{count} packs}} · {size} MB | ያለ ኢንተርኔት መጫወት · {count, plural, =1{1 ጥቅል} other{{count} ጥቅሎች}} · {size} ሜባ |
 | `settings.privacy` | Privacy policy | የግላዊነት ፖሊሲ |
@@ -311,7 +313,7 @@ The Step 1 deck on the canvas is superseded by this file. Step 4 and the play-fi
 | `settings.version` | Version {version} | ስሪት {version} |
 | `settings.musicCredit` | Music used under license from [ASSOCIATION NAME]. | ሙዚቃዎቹ ጥቅም ላይ የዋሉት በ[የማህበሩ ስም] ፈቃድ ነው። |
 
-> **Account actions** (added in Phase 4 · Sprint 3). Sign-out, account deletion (a second confirm step, the password prompt Firebase needs for an old sign-in, and its outcomes) and the linked providers are new `settings.*` rows, and `settings.signOut.confirm` now says that the leaderboard rank needs a sign-in. The four `auth.merged` and `auth.error.*` rows after the display-name step polish the sign-in errors. **Amharic not yet reviewed:** these are marked `REVIEW` in `app_am.arb`.
+> **Account actions** (added in Phase 4 · Sprint 3). Sign-out (with its progress line), account deletion (a second confirm step, the password prompt Firebase needs for an old sign-in, the message for a sign-in method this phone does not offer, and its outcomes) and the linked providers are new `settings.*` rows, and `settings.signOut.confirm` now says that the leaderboard rank needs a sign-in. The four `auth.merged` and `auth.error.*` rows after the display-name step polish the sign-in errors. **Amharic not yet reviewed:** these are marked `REVIEW` in `app_am.arb`.
 
 ## Ads and consent
 

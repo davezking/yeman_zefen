@@ -88,7 +88,10 @@ class FakeFirebase implements AuthBackend {
   Future<void> signOut() async => _current = AuthState.signedOut;
 
   @override
-  Future<DateTime?> lastSignInAt() async => null;
+  Future<Duration?> signInAge() async => null;
+
+  @override
+  Future<void> revokeAppleToken(String authorizationCode) => throw UnimplementedError();
 
   @override
   Future<void> reauthenticate(AuthCredential credential) => throw UnimplementedError();

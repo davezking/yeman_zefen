@@ -38,13 +38,18 @@ class PlatformCredentialSource implements CredentialSource {
   bool get appleAvailable =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || (AppConfig.appleOnAndroid && defaultTargetPlatform == TargetPlatform.android));
 
-  @override
-  Future<AuthCredential?> google() async {
+  Future<GoogleSignIn> _google() async {
     final signIn = GoogleSignIn.instance;
     if (!_googleReady) {
       await signIn.initialize(serverClientId: AppConfig.googleServerClientId);
       _googleReady = true;
     }
+    return signIn;
+  }
+
+  @override
+  Future<AuthCredential?> google() async {
+    final signIn = await _google();
     try {
       final account = await signIn.authenticate();
       final idToken = account.authentication.idToken;
@@ -60,11 +65,7 @@ class PlatformCredentialSource implements CredentialSource {
   Future<void> signOut() async {
     if (!googleAvailable) return;
     try {
-      if (!_googleReady) {
-        await GoogleSignIn.instance.initialize(serverClientId: AppConfig.googleServerClientId);
-        _googleReady = true;
-      }
-      await GoogleSignIn.instance.signOut();
+      await (await _google()).signOut();
     } on Exception {
       // Nothing to forget, or the plugin is unavailable: the next sign-in shows the picker anyway.
     }

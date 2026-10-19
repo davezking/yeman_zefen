@@ -1358,6 +1358,12 @@ abstract class AppLocalizations {
   /// **'Signed out. You\'re playing as a guest.'**
   String get settingsSignedOut;
 
+  /// Shown while signing out (queued games are sent first)
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out…'**
+  String get settingsSigningOut;
+
   /// Second step of the delete confirm
   ///
   /// In en, this message translates to:
@@ -1411,6 +1417,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in with the account you\'re deleting.'**
   String get settingsReauthMismatch;
+
+  /// Deletion needs a fresh sign-in, but none of the account's providers is offered on this phone
+  ///
+  /// In en, this message translates to:
+  /// **'To delete this account, sign in to it on a phone that offers its sign-in method.'**
+  String get settingsReauthUnavailable;
 
   /// No description provided for @settingsAdPrivacy.
   ///

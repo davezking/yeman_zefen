@@ -262,6 +262,10 @@
   "@settingsSignedOut": {
     "description": "REVIEW. Toast after signing out"
   },
+  "settingsSigningOut": "በመውጣት ላይ…",
+  "@settingsSigningOut": {
+    "description": "REVIEW. Shown while signing out (queued games are sent first)"
+  },
   "settingsDeleteFinalTitle": "መለያዎ አሁን ይሰረዝ?",
   "@settingsDeleteFinalTitle": {
     "description": "REVIEW. Second step of the delete confirm"
@@ -297,6 +301,10 @@
   "settingsReauthMismatch": "እየሰረዙት ባለው መለያ ይግቡ።",
   "@settingsReauthMismatch": {
     "description": "REVIEW. The player confirmed with a different Google or Apple account than the one being deleted"
+  },
+  "settingsReauthUnavailable": "ይህን መለያ ለመሰረዝ የመለያው የመግቢያ ዘዴ ባለበት ስልክ ላይ ይግቡ።",
+  "@settingsReauthUnavailable": {
+    "description": "REVIEW. Deletion needs a fresh sign-in, but none of the account's providers is offered on this phone"
   },
   "settingsAdPrivacy": "የማስታወቂያ ግላዊነት ምርጫዎች",
   "settingsOffline": "ያለ ኢንተርኔት መጫወት · {count, plural, =1{1 ጥቅል} other{{count} ጥቅሎች}} · {size} ሜባ",

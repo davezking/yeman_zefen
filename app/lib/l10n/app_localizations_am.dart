@@ -733,6 +733,9 @@ class AppLocalizationsAm extends AppLocalizations {
   String get settingsSignedOut => 'ወጥተዋል። አሁን በእንግድነት እየተጫወቱ ነው።';
 
   @override
+  String get settingsSigningOut => 'በመውጣት ላይ…';
+
+  @override
   String get settingsDeleteFinalTitle => 'መለያዎ አሁን ይሰረዝ?';
 
   @override
@@ -761,6 +764,10 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get settingsReauthMismatch => 'እየሰረዙት ባለው መለያ ይግቡ።';
+
+  @override
+  String get settingsReauthUnavailable =>
+      'ይህን መለያ ለመሰረዝ የመለያው የመግቢያ ዘዴ ባለበት ስልክ ላይ ይግቡ።';
 
   @override
   String get settingsAdPrivacy => 'የማስታወቂያ ግላዊነት ምርጫዎች';

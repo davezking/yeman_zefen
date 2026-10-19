@@ -182,7 +182,8 @@ void main() {
     expect(deleteErrorMessage(l10n, const ServerException('internal', 'boom', status: 500)), l10n.settingsDeleteFailed);
     expect(deleteErrorMessage(l10n, const AuthFailure('network-request-failed')), l10n.authErrorNetwork);
     expect(deleteErrorMessage(l10n, const AuthFailure('user-mismatch')), l10n.settingsReauthMismatch);
-    expect(deleteErrorMessage(l10n, const AuthFailure('reauth-unavailable')), l10n.settingsDeleteFailed);
+    expect(deleteErrorMessage(l10n, const AuthFailure('reauth-unavailable')), l10n.settingsReauthUnavailable);
+    expect(deleteErrorMessage(l10n, const AuthFailure('internal-error')), l10n.settingsDeleteFailed);
     expect(deleteErrorMessage(l10n, const DeleteIncompleteException()), l10n.settingsDeleteIncomplete);
     expect(
       deleteErrorMessage(l10n, const DeleteIncompleteException(AuthFailure('user-mismatch'))),

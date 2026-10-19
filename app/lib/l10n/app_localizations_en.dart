@@ -742,6 +742,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSignedOut => 'Signed out. You\'re playing as a guest.';
 
   @override
+  String get settingsSigningOut => 'Signing out…';
+
+  @override
   String get settingsDeleteFinalTitle => 'Delete your account now?';
 
   @override
@@ -773,6 +776,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsReauthMismatch =>
       'Sign in with the account you\'re deleting.';
+
+  @override
+  String get settingsReauthUnavailable =>
+      'To delete this account, sign in to it on a phone that offers its sign-in method.';
 
   @override
   String get settingsAdPrivacy => 'Ad privacy choices';

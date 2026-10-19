@@ -228,7 +228,8 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
 EmailError emailErrorFor(String code) => switch (code) {
   'invalid-email' => EmailError.email,
   'weak-password' => EmailError.password,
-  'wrong-password' || 'invalid-credential' || 'invalid-login-credentials' || 'user-not-found' => EmailError.password,
+  'user-not-found' => EmailError.password,
+  _ when isWrongPassword(code) => EmailError.password,
   'network-request-failed' => EmailError.offline,
   'too-many-requests' => EmailError.tooMany,
   _ => EmailError.failed,
