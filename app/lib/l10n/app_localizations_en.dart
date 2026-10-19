@@ -678,6 +678,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authNameErrorTaken => 'That name is taken. Try another.';
 
   @override
+  String get authMerged =>
+      'Progress combined: your guest scores were added to your account.';
+
+  @override
+  String get authErrorNetwork =>
+      'No internet connection. Connect and try again.';
+
+  @override
+  String get authErrorTooMany =>
+      'Too many tries. Wait a few minutes and try again.';
+
+  @override
+  String get authErrorGeneric => 'Sign-in didn\'t work. Try again.';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override
@@ -703,7 +718,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSignOutConfirm =>
-      'Sign out? Your scores stay saved to your account.';
+      'Sign out? Your scores stay saved to your account. Sign in again to see your rank on the leaderboard.';
 
   @override
   String get settingsDelete => 'Delete account';
@@ -714,6 +729,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDeleteConfirm => 'Delete my account';
+
+  @override
+  String settingsSignedInWith(String providers) {
+    return 'Signed in with $providers';
+  }
+
+  @override
+  String get settingsProviderEmail => 'Email';
+
+  @override
+  String get settingsSignedOut => 'Signed out. You\'re playing as a guest.';
+
+  @override
+  String get settingsDeleteFinalTitle => 'Delete your account now?';
+
+  @override
+  String get settingsDeleteFinalBody =>
+      'Your account, display name and leaderboard scores will be gone for good.';
+
+  @override
+  String get settingsDeleting => 'Deleting your account…';
+
+  @override
+  String get settingsDeleted =>
+      'Your account was deleted. You\'re playing as a guest.';
+
+  @override
+  String get settingsDeleteFailed =>
+      'We couldn\'t delete your account. Check your connection and try again.';
+
+  @override
+  String get settingsDeleteIncomplete =>
+      'Your scores were deleted, but the account wasn\'t. Try again to finish.';
+
+  @override
+  String get settingsReauthTitle => 'Confirm it\'s you';
+
+  @override
+  String get settingsReauthBody =>
+      'Enter your password to delete your account.';
+
+  @override
+  String get settingsReauthMismatch =>
+      'Sign in with the account you\'re deleting.';
 
   @override
   String get settingsAdPrivacy => 'Ad privacy choices';

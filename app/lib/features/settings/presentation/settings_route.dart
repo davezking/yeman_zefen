@@ -9,15 +9,18 @@ import '../../../core/config/remote_config.dart';
 import '../../../core/l10n/locale_provider.dart';
 import '../../../prototype/models.dart' as proto;
 import '../../account/data/profile_api.dart';
+import '../../account/ui/account_actions.dart';
+import '../../account/ui/register_sheet.dart';
 import '../../game/application/play_setup.dart';
 import '../../packs/application/offline_play.dart';
 import '../application/settings_providers.dart';
 import 'settings_screen.dart';
 
-/// Settings with the real language, sound, account state, offline packs and version.
+/// Settings with the real language, sound, account, offline packs and version. Sign-in opens the
+/// register sheet; sign-out and account deletion leave the player a new guest.
 ///
-/// Sign-in, sign-out, account deletion and the ad privacy choices are not wired yet (Phase 4
-/// Sprint 3); their rows are shown and do nothing. About has no page yet.
+/// The ad privacy choices are not wired yet (Phase 4 Sprint 3); their row is shown and does
+/// nothing. About has no page yet.
 class SettingsRoute extends ConsumerWidget {
   const SettingsRoute({super.key});
 
@@ -52,9 +55,10 @@ class SettingsRoute extends ConsumerWidget {
           ref.read(localeChoiceProvider.notifier).choose(Locale(code)),
       onSound: ref.read(soundOnProvider.notifier).set,
       onHaptics: ref.read(hapticsOnProvider.notifier).set,
-      onSignIn: _notYet,
-      onSignOut: _notYet,
-      onDeleteAccount: _notYet,
+      providers: registered ? signInProviders(auth.providers) : const [],
+      onSignIn: () => showRegisterSheet(context),
+      onSignOut: () => signOut(context, ref),
+      onDeleteAccount: () => deleteAccount(context, ref),
       onOfflinePlay: () => context.go('/packs'),
       onAdPrivacy: _notYet,
       onPrivacy: () {
@@ -75,3 +79,10 @@ class SettingsRoute extends ConsumerWidget {
 }
 
 void _notYet() {}
+
+/// Firebase provider ids as the account row names them, in a fixed order. Unknown ones are left out.
+List<proto.SignInProvider> signInProviders(List<String> ids) => [
+  if (ids.contains('apple.com')) proto.SignInProvider.apple,
+  if (ids.contains('google.com')) proto.SignInProvider.google,
+  if (ids.contains('password')) proto.SignInProvider.email,
+];

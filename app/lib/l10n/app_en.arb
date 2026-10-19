@@ -466,6 +466,22 @@
   "authNameSave": "Save name",
   "authNameErrorShort": "Use at least 2 characters.",
   "authNameErrorTaken": "That name is taken. Try another.",
+  "authMerged": "Progress combined: your guest scores were added to your account.",
+  "@authMerged": {
+    "description": "Toast after signing in to an existing account: the guest's history was merged into it"
+  },
+  "authErrorNetwork": "No internet connection. Connect and try again.",
+  "@authErrorNetwork": {
+    "description": "Sign-in failed because the phone is offline"
+  },
+  "authErrorTooMany": "Too many tries. Wait a few minutes and try again.",
+  "@authErrorTooMany": {
+    "description": "Email sign-in: Firebase blocked further attempts for a while"
+  },
+  "authErrorGeneric": "Sign-in didn't work. Try again.",
+  "@authErrorGeneric": {
+    "description": "Sign-in failed for a reason the player cannot fix by retyping"
+  },
   "settingsTitle": "Settings",
   "settingsLanguage": "Language",
   "settingsSound": "Sound effects",
@@ -474,10 +490,63 @@
   "settingsGuest": "Playing as a guest",
   "settingsSignIn": "Sign in",
   "settingsSignOut": "Sign out",
-  "settingsSignOutConfirm": "Sign out? Your scores stay saved to your account.",
+  "settingsSignOutConfirm": "Sign out? Your scores stay saved to your account. Sign in again to see your rank on the leaderboard.",
   "settingsDelete": "Delete account",
   "settingsDeleteBody": "This permanently deletes your account and your leaderboard scores. It can't be undone.",
   "settingsDeleteConfirm": "Delete my account",
+  "settingsSignedInWith": "Signed in with {providers}",
+  "@settingsSignedInWith": {
+    "description": "Settings account row: the providers linked to the account, e.g. 'Google · Email'",
+    "placeholders": {
+      "providers": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsProviderEmail": "Email",
+  "@settingsProviderEmail": {
+    "description": "The email sign-in provider's name, in the account row"
+  },
+  "settingsSignedOut": "Signed out. You're playing as a guest.",
+  "@settingsSignedOut": {
+    "description": "Toast after signing out"
+  },
+  "settingsDeleteFinalTitle": "Delete your account now?",
+  "@settingsDeleteFinalTitle": {
+    "description": "Second step of the delete confirm"
+  },
+  "settingsDeleteFinalBody": "Your account, display name and leaderboard scores will be gone for good.",
+  "@settingsDeleteFinalBody": {
+    "description": "Second step of the delete confirm"
+  },
+  "settingsDeleting": "Deleting your account…",
+  "@settingsDeleting": {
+    "description": "Shown while the account is being deleted"
+  },
+  "settingsDeleted": "Your account was deleted. You're playing as a guest.",
+  "@settingsDeleted": {
+    "description": "Toast after the account was deleted"
+  },
+  "settingsDeleteFailed": "We couldn't delete your account. Check your connection and try again.",
+  "@settingsDeleteFailed": {
+    "description": "Deletion failed before anything was deleted"
+  },
+  "settingsDeleteIncomplete": "Your scores were deleted, but the account wasn't. Try again to finish.",
+  "@settingsDeleteIncomplete": {
+    "description": "The server data is gone but the sign-in account is not; deleting again finishes it"
+  },
+  "settingsReauthTitle": "Confirm it's you",
+  "@settingsReauthTitle": {
+    "description": "Password prompt before deleting an email account"
+  },
+  "settingsReauthBody": "Enter your password to delete your account.",
+  "@settingsReauthBody": {
+    "description": "Password prompt before deleting an email account"
+  },
+  "settingsReauthMismatch": "Sign in with the account you're deleting.",
+  "@settingsReauthMismatch": {
+    "description": "The player confirmed with a different Google or Apple account than the one being deleted"
+  },
   "settingsAdPrivacy": "Ad privacy choices",
   "settingsOffline": "Offline play · {count, plural, =1{1 pack} other{{count} packs}} · {size} MB",
   "@settingsOffline": {

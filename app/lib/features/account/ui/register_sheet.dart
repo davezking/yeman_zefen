@@ -8,6 +8,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/http/api_client.dart';
 import '../../../core/http/api_providers.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../prototype/models.dart';
 import '../data/profile_api.dart';
 import 'sign_in_sheet.dart';
@@ -44,6 +45,9 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
   NameError _nameError = NameError.none;
   bool _savingName = false;
 
+  /// How the sign-in went, once it has. Null when the sheet opened at the name step.
+  LinkResult? _result;
+
   bool get _busy => _status == SignInStatus.signingIn;
 
   bool get _appleOffered => AppConfig.appleOnAndroid || defaultTargetPlatform == TargetPlatform.iOS;
@@ -58,10 +62,11 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     try {
       final result = provider == SignInProvider.apple ? await linker.linkWithApple() : await linker.linkWithGoogle();
       await _afterLink(result);
+    } on AuthFailure catch (e) {
+      // The provider refused or failed: the buttons come back, with a note saying why.
+      _back(e.code == 'network-request-failed' ? SignInStatus.offline : SignInStatus.failed);
     } on Exception {
-      // The provider refused, was closed by the platform, or failed. The buttons come back, with
-      // the message that the account could not be linked.
-      _back(SignInStatus.linkFailed);
+      _back(SignInStatus.failed);
     }
   }
 
@@ -90,20 +95,19 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
           : await linker.signInWithEmail(email, password);
       await _afterLink(result);
     } on AuthFailure catch (e) {
-      if (!mounted) return;
-      final error = emailErrorFor(e.code);
-      if (error == EmailError.none) {
-        // Not about what was typed (offline, too many tries, a disabled account).
-        _back(SignInStatus.linkFailed);
-        return;
-      }
-      setState(() {
-        _status = SignInStatus.idle;
-        _emailError = error;
-      });
+      _emailFailed(emailErrorFor(e.code));
     } on Exception {
-      _back(SignInStatus.linkFailed);
+      _emailFailed(EmailError.failed);
     }
+  }
+
+  /// The form stays, with what was typed, and says what went wrong.
+  void _emailFailed(EmailError error) {
+    if (!mounted) return;
+    setState(() {
+      _status = SignInStatus.idle;
+      _emailError = error;
+    });
   }
 
   Future<void> _afterLink(LinkResult result) async {
@@ -112,6 +116,7 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
       _back(SignInStatus.idle);
       return;
     }
+    _result = result;
     // Signed in (even when the server step is still waiting to go through). A signed-in account
     // with a name is done; anything else, or a name that cannot be read, is asked for its name.
     String? name;
@@ -122,7 +127,7 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     }
     if (!mounted) return;
     if (name != null) {
-      _finish();
+      _finish(name);
     } else {
       setState(() {
         _status = SignInStatus.idle;
@@ -139,9 +144,22 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     });
   }
 
-  /// The board rebuilds by itself: it watches the account and [ownNameProvider].
-  void _finish() {
+  /// The board rebuilds by itself: it watches the account and [ownNameProvider]. The toast says
+  /// what happened to the guest's scores.
+  void _finish(String name) {
     ref.invalidate(ownNameProvider);
+    final l10n = AppLocalizations.of(context);
+    final result = _result;
+    final message = result == null
+        ? l10n.authSignedIn(name)
+        : !result.serverSynced
+        ? l10n.authLinkFailed
+        : result.outcome == LinkOutcome.merged
+        ? l10n.authMerged
+        : l10n.authSignedIn(name);
+    ScaffoldMessenger.maybeOf(context)
+      ?..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
     Navigator.of(context).pop(true);
   }
 
@@ -157,7 +175,7 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
     });
     try {
       await saveDisplayName(ref.read(apiClientProvider), raw.trim());
-      if (mounted) _finish();
+      if (mounted) _finish(raw.trim());
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -206,10 +224,12 @@ class _RegisterSheetState extends ConsumerState<RegisterSheet> {
   }
 }
 
-/// Maps Firebase's email error codes to the two messages the email form shows.
+/// Maps Firebase's error codes to what the email form says.
 EmailError emailErrorFor(String code) => switch (code) {
   'invalid-email' => EmailError.email,
   'weak-password' => EmailError.password,
-  'wrong-password' || 'invalid-credential' || 'user-not-found' => EmailError.password,
-  _ => EmailError.none,
+  'wrong-password' || 'invalid-credential' || 'invalid-login-credentials' || 'user-not-found' => EmailError.password,
+  'network-request-failed' => EmailError.offline,
+  'too-many-requests' => EmailError.tooMany,
+  _ => EmailError.failed,
 };

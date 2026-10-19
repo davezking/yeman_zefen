@@ -46,6 +46,18 @@ class FakeBackend implements AuthBackend {
 
   @override
   Future<void> sendPasswordResetEmail(String email) => throw UnimplementedError();
+
+  @override
+  Future<void> signOut() async => setUser(AuthState.signedOut);
+
+  @override
+  Future<DateTime?> lastSignInAt() async => null;
+
+  @override
+  Future<void> reauthenticate(AuthCredential credential) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteUser() => throw UnimplementedError();
 }
 
 /// Records retry timers instead of waiting for them.

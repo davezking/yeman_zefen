@@ -31,6 +31,7 @@ class SettingsScreen extends StatelessWidget {
     required this.onHome,
     required this.onPlay,
     this.offlineUpdateAvailable = false,
+    this.providers = const [],
   });
 
   /// `am` or `en`.
@@ -38,6 +39,9 @@ class SettingsScreen extends StatelessWidget {
   final bool soundOn;
   final bool hapticsOn;
   final UserInfo user;
+
+  /// How a signed-in player signs in, shown under their name.
+  final List<SignInProvider> providers;
 
   /// Packs on the phone and their total size, for the "Offline play" row.
   final int offlinePackCount;
@@ -78,6 +82,41 @@ class SettingsScreen extends StatelessWidget {
     if (confirmed == true) onConfirmed();
   }
 
+  /// Two confirms before anything is deleted: what deleting means, then a last "now?".
+  Future<void> _confirmDelete(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final first = await showAppDialog(
+      context,
+      title: l10n.settingsDelete,
+      body: l10n.settingsDeleteBody,
+      confirmLabel: l10n.settingsDeleteConfirm,
+      cancelLabel: l10n.packsCancel,
+    );
+    if (first != true || !context.mounted) return;
+    await _confirm(
+      context,
+      title: l10n.settingsDeleteFinalTitle,
+      body: l10n.settingsDeleteFinalBody,
+      confirmLabel: l10n.settingsDelete,
+      onConfirmed: onDeleteAccount,
+    );
+  }
+
+  String _accountSubtitle(AppLocalizations l10n) {
+    final names = [
+      for (final p in providers)
+        switch (p) {
+          SignInProvider.google => 'Google',
+          SignInProvider.apple => 'Apple',
+          SignInProvider.email => l10n.settingsProviderEmail,
+        },
+    ];
+    return [
+      if (user.displayName case final name? when name.isNotEmpty) name,
+      if (names.isNotEmpty) l10n.settingsSignedInWith(names.join(' · ')),
+    ].join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -98,7 +137,7 @@ class SettingsScreen extends StatelessWidget {
       else ...[
         SettingsRow(
           title: l10n.settingsAccount,
-          subtitle: user.displayName,
+          subtitle: _accountSubtitle(l10n),
           onTap: null,
           trailing: SecondaryButton(
             label: l10n.settingsSignOut,
@@ -194,13 +233,7 @@ class SettingsScreen extends StatelessWidget {
                 SettingsRow(
                   title: l10n.settingsDelete,
                   titleColor: ColorTokens.textError,
-                  onTap: () => _confirm(
-                    context,
-                    title: l10n.settingsDelete,
-                    body: l10n.settingsDeleteBody,
-                    confirmLabel: l10n.settingsDeleteConfirm,
-                    onConfirmed: onDeleteAccount,
-                  ),
+                  onTap: () => _confirmDelete(context),
                 ),
             ],
           ),

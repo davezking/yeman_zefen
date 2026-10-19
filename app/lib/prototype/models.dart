@@ -529,9 +529,32 @@ enum SignInStatus {
 
   /// Signed in, but the scores could not be attached to the account yet.
   linkFailed,
+
+  /// The sign-in did not go through: the phone is offline.
+  offline,
+
+  /// The sign-in did not go through for another reason (the provider failed or refused).
+  failed,
 }
 
-enum EmailError { none, email, password }
+enum EmailError {
+  none,
+
+  /// The address does not look like one.
+  email,
+
+  /// The password is too short, or does not match the account.
+  password,
+
+  /// Not about what was typed: the phone is offline.
+  offline,
+
+  /// Not about what was typed: too many attempts, Firebase asks to wait.
+  tooMany,
+
+  /// Not about what was typed: anything else (a disabled account, a provider error).
+  failed,
+}
 
 enum NameError {
   none,

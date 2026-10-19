@@ -671,6 +671,19 @@ class AppLocalizationsAm extends AppLocalizations {
   String get authNameErrorTaken => 'ይህ ስም ተይዟል። ሌላ ይሞክሩ።';
 
   @override
+  String get authMerged => 'እድገትዎ ተዋህዷል፦ የእንግዳ ውጤቶችዎ ወደ መለያዎ ተጨምረዋል።';
+
+  @override
+  String get authErrorNetwork => 'የኢንተርኔት ግንኙነት የለም። ተገናኝተው እንደገና ይሞክሩ።';
+
+  @override
+  String get authErrorTooMany =>
+      'በጣም ብዙ ሙከራዎች ተደርገዋል። ጥቂት ደቂቃዎች ጠብቀው እንደገና ይሞክሩ።';
+
+  @override
+  String get authErrorGeneric => 'መግባት አልተሳካም። እንደገና ይሞክሩ።';
+
+  @override
   String get settingsTitle => 'ቅንብሮች';
 
   @override
@@ -695,7 +708,8 @@ class AppLocalizationsAm extends AppLocalizations {
   String get settingsSignOut => 'ይውጡ';
 
   @override
-  String get settingsSignOutConfirm => 'ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ።';
+  String get settingsSignOutConfirm =>
+      'ይወጣሉ? ውጤቶችዎ በመለያዎ ላይ ተቀምጠው ይቆያሉ። በደረጃ ሰንጠረዡ ላይ ደረጃዎን ለማየት እንደገና ይግቡ።';
 
   @override
   String get settingsDelete => 'መለያ ይሰርዙ';
@@ -706,6 +720,47 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get settingsDeleteConfirm => 'መለያዬን ይሰርዙ';
+
+  @override
+  String settingsSignedInWith(String providers) {
+    return 'በ$providers ገብተዋል';
+  }
+
+  @override
+  String get settingsProviderEmail => 'ኢሜይል';
+
+  @override
+  String get settingsSignedOut => 'ወጥተዋል። አሁን በእንግድነት እየተጫወቱ ነው።';
+
+  @override
+  String get settingsDeleteFinalTitle => 'መለያዎ አሁን ይሰረዝ?';
+
+  @override
+  String get settingsDeleteFinalBody =>
+      'መለያዎ፣ የሚታይ ስምዎና የደረጃ ውጤቶችዎ እስከመጨረሻው ይጠፋሉ።';
+
+  @override
+  String get settingsDeleting => 'መለያዎ በመሰረዝ ላይ ነው…';
+
+  @override
+  String get settingsDeleted => 'መለያዎ ተሰርዟል። አሁን በእንግድነት እየተጫወቱ ነው።';
+
+  @override
+  String get settingsDeleteFailed =>
+      'መለያዎን መሰረዝ አልተቻለም። ግንኙነትዎን አረጋግጠው እንደገና ይሞክሩ።';
+
+  @override
+  String get settingsDeleteIncomplete =>
+      'ውጤቶችዎ ተሰርዘዋል፤ መለያው ግን አልተሰረዘም። ለመጨረስ እንደገና ይሞክሩ።';
+
+  @override
+  String get settingsReauthTitle => 'እርስዎ መሆንዎን ያረጋግጡ';
+
+  @override
+  String get settingsReauthBody => 'መለያዎን ለመሰረዝ የይለፍ ቃልዎን ያስገቡ።';
+
+  @override
+  String get settingsReauthMismatch => 'እየሰረዙት ባለው መለያ ይግቡ።';
 
   @override
   String get settingsAdPrivacy => 'የማስታወቂያ ግላዊነት ምርጫዎች';
