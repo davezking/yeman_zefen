@@ -16,7 +16,8 @@ class PackService {
   /// fetched or used, or if the install fails (the installed version is then
   /// left as it was). [isCancelled] is asked once the manifest is in, because
   /// [PackInstaller.cancel] only reaches an install the installer has started.
-  Future<void> install(PackListing listing, {bool Function()? isCancelled}) async {
+  /// With [wifiOnly] the clips download only on Wi-Fi.
+  Future<void> install(PackListing listing, {bool Function()? isCancelled, bool wifiOnly = false}) async {
     final json = await api.fetchManifestJson(listing.manifestUrl);
     if (isCancelled?.call() ?? false) {
       throw const PackInstallException('cancelled', failure: PackInstallFailure.cancelled);
@@ -32,6 +33,7 @@ class PackService {
       json,
       expectedSlug: listing.slug,
       expectedVersion: listing.version,
+      wifiOnly: wifiOnly,
     );
   }
 }

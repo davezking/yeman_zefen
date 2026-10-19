@@ -15,6 +15,7 @@ import '../data/packs_providers.dart';
 import '../data/starter_pack.dart';
 import '../domain/pack_install_progress.dart';
 import '../domain/pack_update.dart';
+import '../../settings/application/settings_providers.dart';
 
 /// Whole megabytes, rounded up so a small pack or cache never shows 0 MB.
 int megabytes(int bytes) => (bytes + 1024 * 1024 - 1) ~/ (1024 * 1024);
@@ -43,8 +44,9 @@ class PackJob {
 /// The pack downloads the player started. It lives as long as the app, so a download goes on when
 /// the player leaves Offline play, and its state is still there when they come back.
 class PackDownloadsNotifier extends Notifier<Map<String, PackJob>> {
-  /// Slugs whose download the player cancelled before the installer had it.
-  final _cancelled = <String>{};
+  /// The current run of each pack. A run that is no longer current (cancelled, or followed by a
+  /// new one) changes nothing when it ends, and stops before the installer starts if it can.
+  final _current = <String, Object>{};
 
   @override
   Map<String, PackJob> build() => const {};
@@ -60,48 +62,85 @@ class PackDownloadsNotifier extends Notifier<Map<String, PackJob>> {
     state = next;
   }
 
-  /// Downloads or updates [listing]'s pack, unless it is already downloading. A file that fails
-  /// its checksum on every try gets one more whole run by itself before the player is asked.
-  Future<void> start(PackListing listing) async {
-    if (state[listing.slug]?.running ?? false) return;
-    await _run(listing, retryingCorrupt: false);
+  /// Downloads or updates the pack [slug], unless it is already downloading. Its listing comes
+  /// from [listings]; when they lack it (the list failed to load, or is stale) the list is fetched
+  /// again, and the pack fails with "Download failed" if it is still missing.
+  ///
+  /// With [wifiOnly] the clips download only on Wi-Fi, also if the phone moves to mobile data
+  /// meanwhile. A file that fails its checksum on every try gets one more whole run by itself,
+  /// with the same rule, before the player is asked.
+  Future<void> start(String slug, {List<PackListing>? listings, bool wifiOnly = false}) async {
+    if (state[slug]?.running ?? false) return;
+    final run = Object();
+    _current[slug] = run;
+    _put(slug, const PackJob.running());
+    var listing = listingOf(listings, slug);
+    if (listing == null) {
+      ref.invalidate(packListingsProvider);
+      // Listened to while it loads: an unlistened provider would be paused or disposed.
+      final list = ref.listen(packListingsProvider.future, (_, _) {});
+      try {
+        listing = listingOf(await list.read(), slug);
+      } catch (e) {
+        developer.log('pack list failed', name: 'packs', error: e);
+      } finally {
+        list.close();
+      }
+      if (!identical(_current[slug], run)) return;
+      if (listing == null) {
+        _current.remove(slug);
+        _put(slug, const PackJob.failed(proto.PackProblem.downloadFailed));
+        return;
+      }
+    }
+    await _run(listing, run, wifiOnly: wifiOnly, retryingCorrupt: false);
   }
 
-  Future<void> _run(PackListing listing, {required bool retryingCorrupt}) async {
+  Future<void> _run(
+    PackListing listing,
+    Object run, {
+    required bool wifiOnly,
+    required bool retryingCorrupt,
+  }) async {
     final slug = listing.slug;
-    _cancelled.remove(slug);
+    bool current() => identical(_current[slug], run);
     _put(slug, PackJob.running(retryingCorrupt: retryingCorrupt));
+    PackJob? outcome;
     try {
-      await ref.read(packServiceProvider).install(listing, isCancelled: () => _cancelled.contains(slug));
-      _put(slug, null);
+      await ref.read(packServiceProvider).install(listing, isCancelled: () => !current(), wifiOnly: wifiOnly);
     } on PackInstallException catch (e) {
       switch (e.failure) {
         case PackInstallFailure.cancelled:
-          _put(slug, null);
-        case PackInstallFailure.checksum when !retryingCorrupt:
-          await _run(listing, retryingCorrupt: true);
+          break;
+        case PackInstallFailure.checksum when !retryingCorrupt && current():
+          return _run(listing, run, wifiOnly: wifiOnly, retryingCorrupt: true);
         case PackInstallFailure.storageFull:
-          _put(slug, PackJob.failed(proto.PackProblem.storageFull, missingBytes: e.missingBytes));
+          outcome = PackJob.failed(proto.PackProblem.storageFull, missingBytes: e.missingBytes);
         case _:
           developer.log('pack install failed', name: 'packs', error: e);
-          _put(slug, const PackJob.failed(proto.PackProblem.downloadFailed));
+          outcome = const PackJob.failed(proto.PackProblem.downloadFailed);
       }
     } catch (e, st) {
       // Offline, or the manifest could not be fetched. The reason goes to the log.
       developer.log('pack install failed', name: 'packs', error: e, stackTrace: st);
-      _put(slug, const PackJob.failed(proto.PackProblem.downloadFailed));
+      outcome = const PackJob.failed(proto.PackProblem.downloadFailed);
     }
+    // A cancelled or replaced run leaves the pack's state to whatever came after it.
+    if (!current()) return;
+    _current.remove(slug);
+    _put(slug, outcome);
   }
 
-  /// Stops a download. Files that verified stay, so downloading again continues from there; an
-  /// update that is cancelled leaves the installed version.
+  /// Stops a download, including the files under way. Files that verified stay, so downloading
+  /// again continues from there; an update that is cancelled leaves the installed version.
   void cancel(String slug) {
-    _cancelled.add(slug);
+    _current.remove(slug);
     ref.read(packInstallerProvider).cancel(slug);
     _put(slug, null);
   }
 
   /// Removes an installed pack. Its clips join the stream cache, which is then trimmed to its cap.
+  /// During a game this waits for the game to end.
   Future<void> remove(String slug) async {
     try {
       await ref.read(packInstallerProvider).remove(slug);
@@ -202,44 +241,26 @@ final starterSongCountProvider = StreamProvider<int>((ref) {
 /// The cap of the stream cache, in bytes.
 final streamCacheCapProvider = FutureProvider<int>((ref) => ref.watch(clipSettingsProvider).streamCacheCapBytes());
 
-/// A yes-or-no choice of [ClipSettings], read from the database before it is shown and saved as
-/// soon as it changes, so what reads it next (a session, a download) sees the new value.
-abstract class ClipFlagNotifier extends AsyncNotifier<bool> {
-  Future<bool> read(ClipSettings settings);
-  Future<void> write(ClipSettings settings, bool on);
-
+/// "Download packs on Wi-Fi only", on by default. Saved where [ClipSettings] reads it.
+class PackWifiOnlyNotifier extends FlagSettingNotifier {
   @override
-  Future<bool> build() => read(ref.watch(clipSettingsProvider));
-
-  Future<void> set(bool on) async {
-    state = AsyncData(on);
-    try {
-      await write(ref.read(clipSettingsProvider), on);
-    } catch (_) {
-      // Not saved: it holds until the app restarts.
-    }
-  }
+  String get key => ClipSettings.packWifiOnlyKey;
+  @override
+  bool get fallback => true;
 }
 
-class PackWifiOnlyNotifier extends ClipFlagNotifier {
+/// "Download upcoming songs on mobile data", on by default. Saved where [ClipSettings] reads it,
+/// which is what the prefetcher goes by.
+class MobilePrefetchNotifier extends FlagSettingNotifier {
   @override
-  Future<bool> read(ClipSettings settings) => settings.packWifiOnly();
+  String get key => ClipSettings.prefetchOnMobileKey;
   @override
-  Future<void> write(ClipSettings settings, bool on) => settings.setPackWifiOnly(on);
+  bool get fallback => true;
 }
 
-class MobilePrefetchNotifier extends ClipFlagNotifier {
-  @override
-  Future<bool> read(ClipSettings settings) => settings.prefetchOnMobile();
-  @override
-  Future<void> write(ClipSettings settings, bool on) => settings.setPrefetchOnMobile(on);
-}
+final packWifiOnlyProvider = NotifierProvider<PackWifiOnlyNotifier, bool>(PackWifiOnlyNotifier.new);
 
-/// "Download packs on Wi-Fi only", on by default.
-final packWifiOnlyProvider = AsyncNotifierProvider<PackWifiOnlyNotifier, bool>(PackWifiOnlyNotifier.new);
-
-/// "Download upcoming songs on mobile data", on by default.
-final mobilePrefetchProvider = AsyncNotifierProvider<MobilePrefetchNotifier, bool>(MobilePrefetchNotifier.new);
+final mobilePrefetchProvider = NotifierProvider<MobilePrefetchNotifier, bool>(MobilePrefetchNotifier.new);
 
 /// The pack rows of Offline play: the installed packs, then the listed packs that are not
 /// installed (the starter pack is built in and never listed).

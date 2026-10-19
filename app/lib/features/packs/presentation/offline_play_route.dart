@@ -48,17 +48,30 @@ class OfflinePlayRoute extends ConsumerWidget {
     );
     final downloads = ref.read(packDownloadsProvider.notifier);
 
+    final wifiOnly = ref.watch(packWifiOnlyProvider);
+    final connection = switch (network) {
+      NetworkKind.unmetered => proto.Connection.wifi,
+      NetworkKind.none => proto.Connection.offline,
+      // Until the connection is known it counts as mobile data, so "Wi-Fi only" still asks.
+      NetworkKind.cellular || null => proto.Connection.mobile,
+    };
+
     void download(String slug) {
-      final listing = listingOf(listings, slug);
-      // Offline, or the pack is no longer published: nothing to download it from.
-      if (listing == null) return;
-      unawaited(downloads.start(listing));
+      // On mobile data the screen has already asked, and the player said download now. On Wi-Fi,
+      // "Wi-Fi only" keeps the download off mobile data if the phone moves to it meanwhile.
+      unawaited(
+        downloads.start(
+          slug,
+          listings: listings,
+          wifiOnly: wifiOnly && connection != proto.Connection.mobile,
+        ),
+      );
     }
 
     return OfflinePlayScreen(
       loadingPacks: listingsState.isLoading && !offline,
-      wifiOnly: ref.watch(packWifiOnlyProvider).asData?.value ?? true,
-      mobilePrefetch: ref.watch(mobilePrefetchProvider).asData?.value ?? true,
+      wifiOnly: wifiOnly,
+      mobilePrefetch: ref.watch(mobilePrefetchProvider),
       cache: proto.CacheUsage(
         usedMb: megabytes(usage?.streamBytes ?? 0),
         capMb: megabytes(capBytes ?? 0),
@@ -67,15 +80,10 @@ class OfflinePlayRoute extends ConsumerWidget {
       ),
       builtInSongCount: ref.watch(starterSongCountProvider).asData?.value ?? 0,
       packs: packs,
-      connection: switch (network) {
-        NetworkKind.unmetered => proto.Connection.wifi,
-        NetworkKind.none => proto.Connection.offline,
-        // Until the connection is known it counts as mobile data, so "Wi-Fi only" still asks.
-        NetworkKind.cellular || null => proto.Connection.mobile,
-      },
+      connection: connection,
       onBack: () => context.canPop() ? context.pop() : context.go('/settings'),
-      onWifiOnly: (on) => unawaited(ref.read(packWifiOnlyProvider.notifier).set(on)),
-      onMobilePrefetch: (on) => unawaited(ref.read(mobilePrefetchProvider.notifier).set(on)),
+      onWifiOnly: ref.read(packWifiOnlyProvider.notifier).set,
+      onMobilePrefetch: ref.read(mobilePrefetchProvider.notifier).set,
       onClearCache: () => unawaited(ref.read(clearStreamCacheProvider)()),
       onDownload: download,
       onCancel: downloads.cancel,

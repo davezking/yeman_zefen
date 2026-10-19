@@ -41,10 +41,17 @@ class _ScriptedPackService implements PackService {
   /// Holds each install open until completed, to cancel one meanwhile.
   Completer<void>? hold;
 
+  /// Holds the next installs one each, before [hold] applies.
+  final gates = <Completer<void>>[];
+
+  /// The Wi-Fi rule of each install.
+  final wifiOnly = <bool>[];
+
   @override
-  Future<void> install(PackListing listing, {bool Function()? isCancelled}) async {
+  Future<void> install(PackListing listing, {bool Function()? isCancelled, bool wifiOnly = false}) async {
     installs++;
-    await hold?.future;
+    this.wifiOnly.add(wifiOnly);
+    await (gates.isEmpty ? hold : gates.removeAt(0))?.future;
     if (isCancelled?.call() ?? false) {
       throw const PackInstallException('cancelled', failure: PackInstallFailure.cancelled);
     }
@@ -78,7 +85,7 @@ void main() {
 
     test('a finished download leaves no job behind', () async {
       final c = containerWith(_ScriptedPackService());
-      await c.read(packDownloadsProvider.notifier).start(_listing());
+      await c.read(packDownloadsProvider.notifier).start('golden-era', listings: [_listing()]);
       expect(c.read(packDownloadsProvider), isEmpty);
     });
 
@@ -87,7 +94,7 @@ void main() {
         const PackInstallException('mismatch', failure: PackInstallFailure.checksum),
       ]);
       final c = containerWith(service);
-      await c.read(packDownloadsProvider.notifier).start(_listing());
+      await c.read(packDownloadsProvider.notifier).start('golden-era', listings: [_listing()]);
       expect(service.installs, 2);
       expect(c.read(packDownloadsProvider), isEmpty);
     });
@@ -96,7 +103,7 @@ void main() {
       const mismatch = PackInstallException('mismatch', failure: PackInstallFailure.checksum);
       final service = _ScriptedPackService([mismatch, mismatch]);
       final c = containerWith(service);
-      await c.read(packDownloadsProvider.notifier).start(_listing());
+      await c.read(packDownloadsProvider.notifier).start('golden-era', listings: [_listing()]);
       expect(service.installs, 2);
       final job = c.read(packDownloadsProvider)['golden-era']!;
       expect((job.running, job.problem), (false, PackProblem.downloadFailed));
@@ -106,7 +113,7 @@ void main() {
       final c = containerWith(_ScriptedPackService([
         const PackInstallException('full', failure: PackInstallFailure.storageFull, missingBytes: 3 * _mb),
       ]));
-      await c.read(packDownloadsProvider.notifier).start(_listing());
+      await c.read(packDownloadsProvider.notifier).start('golden-era', listings: [_listing()]);
       final job = c.read(packDownloadsProvider)['golden-era']!;
       expect((job.problem, job.missingBytes), (PackProblem.storageFull, 3 * _mb));
     });
@@ -115,7 +122,7 @@ void main() {
       final service = _ScriptedPackService()..hold = Completer<void>();
       final c = containerWith(service);
       final downloads = c.read(packDownloadsProvider.notifier);
-      final run = downloads.start(_listing());
+      final run = downloads.start('golden-era', listings: [_listing()]);
       expect(c.read(packDownloadsProvider)['golden-era']!.running, isTrue);
 
       downloads.cancel('golden-era');
@@ -129,11 +136,76 @@ void main() {
       final service = _ScriptedPackService()..hold = Completer<void>();
       final c = containerWith(service);
       final downloads = c.read(packDownloadsProvider.notifier);
-      final first = downloads.start(_listing());
-      await downloads.start(_listing());
+      final first = downloads.start('golden-era', listings: [_listing()]);
+      await downloads.start('golden-era', listings: [_listing()]);
       expect(service.installs, 1);
       service.hold!.complete();
       await first;
+    });
+
+    test('a cancelled run ending late leaves the new download alone', () async {
+      final old = Completer<void>();
+      final next = Completer<void>();
+      final service = _ScriptedPackService()..gates.addAll([old, next]);
+      final c = containerWith(service);
+      final downloads = c.read(packDownloadsProvider.notifier);
+
+      final first = downloads.start('golden-era', listings: [_listing()]);
+      downloads.cancel('golden-era');
+      final second = downloads.start('golden-era', listings: [_listing()]);
+      expect(c.read(packDownloadsProvider)['golden-era']!.running, isTrue);
+
+      // The cancelled run finds out only now, while the new one is still going.
+      old.complete();
+      await first;
+      expect(c.read(packDownloadsProvider)['golden-era']?.running, isTrue);
+
+      next.complete();
+      await second;
+      expect(c.read(packDownloadsProvider), isEmpty);
+      expect(service.installs, 2);
+    });
+
+    test('a pack missing from the list fetches the list again', () async {
+      final service = _ScriptedPackService();
+      final container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWithValue(db),
+          packServiceProvider.overrideWithValue(service),
+          packListingsProvider.overrideWith((ref) async => [_listing()]),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(packDownloadsProvider.notifier).start('golden-era');
+      expect(service.installs, 1);
+      expect(container.read(packDownloadsProvider), isEmpty);
+    });
+
+    test('a pack the list still does not have fails with Try again, rather than doing nothing', () async {
+      final service = _ScriptedPackService();
+      final container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWithValue(db),
+          packServiceProvider.overrideWithValue(service),
+          packListingsProvider.overrideWith((ref) async => throw Exception('server error')),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(packDownloadsProvider.notifier).start('golden-era');
+      expect(service.installs, 0);
+      final job = container.read(packDownloadsProvider)['golden-era']!;
+      expect((job.running, job.problem), (false, PackProblem.downloadFailed));
+    });
+
+    test('the automatic re-run after a bad file keeps the Wi-Fi rule', () async {
+      final service = _ScriptedPackService([
+        const PackInstallException('mismatch', failure: PackInstallFailure.checksum),
+      ]);
+      final c = containerWith(service);
+      await c.read(packDownloadsProvider.notifier).start('golden-era', listings: [_listing()], wifiOnly: true);
+      expect(service.wifiOnly, [true, true]);
     });
   });
 

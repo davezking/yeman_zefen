@@ -115,14 +115,16 @@ RoundView roundView({
 
 SessionState playing(RoundView round) => SessionState(phase: SessionPhase.playing, config: config, round: round);
 
-/// A pack service that records installs. [onInstall] can hold one open.
+/// A pack service that records installs and their Wi-Fi rule. [onInstall] can hold one open.
 class FakePackService implements PackService {
   final installs = <PackListing>[];
+  final wifiOnly = <bool>[];
   Future<void> Function(PackListing listing)? onInstall;
 
   @override
-  Future<void> install(PackListing listing, {bool Function()? isCancelled}) async {
+  Future<void> install(PackListing listing, {bool Function()? isCancelled, bool wifiOnly = false}) async {
     installs.add(listing);
+    this.wifiOnly.add(wifiOnly);
     await onInstall?.call(listing);
   }
 

@@ -93,6 +93,8 @@ void main() {
       await tester.tap(find.text('Download now'));
       await tester.pumpAndSettle();
       expect(service.installs.map((l) => l.slug), ['golden-era']);
+      // The player chose mobile data for this one.
+      expect(service.wifiOnly, [false]);
     });
 
     testWidgets('with Wi-Fi only off, it downloads without asking, and the choice is saved', (tester) async {
@@ -124,6 +126,8 @@ void main() {
     await tester.tap(find.text('Download'));
     await tester.pumpAndSettle();
     expect(service.installs, hasLength(1));
+    // With "Wi-Fi only" on, it stays off mobile data if the phone moves to it.
+    expect(service.wifiOnly, [true]);
   });
 
   testWidgets('offline, downloads are held back and the screen says why', (tester) async {

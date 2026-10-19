@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value, BooleanExpressionOperators;
@@ -512,5 +513,122 @@ void main() {
       expect(clips.where((c) => c.trackId == 3).map((c) => c.source), everyElement(ClipSource.stream));
       expect(await installer.installedVersion('other-pack'), 1);
     });
+  });
+
+  group('downloads under way', () {
+    test('cancel stops them as well, and the install ends as cancelled', () async {
+      downloader.hold = Completer<void>();
+      addTearDown(() => downloader.hold!.isCompleted ? null : downloader.hold!.complete());
+      final run = install();
+      // Let the first downloads start and wait.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(downloader.calls, isNotEmpty);
+
+      installer.cancel('golden-era');
+
+      await expectLater(
+        run,
+        throwsA(isA<PackInstallException>().having((e) => e.failure, 'failure', PackInstallFailure.cancelled)),
+      );
+      expect(downloader.cancelledGroups, ['pack:golden-era']);
+      expect(await db.select(db.installedPacks).get(), isEmpty);
+    });
+
+    test('carry the pack\'s group and the Wi-Fi rule', () async {
+      final json = manifestJson();
+      await installer.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: 1, wifiOnly: true);
+      expect(downloader.groups.values.toSet(), {'pack:golden-era'});
+      expect(downloader.wifiOnly.values.toSet(), {true});
+    });
+
+    test('a full phone fails the install as storage full, with what was still to come', () async {
+      downloader.noSpace.add(clipUrl(3, 'middle', 1));
+      await expectLater(
+        install(),
+        throwsA(isA<PackInstallException>()
+            .having((e) => e.failure, 'failure', PackInstallFailure.storageFull)
+            .having((e) => e.missingBytes, 'missingBytes', greaterThan(0))),
+      );
+    });
+  });
+
+  group('built-in clips', () {
+    Future<void> builtIn(int trackId, ClipKind kind) async {
+      final path = ClipStore.starterPath(trackId, kind);
+      File(p.join(base.path, path))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(bodyFor(clipUrl(trackId, kind.name, 1)));
+      await db.into(db.clips).insert(
+            ClipsCompanion.insert(
+              trackId: trackId,
+              kind: kind.name,
+              path: path,
+              bytes: 1,
+              source: ClipSource.starter,
+              lastPlayedAt: 1,
+            ),
+          );
+    }
+
+    test('stay built in when a pack has the same track, and when the pack is removed', () async {
+      await builtIn(2, ClipKind.intro);
+
+      await install();
+      var clip = await (db.select(db.clips)..where((c) => c.trackId.equals(2) & c.kind.equals('intro'))).getSingle();
+      expect((clip.source, clip.path), (ClipSource.starter, ClipStore.starterPath(2, ClipKind.intro)));
+      // Copied into the pack, not downloaded.
+      expect(downloader.calls, isNot(contains(clipUrl(2, 'intro', 1))));
+
+      await installer.remove('golden-era');
+      clip = await (db.select(db.clips)..where((c) => c.trackId.equals(2) & c.kind.equals('intro'))).getSingle();
+      expect((clip.source, clip.path), (ClipSource.starter, ClipStore.starterPath(2, ClipKind.intro)));
+      expect(fileExists(clip.path), isTrue);
+    });
+  });
+
+  test('a clip prefetched earlier is moved into the pack, not copied', () async {
+    final url = clipUrl(1, 'intro', 1);
+    final streamPath = ClipStore.streamPath(1, ClipKind.intro);
+    File(p.join(base.path, streamPath))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(bodyFor(url));
+    await db.into(db.clips).insert(
+          ClipsCompanion.insert(
+            trackId: 1,
+            kind: 'intro',
+            path: streamPath,
+            bytes: 1,
+            source: ClipSource.stream,
+            lastPlayedAt: 1,
+          ),
+        );
+    // The file is gone from the cache before the pack is registered: moved, not copied.
+    downloader.hold = Completer<void>();
+    final run = install();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(fileExists(streamPath), isFalse);
+    expect(fileExists('packs/golden-era/v1/1-intro.mp3'), isTrue);
+    downloader.hold!.complete();
+    await run;
+    expect(downloader.calls, isNot(contains(url)));
+  });
+
+  test('removing a pack waits for the game in progress to end', () async {
+    final store = ClipStore(db: db, supportDirectory: () async => base);
+    final guarded = PackInstaller(db: db, downloader: downloader, supportDirectory: () async => base, store: store);
+    addTearDown(guarded.dispose);
+    final json = manifestJson();
+    await guarded.install(manifestOf(json), json, expectedSlug: 'golden-era', expectedVersion: 1);
+
+    store.sessionStarted();
+    var removed = false;
+    final removal = guarded.remove('golden-era').then((_) => removed = true);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(removed, isFalse);
+    expect(fileExists('packs/golden-era/v1/1-intro.mp3'), isTrue);
+
+    await store.sessionEnded(capBytes: 1 << 30);
+    await removal;
+    expect(await db.select(db.installedPacks).get(), isEmpty);
   });
 }

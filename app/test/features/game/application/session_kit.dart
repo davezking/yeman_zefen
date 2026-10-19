@@ -75,10 +75,15 @@ class KitDownloader implements ClipDownloader {
   }
 
   @override
+  Future<void> cancelGroup(String group) async {}
+
+  @override
   Future<void> download({
     required String url,
     required String relativePath,
     required void Function(double fraction) onProgress,
+    String? group,
+    bool wifiOnly = false,
   }) async {
     calls.add(url);
     if (hold) {
