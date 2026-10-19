@@ -358,6 +358,20 @@ void main() {
       expect(session.rounds.every((r) => r.optionIds.toSet().length == 4), isTrue);
     });
 
+    test('only asks about, and only offers, the eras the app can name', () {
+      final tracks = [
+        ...makeTracks({1: (3, 3), 2: (3, 3)}),
+        for (var i = 0; i < 4; i++) GameTrack(id: 200 + i, artistId: 950 + i, generationId: 6),
+      ];
+      for (var seed = 1; seed <= 20; seed++) {
+        final session = generator(tracks, seed).generate(config(mode: GameMode.generation, rounds: 6));
+        for (final r in session.rounds) {
+          expect(r.trackId, lessThan(200), reason: 'era 6 has no name in the app');
+          expect(r.optionIds.every(eraIds.contains), isTrue);
+        }
+      }
+    });
+
     test('fails when no playable track has an era', () {
       final tracks = [for (var i = 1; i <= 6; i++) GameTrack(id: i, artistId: i)];
       expect(

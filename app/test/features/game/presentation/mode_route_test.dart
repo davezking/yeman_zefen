@@ -1,8 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/features/game/application/play_setup.dart';
+import 'package:yeman_zefen/features/game/domain/session_config.dart' as domain;
 import 'package:yeman_zefen/prototype/models.dart' as proto;
 
 import 'screen_kit.dart';
+
+/// Saves new Play choices, as the screens do.
+void updateSetup(Harness h, proto.PlaySettings settings) =>
+    h.container.read(playSetupProvider.notifier).choose(settings);
 
 void main() {
   testWidgets('a mode card saves the mode, and Next opens setup', (tester) async {
@@ -40,6 +45,18 @@ void main() {
   testWidgets('Home offers Which Era? as a way to play', (tester) async {
     await pumpScreens(tester);
     expect(find.text('Which Era?'), findsWidgets);
+  });
+
+  testWidgets('Home looks up the Which Era? best under all eras, where its sessions are saved', (tester) async {
+    final asked = <(domain.GameMode, int)>[];
+    final h = await pumpScreens(tester, bestScore: (mode, era) async {
+      asked.add((mode, era));
+      return null;
+    });
+    updateSetup(h, const proto.PlaySettings(mode: proto.GameMode.era, generationId: 3));
+    await tester.pump();
+    await tester.pump();
+    expect(asked.last, (domain.GameMode.generation, 0));
   });
 
   testWidgets('the artist guess is saved from the segmented control', (tester) async {

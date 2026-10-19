@@ -90,7 +90,7 @@ class RoundGenerator {
 
   /// The generation-guess session (FR-12): each round plays a track and asks which era it is from.
   /// It has no era filter and no question mix: the answer would give the filter away, and every
-  /// round is an era question. Only tracks with an era can be asked about.
+  /// round is an era question. Only tracks with one of the known eras ([eraIds]) can be asked about.
   GeneratedSession _generateEraSession(
     SessionConfig config,
     List<Iterable<int>> recentSessions,
@@ -98,7 +98,7 @@ class RoundGenerator {
   ) {
     final pool = [
       for (final t in _tracks)
-        if (t.generationId != null && (playable == null || playable.contains(t.id))) t,
+        if (eraIds.contains(t.generationId) && (playable == null || playable.contains(t.id))) t,
     ];
     if (pool.isEmpty) {
       throw const RoundGenerationException(
@@ -142,12 +142,11 @@ class RoundGenerator {
   /// all, every era is an option.
   GeneratedRound _buildEraRound(GameTrack track) {
     final correctId = track.generationId;
-    if (correctId == null) {
-      throw ArgumentError.value(track.id, 'track', 'has no era to ask about');
+    if (correctId == null || !eraIds.contains(correctId)) {
+      throw ArgumentError.value(track.id, 'track', 'has no known era to ask about');
     }
-    // The seeded eras, and any other era the tracks mention.
-    final eras = {...eraIds, for (final t in _tracks) ?t.generationId}.toList()..sort();
-    final others = [for (final e in eras) if (e != correctId) e]..shuffle(_rng);
+    // Only the eras the app can name: an id it does not know would read as "All eras".
+    final others = [for (final e in eraIds) if (e != correctId) e]..shuffle(_rng);
     final options = [correctId, ...others.take(optionCount - 1)]..shuffle(_rng);
     return GeneratedRound(
       trackId: track.id,

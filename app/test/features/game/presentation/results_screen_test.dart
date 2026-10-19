@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/l10n/display_name.dart';
+import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
 
 import 'screen_kit.dart';
@@ -25,6 +27,43 @@ void main() {
     expect(find.descendant(of: find.byKey(const Key('round-2')), matching: find.text('You chose Song 9')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('round-4')), matching: find.text("Time's up")), findsOneWidget);
     expect(find.byKey(const Key('round-3')), findsNothing, reason: 'a skipped round is not listed');
+  });
+
+  testWidgets('a wrong Which Era? round names the song, its era and the era picked', (tester) async {
+    const era = SessionConfig(mode: GameMode.generation, difficulty: Difficulty.easy);
+    await pumpScreens(
+      tester,
+      location: '/results',
+      state: const SessionState(
+        phase: SessionPhase.finished,
+        config: era,
+        summary: SessionSummary(
+          config: era,
+          totalScore: 0,
+          rounds: [
+            RoundSummary(
+              number: 1,
+              kind: QuestionKind.era,
+              correctName: DisplayName(latin: 'Song 1'),
+              chosenName: DisplayName(),
+              correctEraId: 3,
+              chosenEraId: 5,
+              correct: false,
+              points: 0,
+              valid: true,
+              responseMs: 3000,
+            ),
+          ],
+          skipped: 0,
+          flagged: false,
+          bestBefore: null,
+          isNewBest: false,
+        ),
+      ),
+    );
+    final row = find.byKey(const Key('round-1'));
+    expect(find.descendant(of: row, matching: find.text("Song 1 · The '90s")), findsOneWidget);
+    expect(find.descendant(of: row, matching: find.text('You chose Modern')), findsOneWidget);
   });
 
   testWidgets('says when the score is a new best', (tester) async {

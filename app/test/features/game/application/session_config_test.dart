@@ -31,6 +31,18 @@ void main() {
       expect(domainMode(proto.GameMode.era), domain.GameMode.generation);
     });
 
+    test('reads as all eras and Easy (10 s) on every screen, whatever was saved', () {
+      const saved = proto.PlaySettings(mode: proto.GameMode.era, generationId: 3, difficulty: proto.Difficulty.hard);
+      final shown = effectivePlaySettings(saved, null);
+      expect((shown.generationId, shown.difficulty), (proto.EraId.all, proto.Difficulty.easy));
+    });
+
+    test('other modes keep the saved era and difficulty', () {
+      const saved = proto.PlaySettings(generationId: 3, difficulty: proto.Difficulty.hard);
+      final shown = effectivePlaySettings(saved, null);
+      expect((shown.generationId, shown.difficulty), (3, proto.Difficulty.hard));
+    });
+
     test('is for all eras whatever era is saved: it counts on the all-eras boards under generation 0', () {
       final config = sessionConfigFor(const proto.PlaySettings(mode: proto.GameMode.era, generationId: 4));
       expect((config.mode, config.generationId), (domain.GameMode.generation, 0));

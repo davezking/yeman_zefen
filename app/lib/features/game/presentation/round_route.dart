@@ -288,7 +288,12 @@ proto.RoundView screenViewOf(
     totalRounds: round.total,
     score: round.score,
     eraFilterId: config?.generationId ?? proto.EraId.all,
-    difficulty: config == null ? proto.Difficulty.medium : proto.Difficulty.values.byName(config.difficulty.name),
+    // Which Era? always plays 10 s, which is what Easy means.
+    difficulty: config == null
+        ? proto.Difficulty.medium
+        : kind == proto.QuestionKind.era
+            ? proto.Difficulty.easy
+            : proto.Difficulty.values.byName(config.difficulty.name),
     kind: kind,
     options: options,
     correctIndex: indexOf(round.correctId).clamp(0, options.isEmpty ? 0 : options.length - 1),

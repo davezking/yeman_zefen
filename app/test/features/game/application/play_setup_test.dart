@@ -46,12 +46,12 @@ void main() {
   });
 
   /// A catalog track in era 1 with its intro on the phone.
-  Future<void> addTrack(int id, {bool onDevice = true, bool fetchable = false}) async {
+  Future<void> addTrack(int id, {bool onDevice = true, bool fetchable = false, int? era = 1}) async {
     await db.into(db.catalogTracks).insert(
           CatalogTracksCompanion.insert(
             id: Value(id),
             artistId: 100 + id,
-            generationId: const Value(1),
+            generationId: Value(era),
             introUrl: Value(fetchable ? 'https://cdn.test/$id.mp3' : null),
             introSha256: Value(fetchable ? 'a' * 64 : null),
             introBytes: Value(fetchable ? 10 : null),
@@ -89,6 +89,24 @@ void main() {
     expect(songs.countFor(1), 4);
     expect(songs.disabledEras, isNot(contains(1)));
     expect(songs.tooFew, isFalse);
+  });
+
+  test('Which Era? counts only songs it can ask about: those with a known era', () async {
+    starter.complete();
+    for (var id = 1; id <= 3; id++) {
+      await addTrack(id);
+    }
+    for (var id = 4; id <= 8; id++) {
+      await addTrack(id, era: null);
+    }
+    final c = containerFor(NetworkKind.none);
+    final sub = c.listen(playableSongsProvider(GameMode.generation), (_, _) {});
+    addTearDown(sub.close);
+
+    final songs = await c.read(playableSongsProvider(GameMode.generation).future);
+    expect((songs.countFor(0), songs.onDevice, songs.tooFew), (3, 3, true));
+    // The same songs are all playable as Intro.
+    expect((await c.read(playableSongsProvider(GameMode.intro).future)).countFor(0), 8);
   });
 
   test('counts again when clips arrive on the phone', () async {

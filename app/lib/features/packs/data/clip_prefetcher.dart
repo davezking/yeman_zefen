@@ -3,6 +3,7 @@ import 'dart:math';
 
 
 import '../../game/data/game_library.dart';
+import '../../game/domain/eras.dart';
 import '../../game/domain/game_track.dart';
 import '../../game/domain/generated_session.dart';
 import '../../game/domain/round_generator.dart';
@@ -196,7 +197,7 @@ class ClipPrefetcher {
         if (!_taken.contains(id) &&
             (era == 0 || _tracks[id]?.generationId == era) &&
             // An era question can only be about a track that has an era.
-            (planned.kind != QuestionKind.era || _tracks[id]?.generationId != null))
+            (planned.kind != QuestionKind.era || eraIds.contains(_tracks[id]?.generationId)))
           id,
     ]..sort(); // a stable order, so the shuffles below are all the randomness there is
     final unseen = [for (final id in eligible) if (!recentTrackIds.contains(id)) id]..shuffle(rng);

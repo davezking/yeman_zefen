@@ -336,8 +336,7 @@ class SessionController extends Notifier<SessionState> {
 
     final total = generated.rounds.length;
     final windowMs = _scorer.windowMs(config.mode, config.difficulty);
-    // The generation-guess mode always plays 10 s of the intro, whatever the difficulty says.
-    final limitMs = config.mode == GameMode.generation ? Scorer.generationClipMs : config.difficulty.clipLengthMs;
+    final limitMs = _scorer.clipMs(config.mode, config.difficulty);
 
     final played = <RoundSummary>[];
     var skipped = 0;

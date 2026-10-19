@@ -119,7 +119,12 @@ class _RoundRow extends StatelessWidget {
     return ListTile(
       key: Key('round-${round.number}'),
       leading: Icon(icon, color: color),
-      title: Text(l10n.nameOf(round.correctName, locale)),
+      // An era question names the song and the era it is from, so a wrong guess shows the answer.
+      title: Text(
+        round.correctEraId == null
+            ? l10n.nameOf(round.correctName, locale)
+            : '${l10n.nameOf(round.correctName, locale)} · ${l10n.eraLabel(round.correctEraId!)}',
+      ),
       subtitle: Text(
         round.chosenName == null
             ? l10n.feedbackTimeout

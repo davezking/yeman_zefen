@@ -33,7 +33,7 @@ void main() {
 
       final scorer = const Scorer();
       final windowMs = scorer.windowMs(config.mode, config.difficulty);
-      final limitMs = config.mode == GameMode.generation ? Scorer.generationClipMs : config.difficulty.clipLengthMs;
+      final limitMs = scorer.clipMs(config.mode, config.difficulty);
       final kinds = <QuestionKind>{};
 
       var last = 0;
