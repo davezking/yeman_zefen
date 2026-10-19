@@ -211,13 +211,26 @@ class ClipStore {
   /// a session counts on.
   var _activeSessions = 0;
 
-  void sessionStarted() => _activeSessions++;
+  /// Completes when the last running session ends.
+  Completer<void>? _idle;
+
+  void sessionStarted() {
+    if (_activeSessions++ == 0) _idle = Completer<void>();
+  }
 
   /// A session ended: once no other session runs, trims `stream` clips to [capBytes].
   Future<void> sessionEnded({required int capBytes}) async {
     _activeSessions = max(0, _activeSessions - 1);
-    if (_activeSessions == 0) await evict(capBytes);
+    if (_activeSessions == 0) {
+      _idle?.complete();
+      _idle = null;
+      await evict(capBytes);
+    }
   }
+
+  /// Completes once no session is running: what moves or deletes clip files waits for it, so a
+  /// game never loses a clip it counts on.
+  Future<void> idle() => _idle?.future ?? Future<void>.value();
 
   /// Drops a clip row whose file turned out to be gone, so the clip counts as not on the device.
   Future<void> forget(int trackId, ClipKind kind) {

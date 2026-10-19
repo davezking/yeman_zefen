@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -86,24 +87,60 @@ class FakeClipDownloader implements ClipDownloader {
   /// urls whose download fails, like a lost connection.
   final failing = <String>{};
 
+  /// urls whose download fails because the phone is full.
+  final noSpace = <String>{};
+
   final calls = <String>[];
   var running = 0;
   var maxRunning = 0;
+
+  /// The group and Wi-Fi rule each url was downloaded with.
+  final groups = <String, String?>{};
+  final wifiOnly = <String, bool>{};
+
+  /// While set, downloads wait for it, unless their group is cancelled first.
+  Completer<void>? hold;
+  final cancelledGroups = <String>[];
+  final _waiting = <String?, List<Completer<void>>>{};
+
+  @override
+  Future<void> cancelGroup(String group) async {
+    cancelledGroups.add(group);
+    for (final c in _waiting.remove(group) ?? const <Completer<void>>[]) {
+      if (!c.isCompleted) c.completeError(const ClipDownloadException('canceled'));
+    }
+  }
 
   @override
   Future<void> download({
     required String url,
     required String relativePath,
     required void Function(double fraction) onProgress,
+    String? group,
+    bool wifiOnly = false,
   }) async {
     calls.add(url);
+    groups[url] = group;
+    this.wifiOnly[url] = wifiOnly;
     running++;
     if (running > maxRunning) maxRunning = running;
     try {
       // Yield so concurrent downloads overlap and the parallelism limit is observable.
       await Future<void>.delayed(const Duration(milliseconds: 1));
+      final held = hold;
+      if (held != null) {
+        final waiter = Completer<void>();
+        (_waiting[group] ??= []).add(waiter);
+        unawaited(held.future.then((_) {
+          if (!waiter.isCompleted) waiter.complete();
+        }));
+        await waiter.future;
+      }
       if (failing.contains(url)) {
         throw const ClipDownloadException('connection lost');
+      }
+      if (noSpace.contains(url)) {
+        throw const ClipDownloadException('no space', noSpace: true);
       }
       var body = bodyFor(url);
       final remaining = corruptTimes[url] ?? 0;

@@ -108,9 +108,12 @@ final currentNetworkProvider = StreamProvider.autoDispose<NetworkKind>((ref) asy
 final clipAccessProvider = FutureProvider.autoDispose<bool>((ref) async {
   final current = ref.watch(currentNetworkProvider);
   final network = current.hasValue ? current.requireValue : await ref.watch(currentNetworkProvider.future);
+  // Counted again when the player changes "Download upcoming songs on mobile data". The value
+  // itself is read where it is saved, which is also what the prefetcher goes by.
+  ref.watch(mobilePrefetchProvider);
   return switch (network) {
     NetworkKind.unmetered => true,
-    NetworkKind.cellular => ref.watch(mobilePrefetchProvider.future),
+    NetworkKind.cellular => ref.watch(clipSettingsProvider).prefetchOnMobile(),
     NetworkKind.none => false,
   };
 });
