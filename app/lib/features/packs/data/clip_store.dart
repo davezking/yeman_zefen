@@ -110,7 +110,8 @@ class ClipStore {
   /// Records a verified clip file and returns the row that is there now. With [replace] false a
   /// `starter` or `pack` row that is already there stays (a bundled or prefetched clip never
   /// downgrades a pack's), while a prefetched `stream` row is replaced and its file removed, so the
-  /// clip is not kept twice.
+  /// clip is not kept twice. A broken row is always replaced: this file verified, that one did not
+  /// play.
   Future<Clip> registerClip({
     required int trackId,
     required ClipKind kind,
@@ -120,12 +121,14 @@ class ClipStore {
     bool replace = true,
   }) async {
     if (!replace) {
-      final old = await (db.select(db.clips)
-            ..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name) & t.source.equals(ClipSource.stream)))
+      final old = await (db.select(db.clips)..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name)))
           .getSingleOrNull();
-      if (old != null && old.path != path) {
-        await forget(trackId, kind);
-        await _deleteFile(File(p.join((await supportDirectory()).path, old.path)));
+      if (old != null && (old.source == ClipSource.stream || old.broken)) {
+        replace = true;
+        if (old.source == ClipSource.stream && old.path != path) {
+          await forget(trackId, kind);
+          await _deleteFile(File(p.join((await supportDirectory()).path, old.path)));
+        }
       }
     }
     await db.into(db.clips).insert(
@@ -232,6 +235,22 @@ class ClipStore {
   /// game never loses a clip it counts on.
   Future<void> idle() => _idle?.future ?? Future<void>.value();
 
+  /// A clip would not play, or failed its checksum. A `stream` clip is simply dropped, file and
+  /// row: the cache fetches it again when it is next needed. A `pack` or `starter` clip is marked
+  /// broken, so no game plays it until a copy that verifies replaces it (see [registerClip]).
+  Future<void> markBroken(int trackId, ClipKind kind) async {
+    final row = await (db.select(db.clips)..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name)))
+        .getSingleOrNull();
+    if (row == null) return;
+    if (row.source == ClipSource.stream) {
+      await forget(trackId, kind);
+      await _deleteFile(File(p.join((await supportDirectory()).path, row.path)));
+      return;
+    }
+    await (db.update(db.clips)..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name)))
+        .write(const ClipsCompanion(broken: Value(true)));
+  }
+
   /// Drops a clip row whose file turned out to be gone, so the clip counts as not on the device.
   Future<void> forget(int trackId, ClipKind kind) {
     return (db.delete(db.clips)..where((t) => t.trackId.equals(trackId) & t.kind.equals(kind.name))).go();
@@ -263,6 +282,31 @@ class ClipStore {
       freed += row.bytes;
     }
     return freed;
+  }
+
+  /// Checks every `stream` clip against the checksum the catalog has for it, and drops each one
+  /// whose file is gone or no longer matches: it is fetched again when a game next needs it.
+  /// Returns how many were dropped.
+  Future<int> checkStreamClips() async {
+    final rows = await (db.select(db.clips)..where((t) => t.source.equals(ClipSource.stream))).get();
+    if (rows.isEmpty) return 0;
+    final catalog = {
+      for (final t in await (db.select(db.catalogTracks)..where((t) => t.id.isIn({for (final r in rows) r.trackId}))).get())
+        t.id: t,
+    };
+    final base = await supportDirectory();
+    var dropped = 0;
+    for (final row in rows) {
+      final track = catalog[row.trackId];
+      final sha = row.kind == ClipKind.middle.name ? track?.middleSha256 : track?.introSha256;
+      final file = File(p.join(base.path, row.path));
+      // A clip the catalog has no checksum for cannot be checked, only found missing.
+      final good = await file.exists() && (sha == null || await fileHasSha256(file, sha));
+      if (good) continue;
+      await markBroken(row.trackId, ClipKind.values.byName(row.kind));
+      dropped++;
+    }
+    return dropped;
   }
 
   /// Deletes every `stream` clip (Settings → Clear cache). Starter and pack clips stay.

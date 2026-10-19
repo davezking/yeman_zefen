@@ -16,13 +16,24 @@ class ClipStoppedException extends ClipPlaybackException {
   const ClipStoppedException() : super('stopped before audio started');
 }
 
+/// The clip decoded, but has less than [ClipTooShortException.minimum] of audio: a cut that went
+/// wrong, not a clip to guess from.
+class ClipTooShortException extends ClipPlaybackException {
+  const ClipTooShortException(this.duration) : super('clip has under a second of audio');
+
+  static const minimum = Duration(seconds: 1);
+
+  final Duration duration;
+}
+
 /// One loaded audio slot: a single player that holds one clip at a time.
 /// [ClipPlayer] keeps two of these so the next round's clip can load while the
 /// current one plays. This is the seam that lets that logic be tested without
 /// a platform audio engine.
 abstract class ClipVoice {
   /// Loads [path] and limits playback to its first [limit]. Completes when the
-  /// clip is ready to start without further loading.
+  /// clip is ready to start without further loading. Throws
+  /// [ClipTooShortException] when the clip has under a second of audio.
   Future<void> load(String path, Duration limit);
 
   /// Starts playback. Completes once audio is actually playing, not when the
@@ -62,13 +73,16 @@ class JustAudioClipVoice implements ClipVoice {
     await _player.pause();
     // The clip file already starts at the musical moment, so only the end is set.
     // The player enforces the end itself, so the stop is not a Dart timer.
-    await _player.setAudioSource(
+    final duration = await _player.setAudioSource(
       ClippingAudioSource(
         child: AudioSource.file(path),
         start: Duration.zero,
         end: limit,
       ),
     );
+    // The clipped length: the file's own when it is shorter than the limit. Unknown (null) is let
+    // through, as a clip that will not play still fails when it starts.
+    if (duration != null && duration < ClipTooShortException.minimum) throw ClipTooShortException(duration);
   }
 
   @override

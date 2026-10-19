@@ -31,6 +31,7 @@ class OfflinePlayScreen extends StatelessWidget {
     required this.onCancel,
     required this.onRetry,
     required this.onRemove,
+    this.onRetryConnection,
     this.loadingPacks = false,
   });
 
@@ -55,6 +56,9 @@ class OfflinePlayScreen extends StatelessWidget {
 
   /// Remove the pack with this id (after the confirmation).
   final ValueChanged<String> onRemove;
+
+  /// Offline: checks the connection again and reloads the pack list. No button when null.
+  final VoidCallback? onRetryConnection;
 
   /// Starts [start] for [pack] (a download, an update or a retry), asking
   /// first when it would use mobile data while "Wi-Fi only" is on.
@@ -200,7 +204,7 @@ class OfflinePlayScreen extends StatelessWidget {
               child: Text(l10n.packsAvailable, style: heading),
             ),
           ),
-          if (offline)
+          if (offline) ...[
             Semantics(
               liveRegion: true,
               child: Text(
@@ -208,6 +212,12 @@ class OfflinePlayScreen extends StatelessWidget {
                 style: text.caption.copyWith(color: ColorTokens.textSecondary),
               ),
             ),
+            if (onRetryConnection != null)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: SecondaryButton(label: l10n.errorRetry, small: true, onPressed: onRetryConnection),
+              ),
+          ],
           if (loadingPacks) ...[
             Semantics(
               liveRegion: true,

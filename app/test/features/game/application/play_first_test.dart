@@ -360,15 +360,19 @@ void main() {
     });
   });
 
-  test('a clip file that vanished from the phone is dropped from the clip store', () async {
+  test('a pack clip file that vanished from the phone is marked broken and reported', () async {
     kit = await SessionKit.create(onDevice: {for (var i = 1; i <= 30; i++) i});
     kit.existing.remove(kit.clipPath(8));
 
     kit.start(const SessionConfig(mode: GameMode.intro, difficulty: Difficulty.easy, generationId: 1, questions: QuestionMix.song, rounds: 15));
     await kit.playAll(pick: kit.correctOption);
 
-    final left = await (kit.db.select(kit.db.clips)..where((c) => c.trackId.equals(8))..where((c) => c.kind.equals('intro'))).get();
-    expect(left, isEmpty, reason: 'the row is gone, so the clip counts as not on the phone');
+    final left = await (kit.db.select(kit.db.clips)..where((c) => c.trackId.equals(8))..where((c) => c.kind.equals('intro'))).getSingle();
+    expect(left.broken, isTrue, reason: 'a broken clip counts as not on the phone until it is downloaded again');
     expect(await SessionStore(kit.db).clipErrorCount(), 1);
+    await kit.until(() => kit.reports.isNotEmpty, what: 'the report');
+    expect(kit.reports, [
+      {'trackId': 8, 'clipType': 'intro', 'error': 'file_missing'},
+    ]);
   });
 }

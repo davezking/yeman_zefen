@@ -148,7 +148,7 @@ class PackInstaller {
 
   /// Runs [action] after everything queued for [slug], because two at once would write the
   /// same files.
-  Future<void> _enqueue(String slug, Future<void> Function() action) {
+  Future<T> _enqueue<T>(String slug, Future<T> Function() action) {
     final previous = _running[slug] ?? Future<void>.value();
     final run = previous.then((_) => action());
     // The queue moves on whether this one succeeds or fails.
@@ -282,7 +282,8 @@ class PackInstaller {
     Clip? onPhone,
   ) async {
     // A built-in clip stays the one that plays (see [_register]): a copy would only take space.
-    if (onPhone?.source == ClipSource.starter) {
+    // A broken one does not, so the pack's own file is fetched.
+    if (onPhone != null && onPhone.source == ClipSource.starter && !onPhone.broken) {
       tracker.fileDone(file.relativePath, file.clip.bytes);
       return;
     }
@@ -341,6 +342,92 @@ class PackInstaller {
     }
   }
 
+  /// Checks every clip of the installed pack [slug] against the manifest it was installed from,
+  /// and fixes what it can. A clip whose file is missing, fails its checksum, or is marked broken
+  /// is downloaded again when [allowDownloads] is set, and otherwise marked broken so no game plays
+  /// it. A good file whose row is missing or points elsewhere (a prefetched copy took its place) is
+  /// registered as the pack's again. A clip the pack does not supply (a built-in one, or another
+  /// installed pack's file) is left alone.
+  ///
+  /// Returns true when every clip of the pack is now good, false when one still needs a download.
+  /// Runs after any install or removal of the same pack, never alongside it. Not installed: true.
+  Future<bool> check(String slug, {required bool allowDownloads}) =>
+      _enqueue(slug, () => _check(slug, allowDownloads));
+
+  Future<bool> _check(String slug, bool allowDownloads) async {
+    final installed = await (db.select(db.installedPacks)..where((t) => t.slug.equals(slug))).getSingleOrNull();
+    if (installed == null) return true;
+    final PackManifest manifest;
+    try {
+      manifest = PackManifest.parse(installed.manifestJson);
+    } on PackManifestException {
+      return true; // Nothing to check against.
+    }
+    final base = await supportDirectory();
+    final paths = _TrackPaths.of(manifest);
+    final onPhone = {
+      for (final c in await (db.select(db.clips)..where((c) => c.trackId.isIn({for (final t in manifest.tracks) t.id})))
+          .get())
+        (c.trackId, c.kind): c,
+    };
+    var complete = true;
+    for (final t in manifest.tracks) {
+      for (final (kind, path, clip) in [
+        (ClipKind.intro, paths.intro(t.id), t.intro),
+        (ClipKind.middle, paths.middle(t.id), t.middle),
+      ]) {
+        final row = onPhone[(t.id, kind.name)];
+        if (row != null && !row.broken && row.path != path && row.source != ClipSource.stream) continue;
+        final target = File(p.join(base.path, path));
+        // A broken file is downloaded again even when it matches: it would not play.
+        var good = !(row != null && row.broken && row.path == path) &&
+            await target.exists() &&
+            await fileHasSha256(target, clip.sha256);
+        if (!good && allowDownloads) good = await _refetch(base, slug, path, clip);
+        if (good) {
+          if (row == null || row.broken || row.path != path) {
+            await _store.registerClip(trackId: t.id, kind: kind, path: path, bytes: clip.bytes, source: ClipSource.pack);
+            if (row != null && row.source == ClipSource.stream && row.path != path) {
+              try {
+                final old = File(p.join(base.path, row.path));
+                if (await old.exists()) await old.delete();
+              } catch (_) {}
+            }
+          }
+        } else {
+          complete = false;
+          if (row != null && row.path == path) await _store.markBroken(t.id, kind);
+        }
+      }
+    }
+    return complete;
+  }
+
+  /// Downloads a pack clip again, next to its file, and moves it into place only once it
+  /// verifies, so a game playing the old file is not cut off mid-download. False when it never
+  /// verified or could not be downloaded.
+  Future<bool> _refetch(Directory base, String slug, String path, ManifestClip clip) async {
+    final partPath = '$path.part';
+    final part = File(p.join(base.path, partPath));
+    try {
+      for (var attempt = 0; attempt < maxDownloadAttempts; attempt++) {
+        if (await part.exists()) await part.delete();
+        await part.parent.create(recursive: true);
+        await downloader.download(url: clip.url, relativePath: partPath, onProgress: (_) {}, group: _downloadGroup(slug));
+        if (await part.exists() && await fileHasSha256(part, clip.sha256)) {
+          await part.rename(p.join(base.path, path));
+          return true;
+        }
+      }
+    } catch (_) {
+      // Offline, cancelled, or out of space: the clip stays broken until the next check.
+    }
+    try {
+      if (await part.exists()) await part.delete();
+    } catch (_) {}
+    return false;
+  }
+
   /// Removes an installed pack and frees its space. A clip that another installed pack also has
   /// is pointed at that pack's file. Every other clip moves into the stream cache, where the
   /// prefetcher can still use it and the cache cap applies (the caller trims the cache). Waits for
@@ -366,7 +453,8 @@ class PackInstaller {
     // file, which the game already handles by forgetting the clip.
     final moved = <Clip>[];
     for (final clip in packClips) {
-      if (elsewhere.contains(clip.trackId)) continue;
+      // A broken clip is not worth keeping in the cache: it goes with the pack.
+      if (elsewhere.contains(clip.trackId) || clip.broken) continue;
       final kind = ClipKind.values.byName(clip.kind);
       final to = ClipStore.streamPath(clip.trackId, kind);
       try {
@@ -442,10 +530,11 @@ class PackInstaller {
       final replaced = await (db.select(db.clips)
             ..where((c) => c.trackId.isIn(ids) & c.source.equals(ClipSource.stream)))
           .get();
-      // A built-in clip keeps its row: it is never evicted, and stays when this pack is removed.
+      // A built-in clip keeps its row: it is never evicted, and stays when this pack is removed. A
+      // broken one gives way to the pack's.
       final builtIn = {
         for (final c in await (db.select(db.clips)
-              ..where((c) => c.trackId.isIn(ids) & c.source.equals(ClipSource.starter)))
+              ..where((c) => c.trackId.isIn(ids) & c.source.equals(ClipSource.starter) & c.broken.equals(false)))
             .get())
           (c.trackId, c.kind),
       };

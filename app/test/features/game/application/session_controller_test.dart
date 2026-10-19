@@ -1,10 +1,14 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show BooleanExpressionOperators, Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/audio/clip_voice.dart';
+import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/data/session_store.dart';
+import 'package:yeman_zefen/features/game/data/game_library.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
+import 'package:yeman_zefen/features/packs/data/clip_providers.dart';
 
 import 'session_kit.dart';
 
@@ -350,6 +354,142 @@ void main() {
       expect(kit.state.error?.count, 2);
       expect(await kit.db.select(kit.db.pendingSessions).get(), isEmpty);
       expect(await SessionStore(kit.db).clipErrorCount(), 2);
+    });
+  });
+
+  group('a clip that will not play is taken out and reported', () {
+    const era1 = SessionConfig(
+      mode: GameMode.intro,
+      difficulty: Difficulty.medium,
+      generationId: 1,
+      questions: QuestionMix.song,
+      rounds: 15,
+    );
+
+    void failLoading(String clipName, Object error) {
+      for (final v in kit.voices) {
+        v.loadErrorFor = (path) => path.endsWith('/$clipName') ? error : null;
+      }
+    }
+
+    Future<Clip> clipRow(int trackId) => (kit.db.select(kit.db.clips)
+          ..where((c) => c.trackId.equals(trackId) & c.kind.equals('intro')))
+        .getSingle();
+
+    test('a clip that will not decode skips its round, is marked broken and reported', () async {
+      // Era 1 is the even tracks: all 15 are played, so track 8 is one of them.
+      failLoading('8-intro.mp3', const ClipPlaybackException('decoder error'));
+      kit.start(era1);
+      await kit.playAll(pick: kit.correctOption);
+
+      final summary = kit.state.summary!;
+      expect(summary.skipped, 1);
+      expect(summary.rounds, hasLength(14));
+      expect(summary.totalScore, 14 * 206, reason: 'the skipped round costs nothing');
+      expect(await SessionStore(kit.db).clipErrorCount(), 1);
+      expect((await clipRow(8)).broken, isTrue);
+      await kit.until(() => kit.reports.isNotEmpty, what: 'the report');
+      expect(kit.reports, [
+        {'trackId': 8, 'clipType': 'intro', 'error': 'decode_error'},
+      ]);
+      expect(await kit.db.select(kit.db.pendingClipReports).get(), isEmpty, reason: 'sent, so no longer queued');
+
+      // Offline, a broken clip is not on the phone any more: no game asks about it.
+      final library = await loadGameLibrary(kit.db, kit.dir);
+      expect(library.hasClip(8, GameMode.intro), isFalse);
+      expect(library.playableIds(GameMode.intro, includeFetchable: false), isNot(contains(8)));
+    });
+
+    test('a clip with under a second of audio is reported as too short', () async {
+      failLoading('8-intro.mp3', const ClipTooShortException(Duration(milliseconds: 400)));
+      kit.start(era1);
+      await kit.playAll(pick: kit.correctOption);
+
+      expect(kit.state.summary!.skipped, 1);
+      await kit.until(() => kit.reports.isNotEmpty, what: 'the report');
+      expect(kit.reports.single['error'], 'too_short');
+    });
+
+    test('a report made offline waits in the queue and is sent once the API answers', () async {
+      kit.reportStatus = 0;
+      failLoading('8-intro.mp3', const ClipPlaybackException('decoder error'));
+      kit.start(era1);
+      await kit.playAll(pick: kit.correctOption);
+
+      final queued = await kit.db.select(kit.db.pendingClipReports).getSingle();
+      expect((queued.trackId, queued.kind, queued.error), (8, 'intro', 'decode_error'));
+
+      kit.reportStatus = 202;
+      await kit.container.read(clipReporterProvider).flush();
+      expect(kit.reports, hasLength(1));
+      expect(await kit.db.select(kit.db.pendingClipReports).get(), isEmpty);
+    });
+
+    test('a report the API refuses for good (the daily limit) is dropped, not retried for ever', () async {
+      kit.reportStatus = 429;
+      failLoading('8-intro.mp3', const ClipPlaybackException('decoder error'));
+      kit.start(era1);
+      await kit.playAll(pick: kit.correctOption);
+      await kit.until(() => kit.reports.isNotEmpty, what: 'the report');
+      await kit.container.read(clipReporterProvider).flush();
+      expect(await kit.db.select(kit.db.pendingClipReports).get(), isEmpty);
+    });
+  });
+
+  group('offline, with every song on the phone played recently', () {
+    Future<void> playedRecently() => kit.db.into(kit.db.recentSessions).insert(
+          RecentSessionsCompanion.insert(
+            sessionId: 'earlier',
+            playedAt: 1,
+            trackIdsJson: jsonEncode([for (var i = 1; i <= 30; i++) i]),
+            serverScore: const Value(null),
+          ),
+        );
+
+    test('the out-of-songs note shows first, and "play them again" plays the repeats', () async {
+      await playedRecently();
+      kit.start(song);
+      await kit.untilPhase(SessionPhase.outOfSongs);
+      expect(kit.state.round, isNull);
+
+      kit.controller.playAgain();
+      await kit.playAll(pick: kit.correctOption);
+      expect(kit.state.phase, SessionPhase.finished);
+      expect(kit.state.summary!.rounds, hasLength(10));
+
+      // Asked once: the next game goes straight on.
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+    });
+
+    test('leaving from the note ends the session without saving anything', () async {
+      await playedRecently();
+      kit.start(song);
+      await kit.untilPhase(SessionPhase.outOfSongs);
+      kit.controller.leave();
+      expect(kit.state.phase, SessionPhase.idle);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(kit.state.phase, SessionPhase.idle);
+      expect(await kit.db.select(kit.db.pendingSessions).get(), isEmpty);
+    });
+
+    test('online, the note never shows: new songs can be fetched', () async {
+      await playedRecently();
+      kit.offline = false;
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
+    });
+
+    test('with an unplayed song on the phone, the note does not show', () async {
+      await kit.db.into(kit.db.recentSessions).insert(
+            RecentSessionsCompanion.insert(
+              sessionId: 'earlier',
+              playedAt: 1,
+              trackIdsJson: jsonEncode([for (var i = 1; i <= 29; i++) i]),
+            ),
+          );
+      kit.start(short);
+      await kit.untilRound(1, RoundPhase.answering);
     });
   });
 

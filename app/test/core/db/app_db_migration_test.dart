@@ -271,4 +271,26 @@ void main() {
       expect(await db.select(db.clips).get(), hasLength(2));
     });
   });
+
+  test('upgrading from schema 8 keeps clips, unbroken, and adds the clip report queue', () async {
+    final db = AppDb(
+      NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute('CREATE TABLE clips (track_id INTEGER NOT NULL, kind TEXT NOT NULL, path TEXT NOT NULL, '
+              'bytes INTEGER NOT NULL, source TEXT NOT NULL, last_played_at INTEGER NOT NULL, '
+              'PRIMARY KEY (track_id, kind))');
+          raw.execute("INSERT INTO clips VALUES (4, 'intro', 'packs/p/v1/4-intro.mp3', 10, 'pack', 1)");
+          raw.execute('PRAGMA user_version = 8');
+        },
+      ),
+    );
+    addTearDown(db.close);
+
+    final clip = await db.select(db.clips).getSingle();
+    expect((clip.trackId, clip.path, clip.broken), (4, 'packs/p/v1/4-intro.mp3', false));
+    await db.into(db.pendingClipReports).insert(
+          PendingClipReportsCompanion.insert(trackId: 4, kind: 'intro', error: 'decode_error', createdAt: 1),
+        );
+    expect((await db.select(db.pendingClipReports).getSingle()).error, 'decode_error');
+  });
 }

@@ -37,13 +37,14 @@ CatalogTrack row({
       updatedAt: 1,
     );
 
-Clip clip(int trackId, String kind, {String? path, String source = ClipSource.pack}) => Clip(
+Clip clip(int trackId, String kind, {String? path, String source = ClipSource.pack, bool broken = false}) => Clip(
       trackId: trackId,
       kind: kind,
       path: path ?? 'packs/golden-era/v1/$trackId-$kind.mp3',
       bytes: 100,
       source: source,
       lastPlayedAt: 1,
+      broken: broken,
     );
 
 void main() {

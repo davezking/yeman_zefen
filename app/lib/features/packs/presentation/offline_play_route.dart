@@ -89,6 +89,10 @@ class OfflinePlayRoute extends ConsumerWidget {
       onCancel: downloads.cancel,
       onRetry: download,
       onRemove: (slug) => unawaited(downloads.remove(slug)),
+      onRetryConnection: () {
+        ref.invalidate(currentNetworkProvider);
+        ref.invalidate(packListingsProvider);
+      },
     );
   }
 }

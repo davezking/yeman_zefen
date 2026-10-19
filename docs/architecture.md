@@ -182,6 +182,7 @@ All JSON. Errors use the shape `{ error: { code, message } }`. Versioned under `
 | `POST /v1/sessions` | Submit a session's round events plus ad event counts. Idempotent on `id`. Returns the computed score. |
 | `GET /v1/leaderboard?period=all\|week&generation=` | Top 100. Registered, non-shadow-banned users only. |
 | `GET /v1/leaderboard/me?period=&generation=` | Caller's points and rank (registered only) |
+| `POST /v1/reports/clip` | `{ trackId, clipType, error }` (`file_missing \| decode_error \| too_short`): a clip would not play on the phone. Adds to one open `missing_audio` review item per track. 10 per user per day (`429 rate_limited`). |
 
 **Session payload (shape):**
 ```json

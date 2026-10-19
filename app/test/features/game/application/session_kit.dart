@@ -8,10 +8,14 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:path/path.dart' as p;
 import 'package:yeman_zefen/core/audio/audio_providers.dart';
 import 'package:yeman_zefen/core/audio/clip_player.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
+import 'package:yeman_zefen/core/http/api_client.dart';
+import 'package:yeman_zefen/core/http/api_providers.dart';
 import 'package:yeman_zefen/core/net/network_kind.dart';
 import 'package:yeman_zefen/features/game/application/session_controller.dart';
 import 'package:yeman_zefen/features/game/application/session_environment.dart';
@@ -124,6 +128,12 @@ class SessionKit {
   var seed = 1;
   var idCounter = 0;
 
+  /// Bodies sent to `POST /v1/reports/clip`, in order.
+  final reports = <Map<String, Object?>>[];
+
+  /// The status the API answers clip reports with. 0: no connection.
+  var reportStatus = 202;
+
   /// Clip files that exist. Tests remove paths to make clips go missing.
   final existing = <String>{};
 
@@ -156,6 +166,19 @@ class SessionKit {
         supportDirectoryProvider.overrideWith((ref) async => kit.dir),
         clipPlayerProvider.overrideWithValue(kit.player),
         clipDownloaderProvider.overrideWithValue(kit.downloader),
+        apiClientProvider.overrideWithValue(
+          ApiClient(
+            baseUrl: 'https://api.test',
+            idToken: ({bool forceRefresh = false}) async => 'token',
+            client: MockClient((request) async {
+              if (kit.reportStatus == 0) throw http.ClientException('offline');
+              if (request.url.path == '/v1/reports/clip') {
+                kit.reports.add(jsonDecode(request.body) as Map<String, Object?>);
+              }
+              return http.Response('{}', kit.reportStatus, headers: {'content-type': 'application/json'});
+            }),
+          ),
+        ),
         starterReadyProvider.overrideWith((ref) async {}),
         sessionEnvironmentProvider.overrideWithValue(
           SessionEnvironment(

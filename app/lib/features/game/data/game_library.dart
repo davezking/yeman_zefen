@@ -39,7 +39,8 @@ class GameLibrary {
       ],
       byId,
       artistNames,
-      {for (final c in clips) (c.trackId, c.kind): c},
+      // A broken clip does not count as on the device. Its track can still be fetched.
+      {for (final c in clips) if (!c.broken) (c.trackId, c.kind): c},
       base,
     );
   }

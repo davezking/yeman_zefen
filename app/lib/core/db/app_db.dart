@@ -190,6 +190,23 @@ class Clips extends Table {
   TextColumn get source => text()(); // ClipSource
   IntColumn get lastPlayedAt => integer()(); // epoch ms, UTC; the download time until first played
 
+  /// The file would not play (missing, would not decode, or under a second of audio), or failed
+  /// its checksum when it was checked again. A broken clip is not played, and is replaced by a
+  /// clip that downloads and verifies (a starter clip, by the next app update).
+  BoolColumn get broken => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {trackId, kind};
+}
+
+/// Clip failures waiting to be sent to `POST /v1/reports/clip`, one per clip. Kept until the API
+/// takes them, so a clip that broke offline is still reported.
+class PendingClipReports extends Table {
+  IntColumn get trackId => integer()();
+  TextColumn get kind => text()(); // 'intro' | 'middle'
+  TextColumn get error => text()(); // ClipFailure.wireName
+  IntColumn get createdAt => integer()(); // epoch ms, UTC
+
   @override
   Set<Column> get primaryKey => {trackId, kind};
 }
@@ -207,13 +224,14 @@ class Clips extends Table {
     AppSettings,
     CatalogTracks,
     Clips,
+    PendingClipReports,
   ],
 )
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -242,6 +260,11 @@ class AppDb extends _$AppDb {
             await m.createTable(catalogTracks);
             await m.createTable(clips);
             await _migrateLocalTracks();
+          }
+          if (from < 9) {
+            // clips made by the `from < 8` step above already has this column.
+            if (from >= 8) await m.addColumn(clips, clips.broken);
+            await m.createTable(pendingClipReports);
           }
         },
       );

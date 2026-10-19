@@ -6,6 +6,9 @@ import 'package:yeman_zefen/core/audio/clip_voice.dart';
 class FakeClipVoice implements ClipVoice {
   Duration startDelay = const Duration(milliseconds: 20);
   Object? loadError;
+
+  /// The error loading [path] throws, if any, after [loadError].
+  Object? Function(String path)? loadErrorFor;
   Object? startError;
 
   /// Runs when a start begins, before the start delay. Lets a test make time
@@ -29,7 +32,7 @@ class FakeClipVoice implements ClipVoice {
   Future<void> load(String path, Duration limit) async {
     if (playing) loadsWhilePlaying++;
     await Future<void>.delayed(const Duration(milliseconds: 1));
-    final error = loadError;
+    final error = loadError ?? loadErrorFor?.call(path);
     if (error != null) throw error;
     loads.add((path, limit));
     _position = Duration.zero;

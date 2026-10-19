@@ -52,9 +52,13 @@ class RecordingSessionController extends SessionController {
   var backgrounded = 0;
   var left = 0;
   var feedbackSkipped = 0;
+  var replayed = 0;
 
   @override
   SessionState build() => initial;
+
+  @override
+  void playAgain() => replayed++;
 
   @override
   Future<void> start(SessionConfig config) async => startedWith = config;

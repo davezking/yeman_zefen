@@ -146,6 +146,28 @@ void main() {
     expect(find.text('golden-era'), findsOneWidget);
   });
 
+  testWidgets('offline, "Try again" checks the connection and the pack list again', (tester) async {
+    await pumpScreens(
+      tester,
+      location: '/packs',
+      packsError: Exception('offline'),
+      network: NetworkKind.none,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    // Still offline here, so the screen still says so, with the button.
+    expect(find.text('Connect to the internet to download packs.'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+  });
+
+  testWidgets('online, there is no "Try again"', (tester) async {
+    await pumpScreens(tester, location: '/packs', packs: [_listing('golden-era')]);
+    await tester.pumpAndSettle();
+    expect(find.text('Try again'), findsNothing);
+  });
+
   group('a download in progress', () {
     late Completer<void> hold;
     late StreamController<PackInstallProgress> progress;

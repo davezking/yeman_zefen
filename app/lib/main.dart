@@ -35,5 +35,7 @@ Future<void> main() async {
   container.read(sessionSyncStarterProvider);
   // Registers the bundled starter clips, then keeps the catalog fresh: on start and every 12 hours.
   container.read(catalogStarterProvider);
+  // Checks clip files against their checksums and repairs bad ones; sends queued clip reports.
+  container.read(clipHealthStarterProvider);
   runApp(UncontrolledProviderScope(container: container, child: const App()));
 }
