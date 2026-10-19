@@ -256,6 +256,22 @@
   },
   "resultsSavedOffline": "Score saved. It will be sent when you're back online.",
   "resultsNotRanked": "This game couldn't be checked, so it won't count toward rankings.",
+  "resultsSyncing": "Checking your score…",
+  "@resultsSyncing": {
+    "description": "Results: the game was counted on the phone and the server's score has not arrived yet"
+  },
+  "resultsServerDiffers": "The server counted {score} points. Your phone counted {provisional}.",
+  "@resultsServerDiffers": {
+    "description": "Results: the server's score differs from the phone's count",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      },
+      "provisional": {
+        "type": "int"
+      }
+    }
+  },
   "lbTitle": "Leaderboard",
   "lbWeekly": "This week",
   "lbAllTime": "All time",

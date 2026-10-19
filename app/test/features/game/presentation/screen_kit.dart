@@ -281,6 +281,7 @@ SessionState finishedState({
     phase: SessionPhase.finished,
     config: sessionConfig,
     summary: SessionSummary(
+      sessionId: 'test-session',
       config: sessionConfig,
       totalScore: total,
       rounds: unnamed

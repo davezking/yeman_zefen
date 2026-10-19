@@ -423,6 +423,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'This game couldn\'t be checked, so it won\'t count toward rankings.';
 
   @override
+  String get resultsSyncing => 'Checking your score…';
+
+  @override
+  String resultsServerDiffers(int score, int provisional) {
+    return 'The server counted $score points. Your phone counted $provisional.';
+  }
+
+  @override
   String get lbTitle => 'Leaderboard';
 
   @override

@@ -64,6 +64,7 @@ SessionState _results() {
     phase: SessionPhase.finished,
     config: cfg,
     summary: SessionSummary(
+      sessionId: 'test-session',
       config: cfg,
       totalScore: 1234,
       rounds: rounds,

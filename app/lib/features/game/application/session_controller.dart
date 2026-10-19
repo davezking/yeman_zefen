@@ -404,6 +404,7 @@ class SessionController extends Notifier<SessionState> {
         phase: SessionPhase.finished,
         config: config,
         summary: SessionSummary(
+          sessionId: payload.id,
           config: config,
           totalScore: totalScore,
           rounds: played,
@@ -543,6 +544,7 @@ class SessionController extends Notifier<SessionState> {
         number: index + 1,
         kind: round.kind,
         correctName: correctNameOf(),
+        artistName: artistName,
         chosenName: null,
         correctEraId: eraOf(round.correctId),
         correct: false,
@@ -636,6 +638,7 @@ class SessionController extends Notifier<SessionState> {
             number: index + 1,
             kind: round.kind,
             correctName: correctNameOf(),
+            artistName: artistName,
             chosenName: nameOf(optionId),
             correctEraId: eraOf(round.correctId),
             chosenEraId: eraOf(optionId),

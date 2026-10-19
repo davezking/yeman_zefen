@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yeman_zefen/core/l10n/display_name.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
+import 'package:yeman_zefen/features/game/presentation/results_screen.dart';
 import 'package:yeman_zefen/features/game/presentation/round_route.dart';
 import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
 import 'package:yeman_zefen/l10n/app_localizations.dart';
@@ -270,6 +271,7 @@ void main() {
         phase: SessionPhase.finished,
         config: config,
         summary: const SessionSummary(
+          sessionId: 'test-session',
           config: config,
           totalScore: 1200,
           rounds: [],
@@ -282,7 +284,10 @@ void main() {
       await settle(tester);
 
       expect(h.location, '/results');
-      expect(find.byKey(const Key('total-score')), findsOneWidget);
+      expect(find.byType(ResultsScreen), findsOneWidget);
+      // The total counts up from zero on the results screen.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('1,200'), findsWidgets);
     });
 
     testWidgets('leaving asks first, stops the round under the question, and resumes if the player says no', (tester) async {
@@ -309,6 +314,7 @@ void main() {
         phase: SessionPhase.finished,
         config: config,
         summary: const SessionSummary(
+          sessionId: 'test-session',
           config: config,
           totalScore: 900,
           rounds: [],
