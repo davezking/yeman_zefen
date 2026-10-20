@@ -311,7 +311,7 @@ void main() {
     });
 
     testWidgets('under a real ad the stand-in shows its caption, with no countdown', (tester) async {
-      await pumpScreens(tester, location: '/play', state: playing(roundView(remainingMs: 5000, ad: RoundAd.rewarded)));
+      await pumpScreens(tester, location: '/play', state: playing(roundView(remainingMs: 5000), ad: RoundAd.rewarded));
       await settle(tester);
       expect(find.text('Your hint is on its way…'), findsOneWidget);
       expect(find.text('Ad'), findsOneWidget);
@@ -513,8 +513,14 @@ void main() {
 
     setUp(() async => l10n = await AppLocalizations.delegate.load(const Locale('en')));
 
-    proto.RoundView view(RoundView round, {int nowMs = 0, bool leaveOpen = false, Locale locale = const Locale('en')}) =>
-        screenViewOf(playing(round), l10n: l10n, locale: locale, nowMs: nowMs, leaveOpen: leaveOpen);
+    proto.RoundView view(
+      RoundView round, {
+      int nowMs = 0,
+      bool leaveOpen = false,
+      Locale locale = const Locale('en'),
+      RoundAd ad = RoundAd.none,
+    }) =>
+        screenViewOf(playing(round, ad: ad), l10n: l10n, locale: locale, nowMs: nowMs, leaveOpen: leaveOpen);
 
     test('the countdown follows the engine\'s clock: a window of 10 s that began at 1000', () {
       final round = roundView(answerClockStartMs: 1000);
@@ -585,6 +591,11 @@ void main() {
       expect(v(roundView(answerClockStartMs: 0), ready: true).hintAvailable, isTrue);
       expect(v(roundView(answerClockStartMs: 0), ready: false).hintAvailable, isFalse);
       expect(v(roundView(answerClockStartMs: 0, hintUsed: true), ready: true).hintAvailable, isFalse);
+      expect(v(roundView(answerClockStartMs: 0, hintAsked: true), ready: true).hintAvailable, isFalse, reason: 'one try a round');
+      expect(
+        screenViewOf(playing(roundView(answerClockStartMs: 0), ad: RoundAd.interstitial), l10n: l10n, locale: const Locale('en'), nowMs: 0, rewardedReady: true).hintAvailable,
+        isFalse,
+      );
       expect(v(roundView(phase: RoundPhase.loading), ready: true).hintAvailable, isFalse);
     });
 
@@ -595,13 +606,13 @@ void main() {
     });
 
     test('ads cover the round with the timer stopped and the reels still', () {
-      final rewarded = view(roundView(remainingMs: 5000, ad: RoundAd.rewarded), nowMs: 99999);
+      final rewarded = view(roundView(remainingMs: 5000), ad: RoundAd.rewarded, nowMs: 99999);
       expect((rewarded.overlay, rewarded.timerPaused, rewarded.clipPlaying), (proto.RoundOverlay.rewardedAd, true, false));
       expect(rewarded.timeFraction, closeTo(0.5, 0.001));
-      final interstitial = view(roundView(phase: RoundPhase.feedback, chosenId: 12, ad: RoundAd.interstitial));
+      final interstitial = view(roundView(phase: RoundPhase.feedback, chosenId: 12), ad: RoundAd.interstitial);
       expect(interstitial.overlay, proto.RoundOverlay.interstitial);
       // The leave question and the paused notice come first.
-      expect(view(roundView(ad: RoundAd.rewarded), leaveOpen: true).overlay, proto.RoundOverlay.leaveDialog);
+      expect(view(roundView(), ad: RoundAd.rewarded, leaveOpen: true).overlay, proto.RoundOverlay.leaveDialog);
     });
 
     test('names are in the language asked for, so a switch changes the screen at once', () async {

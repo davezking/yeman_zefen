@@ -324,7 +324,7 @@ proto.RoundView screenViewOf(
   final feedbackStart = round.feedbackStartedAtMs;
   final feedbackLeftMs = feedbackStart == null ? 0 : (round.feedbackMs - (nowMs - feedbackStart)).clamp(0, round.feedbackMs);
 
-  final stopped = interrupted || leaveOpen || sheetOpenedAt != null || round.ad != RoundAd.none;
+  final stopped = interrupted || leaveOpen || sheetOpenedAt != null || state.ad != RoundAd.none;
   return proto.RoundView(
     roundNumber: round.number,
     totalRounds: round.total,
@@ -348,7 +348,7 @@ proto.RoundView screenViewOf(
     timerPaused: stopped,
     pickedIndex: indexOf(round.chosenId) < 0 ? null : indexOf(round.chosenId),
     removed: {for (final id in round.removedIds) if (indexOf(id) >= 0) indexOf(id)},
-    hintAvailable: rewardedReady && round.hintOffered,
+    hintAvailable: rewardedReady && round.hintOffered && state.ad == RoundAd.none,
     hintUsed: round.hintUsed,
     points: round.points ?? 0,
     speedBonus: round.speedBonus,
@@ -358,7 +358,7 @@ proto.RoundView screenViewOf(
         ? proto.RoundOverlay.leaveDialog
         : interrupted
             ? proto.RoundOverlay.paused
-            : switch (round.ad) {
+            : switch (state.ad) {
                 RoundAd.interstitial => proto.RoundOverlay.interstitial,
                 RoundAd.rewarded => proto.RoundOverlay.rewardedAd,
                 RoundAd.none => sheetOpenedAt != null ? proto.RoundOverlay.hintSheet : proto.RoundOverlay.none,

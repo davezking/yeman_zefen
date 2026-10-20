@@ -146,6 +146,9 @@ class SessionKit {
   /// The ads. None are loaded until a test loads them.
   final ads = FakeAdService();
 
+  /// The app is in front of the player.
+  var foreground = true;
+
   /// What the phone is connected to. Null follows [offline].
   NetworkKind? network;
 
@@ -200,6 +203,7 @@ class SessionKit {
             isOffline: () async => kit.offline,
             networkProbe: () async => kit.network ?? (kit.offline ? NetworkKind.none : NetworkKind.unmetered),
             rng: () => Random(kit.seed),
+            isForeground: () => kit.foreground,
             feedbackDuration: feedback,
             wrongFeedbackDuration: wrongFeedback ?? feedback,
           ),

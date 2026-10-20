@@ -79,6 +79,10 @@ class GoogleAdService implements AdService {
   /// Google's guidance: a loaded ad older than this may no longer be served.
   static const _maxAge = Duration(hours: 1);
 
+  /// The reward can be reported just after the ad closes. A close without one waits this long for it
+  /// before counting the ad as not finished.
+  static const _lateRewardWait = Duration(milliseconds: 800);
+
   Future<void>? _started;
   var _disposed = false;
 
@@ -186,22 +190,34 @@ class GoogleAdService implements AdService {
     _syncRewarded();
     if (ad == null) return RewardedResult.unavailable;
     var earned = false;
+    var dismissed = false;
+    Timer? lateReward;
     final done = Completer<RewardedResult>();
+    void finish(RewardedResult result) {
+      lateReward?.cancel();
+      if (done.isCompleted) return;
+      done.complete(result);
+      unawaited(ad.dispose());
+    }
+
     ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        unawaited(ad.dispose());
-        if (!done.isCompleted) done.complete(earned ? RewardedResult.earned : RewardedResult.notFinished);
+      onAdDismissedFullScreenContent: (_) {
+        dismissed = true;
+        if (earned) return finish(RewardedResult.earned);
+        // Kept until the wait is over, so a late reward is still delivered.
+        lateReward = Timer(_lateRewardWait, () => finish(RewardedResult.notFinished));
       },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        unawaited(ad.dispose());
-        if (!done.isCompleted) done.complete(RewardedResult.unavailable);
-      },
+      onAdFailedToShowFullScreenContent: (_, _) => finish(RewardedResult.unavailable),
     );
     try {
-      await ad.show(onUserEarnedReward: (_, _) => earned = true);
+      await ad.show(
+        onUserEarnedReward: (_, _) {
+          earned = true;
+          if (dismissed) finish(RewardedResult.earned);
+        },
+      );
     } catch (_) {
-      unawaited(ad.dispose());
-      if (!done.isCompleted) done.complete(RewardedResult.unavailable);
+      finish(RewardedResult.unavailable);
     }
     final result = await done.future;
     _loadRewarded();

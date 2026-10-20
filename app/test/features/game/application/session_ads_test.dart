@@ -72,7 +72,7 @@ void main() {
       kit.clockMs += 4000;
       kit.controller.watchHintAd();
       await kit.until(() => kit.ads.rewardedShowing, what: 'the rewarded ad');
-      expect(kit.state.round!.ad, RoundAd.rewarded);
+      expect(kit.state.ad, RoundAd.rewarded);
       expect(clipPlaying(), isFalse, reason: 'the clip stops for the ad');
 
       // Nor does the time the ad plays, and the app leaving for the ad is not a pause.
@@ -124,6 +124,8 @@ void main() {
       expect(round.removedIds, isEmpty);
       expect(round.hintNotice, HintNotice.notFinished);
       expect(round.remainingMs, windowMs - 2000);
+      kit.ads.rewarded.value = true;
+      expect(round.hintOffered, isFalse, reason: 'one try a round, even without the reward');
 
       kit.clockMs += 500;
       kit.controller.answer(kit.correctOption());
@@ -173,6 +175,100 @@ void main() {
       kit.controller.answer(correct);
       final feedback = await kit.untilRound(1, RoundPhase.feedback);
       expect(feedback.points, 150 + 49, reason: '3500 ms, no hint');
+    });
+
+    test('the sheet opens once a round: "No thanks" cannot be used to stop the clock again', () async {
+      kit.ads.rewarded.value = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 1000;
+      kit.controller.openHint();
+      kit.clockMs += 4000;
+      kit.controller.declineHint();
+      expect(kit.state.round!.hintOffered, isFalse);
+
+      kit.clockMs += 1000;
+      kit.controller.openHint();
+      final round = kit.state.round!;
+      expect(round.hintSheetOpenedAtMs, isNull);
+      expect(kit.clockMs - round.answerClockStartMs!, 2000, reason: 'the clock keeps running');
+    });
+
+    test('leaving while the rewarded ad is up does not leave the next session blocked', () async {
+      kit.ads.rewarded.value = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.controller.openHint();
+      kit.controller.watchHintAd();
+      await kit.until(() => kit.ads.rewardedShowing, what: 'the rewarded ad');
+      // The ad never reports closing; the player leaves and starts again.
+      kit.controller.leave();
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 2500;
+      kit.controller.answer(kit.correctOption());
+      expect((await kit.untilRound(1, RoundPhase.feedback)).points, 206);
+
+      // The old ad closing late changes nothing in the new session.
+      kit.ads.closeRewarded(RewardedResult.earned);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(kit.state.round!.hintUsed, isFalse);
+    });
+
+    test('an ad that never reports closing is given up after its time limit', () async {
+      kit.ads.rewarded.value = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 2000;
+      kit.controller.openHint();
+      kit.controller.watchHintAd();
+      await kit.until(() => kit.ads.rewardedShowing, what: 'the rewarded ad');
+      kit.timers.lastWhere((t) => t.isActive && t.duration == const Duration(minutes: 3)).fire();
+
+      final round = await kit.untilRound(1, RoundPhase.answering, attempt: 2);
+      expect(round.hintNotice, HintNotice.unavailable);
+      expect(kit.state.ad, RoundAd.none);
+      kit.clockMs += 500;
+      kit.controller.answer(kit.correctOption());
+      await kit.untilRound(1, RoundPhase.feedback);
+    });
+
+    test('if the app is still away when the ad closes, the clip waits for Resume', () async {
+      kit.ads.rewarded.value = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.clockMs += 2000;
+      kit.controller.openHint();
+      kit.controller.watchHintAd();
+      await kit.until(() => kit.ads.rewardedShowing, what: 'the rewarded ad');
+      // A call came in while the ad played.
+      kit.foreground = false;
+      kit.ads.closeRewarded(RewardedResult.earned);
+      await kit.until(() => kit.timers.any((t) => t.isActive && t.duration == const Duration(milliseconds: 1500)), what: 'the wait');
+      kit.timers.lastWhere((t) => t.isActive && t.duration == const Duration(milliseconds: 1500)).fire();
+
+      final round = await kit.untilRound(1, RoundPhase.interrupted);
+      expect(round.remainingMs, windowMs - 2000);
+      expect(round.hintUsed, isTrue);
+      kit.foreground = true;
+      kit.controller.resume();
+      final resumed = await kit.untilRound(1, RoundPhase.answering, attempt: 2);
+      expect(resumed.removedIds, hasLength(2));
+    });
+
+    test('an app back in front within the wait plays on', () async {
+      kit.ads.rewarded.value = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      kit.controller.openHint();
+      kit.controller.watchHintAd();
+      await kit.until(() => kit.ads.rewardedShowing, what: 'the rewarded ad');
+      kit.foreground = false;
+      kit.ads.closeRewarded(RewardedResult.notFinished);
+      await kit.until(() => kit.timers.any((t) => t.isActive && t.duration == const Duration(milliseconds: 1500)), what: 'the wait');
+      kit.foreground = true;
+      kit.timers.lastWhere((t) => t.isActive && t.duration == const Duration(milliseconds: 1500)).fire();
+      await kit.untilRound(1, RoundPhase.answering, attempt: 2);
     });
 
     test('the sheet closes by itself after 8 s', () async {
@@ -229,7 +325,7 @@ void main() {
         if (kit.state.phase == SessionPhase.finished) break;
         if (kit.ads.interstitialShowing) {
           final round = kit.state.round!;
-          expect(round.ad, RoundAd.interstitial);
+          expect(kit.state.ad, RoundAd.interstitial);
           expect(round.phase, RoundPhase.feedback, reason: 'after the feedback');
           expect(clipPlaying(), isFalse, reason: 'never while audio plays');
           shownAfter.add(round.number);

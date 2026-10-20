@@ -79,15 +79,14 @@ class _HintAd extends _Outcome {
 
 /// The hint of the round being answered.
 class _RoundHint {
-  _RoundHint(this.windowMs);
-
-  final int windowMs;
+  /// The player opened the sheet. One try a round, whatever came of it: otherwise opening and
+  /// closing the sheet again and again would keep the answer clock stopped.
+  var asked = false;
   var used = false;
   var removedIds = <int>{};
 
   /// While the sheet is open: when it opened (monotonic ms). The answer clock is stopped then.
   int? sheetOpenedAtMs;
-  var ad = RoundAd.none;
   HintNotice? notice;
   var noticeId = 0;
 
@@ -127,8 +126,10 @@ class _RoundResult {
 /// clip, as [AdPolicy] allows. The hint sheet stops the answer clock while it is open; "Watch ad"
 /// stops the clip too and shows a rewarded ad. A reward removes two wrong options and halves the
 /// round's points. Either way the clip then plays again and the window carries on from where the
-/// sheet opened, as after a call. While an ad is up, the app leaving the foreground is the ad, not
-/// the player, and does not pause the round.
+/// sheet opened, as after a call. The hint can be asked for once a round. While an ad is up, the
+/// app leaving the foreground is the ad, not the player, and does not pause the round; if the app
+/// is still away when the ad closes (a call, or the player left from the ad), the next clip waits
+/// for Resume.
 class SessionController extends Notifier<SessionState> {
   static const _scorer = Scorer();
 
@@ -160,8 +161,10 @@ class SessionController extends Notifier<SessionState> {
   _RoundHint? _hint;
   Timer? _hintSheetTimer;
 
-  /// A full-screen ad is showing.
-  var _adShowing = false;
+  /// The run a full-screen ad is showing for. Tied to the run, so leaving the session clears it.
+  int? _adRunId;
+
+  bool get _adShowing => _adRunId != null && _adRunId == _runId;
 
   /// This session's ads, for the payload.
   var _interstitialsShown = 0;
@@ -236,11 +239,15 @@ class SessionController extends Notifier<SessionState> {
     if (hint == null || pending == null || pending.isCompleted || round == null || !round.hintOffered) return;
     if (_adShowing || !ref.read(adServiceProvider).rewardedReady.value) return;
     final env = ref.read(sessionEnvironmentProvider);
+    hint.asked = true;
     hint.sheetOpenedAtMs = env.monotonicMs();
     _windowTimer?.cancel();
     _windowTimer = null;
     _hintSheetTimer?.cancel();
-    _hintSheetTimer = env.timer(env.hintSheetDuration, declineHint);
+    // Closes this round's sheet only, should the timer outlive it.
+    _hintSheetTimer = env.timer(env.hintSheetDuration, () {
+      if (identical(_hint, hint)) declineHint();
+    });
     hint.refresh?.call();
   }
 
@@ -251,12 +258,13 @@ class SessionController extends Notifier<SessionState> {
     if (hint == null || openedAt == null) return;
     _closeHintSheet(hint);
     final pending = _outcome;
-    if (pending == null || pending.isCompleted) return;
+    final windowMs = state.round?.windowMs;
+    if (pending == null || pending.isCompleted || windowMs == null) return;
     final env = ref.read(sessionEnvironmentProvider);
     final now = env.monotonicMs();
     // The time the sheet was open does not count.
     _roundStartedMs += now - openedAt;
-    _startWindow(env, pending, hint.windowMs - (now - _roundStartedMs));
+    _startWindow(env, pending, windowMs - (now - _roundStartedMs));
     hint.refresh?.call();
   }
 
@@ -390,6 +398,7 @@ class SessionController extends Notifier<SessionState> {
     _hintSheetTimer?.cancel();
     _hintSheetTimer = null;
     _hint = null;
+    _adRunId = null;
     final outcome = _outcome;
     _outcome = null;
     if (outcome != null && !outcome.isCompleted) outcome.complete(const _Abandoned());
@@ -555,7 +564,7 @@ class SessionController extends Notifier<SessionState> {
         played.add(summary);
         policy.roundPlayed();
       }
-      if (i < total - 1) await _maybeInterstitial(runId, ads, policy, player, config);
+      await _maybeInterstitial(runId, env, ads, policy, player, config, moreRounds: i < total - 1);
     }
     _hint = null;
 
@@ -657,8 +666,10 @@ class SessionController extends Notifier<SessionState> {
     int? feedbackStartedAtMs;
     var feedbackMs = 0;
 
-    final hint = _RoundHint(windowMs);
+    final hint = _RoundHint();
     _hint = hint;
+    // The rewarded ad is up.
+    var adUp = false;
 
     RoundView view(
       RoundPhase phase,
@@ -670,21 +681,20 @@ class SessionController extends Notifier<SessionState> {
     }) {
       final answering = phase == RoundPhase.answering;
       final sheetOpenedAt = answering ? hint.sheetOpenedAtMs : null;
-      final ad = answering ? hint.ad : RoundAd.none;
       // The clock runs only while nothing covers the round.
-      final clockRuns = answering && sheetOpenedAt == null && ad == RoundAd.none;
+      final clockRuns = answering && sheetOpenedAt == null && !adUp;
       return RoundView(
         score: scoreBefore + (phase == RoundPhase.feedback ? points ?? 0 : 0),
         speedBonus: speedBonus,
         trackName: trackName,
         artistName: artistName,
-        clipPlaying: clipPlaying && answering && ad == RoundAd.none,
+        clipPlaying: clipPlaying && answering && !adUp,
         answerClockStartMs: clockRuns ? _roundStartedMs : null,
+        hintAsked: hint.asked,
         hintUsed: hint.used,
         removedIds: hint.removedIds,
         hintSheetOpenedAtMs: sheetOpenedAt,
         hintSheetMs: env.hintSheetDuration.inMilliseconds,
-        ad: ad,
         hintNotice: hint.notice,
         hintNoticeId: hint.noticeId,
         feedbackStartedAtMs: phase == RoundPhase.feedback ? feedbackStartedAtMs : null,
@@ -834,19 +844,19 @@ class SessionController extends Notifier<SessionState> {
           await _stopPlayer();
           check();
           hint.sheetOpenedAtMs = null;
-          hint.ad = RoundAd.rewarded;
-          _adShowing = true;
-          show(view(RoundPhase.answering, attempt));
-          RewardedResult result;
+          adUp = true;
+          _set(SessionState(
+            phase: SessionPhase.playing,
+            config: config,
+            round: view(RoundPhase.answering, attempt),
+            ad: RoundAd.rewarded,
+          ));
+          final RewardedResult result;
           try {
-            result = await ref.read(adServiceProvider).showRewarded();
-          } catch (_) {
-            result = RewardedResult.unavailable;
+            result = await _showAd(runId, env, ref.read(adServiceProvider).showRewarded, RewardedResult.unavailable);
           } finally {
-            _adShowing = false;
-            hint.ad = RoundAd.none;
+            adUp = false;
           }
-          check();
           switch (result) {
             case RewardedResult.earned:
               hint.used = true;
@@ -906,26 +916,63 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Between rounds, after the feedback: an interstitial when [policy] allows one and one is loaded.
-  /// Never while audio plays, and not while the app is away or the player is being asked to leave.
-  Future<void> _maybeInterstitial(int runId, AdService ads, AdPolicy policy, ClipPlayer player, SessionConfig config) async {
+  /// [moreRounds] is false after the last round. Not while the app is away or the player is being
+  /// asked to leave.
+  Future<void> _maybeInterstitial(
+    int runId,
+    SessionEnvironment env,
+    AdService ads,
+    AdPolicy policy,
+    ClipPlayer player,
+    SessionConfig config, {
+    required bool moreRounds,
+  }) async {
     if (!_alive(runId) || _backgrounded || !ads.interstitialReady) return;
-    if (!policy.shouldShowInterstitial(audioPlaying: player.isPlaying, moreRounds: true)) return;
-    final round = state.round;
-    if (round != null) _set(SessionState(phase: SessionPhase.playing, config: config, round: round.withAd(RoundAd.interstitial)));
-    _adShowing = true;
-    var shown = false;
-    try {
-      shown = await ads.showInterstitial();
-    } catch (_) {
-      // Not shown: the next round starts.
-    } finally {
-      _adShowing = false;
-    }
-    if (!_alive(runId)) throw const _Cancelled();
+    if (!policy.shouldShowInterstitial(audioPlaying: player.isPlaying, moreRounds: moreRounds)) return;
+    _set(SessionState(phase: SessionPhase.playing, config: config, round: state.round, ad: RoundAd.interstitial));
+    final shown = await _showAd(runId, env, ads.showInterstitial, false);
     if (shown) {
       policy.interstitialShown();
       _interstitialsShown++;
     }
+  }
+
+  /// Shows a full-screen ad for run [runId] and returns how it ended, or [fallback] when it failed
+  /// or never reported closing within [SessionEnvironment.adMaxDuration], so the session cannot hang
+  /// under it. If the app is still away once the ad has closed (a call, or the player left from the
+  /// ad), the next clip waits for Resume.
+  Future<T> _showAd<T>(int runId, SessionEnvironment env, Future<T> Function() showAd, T fallback) async {
+    _adRunId = runId;
+    final done = Completer<T>();
+    final limit = env.timer(env.adMaxDuration, () {
+      if (!done.isCompleted) done.complete(fallback);
+    });
+    unawaited(() async {
+      try {
+        final result = await showAd();
+        if (!done.isCompleted) done.complete(result);
+      } catch (_) {
+        if (!done.isCompleted) done.complete(fallback);
+      }
+    }());
+    final T result;
+    try {
+      result = await done.future;
+    } finally {
+      limit.cancel();
+      if (_adRunId == runId) _adRunId = null;
+    }
+    if (!_alive(runId)) throw const _Cancelled();
+    final inForeground = env.isForeground;
+    if (inForeground != null && !inForeground()) {
+      // The app can come back a moment after the ad's own screen closes.
+      final settled = Completer<void>();
+      env.timer(env.foregroundWait, settled.complete);
+      await settled.future;
+      if (!_alive(runId)) throw const _Cancelled();
+      if (!inForeground()) _backgrounded = true;
+    }
+    return result;
   }
 
   /// Loads the next round's clip while this one plays. A failure only means the

@@ -119,10 +119,10 @@ RoundView roundView({
   int? answerClockStartMs,
   int? feedbackStartedAtMs,
   int feedbackMs = 0,
+  bool hintAsked = false,
   bool hintUsed = false,
   Set<int> removedIds = const {},
   int? hintSheetOpenedAtMs,
-  RoundAd ad = RoundAd.none,
   HintNotice? hintNotice,
   int hintNoticeId = 0,
 }) {
@@ -135,11 +135,12 @@ RoundView roundView({
     answerClockStartMs: answerClockStartMs,
     feedbackStartedAtMs: feedbackStartedAtMs,
     feedbackMs: feedbackMs,
+    // A used hint was asked for.
+    hintAsked: hintAsked || hintUsed,
     hintUsed: hintUsed,
     removedIds: removedIds,
     hintSheetOpenedAtMs: hintSheetOpenedAtMs,
     hintSheetMs: 8000,
-    ad: ad,
     hintNotice: hintNotice,
     hintNoticeId: hintNoticeId,
     number: number,
@@ -163,7 +164,8 @@ RoundView roundView({
   );
 }
 
-SessionState playing(RoundView round) => SessionState(phase: SessionPhase.playing, config: config, round: round);
+SessionState playing(RoundView round, {RoundAd ad = RoundAd.none}) =>
+    SessionState(phase: SessionPhase.playing, config: config, round: round, ad: ad);
 
 /// A pack service that records installs and their Wi-Fi rule. [onInstall] can hold one open.
 class FakePackService implements PackService {

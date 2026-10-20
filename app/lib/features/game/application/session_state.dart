@@ -79,11 +79,11 @@ class RoundView {
     this.answerClockStartMs,
     this.feedbackStartedAtMs,
     this.feedbackMs = 0,
+    this.hintAsked = false,
     this.hintUsed = false,
     this.removedIds = const {},
     this.hintSheetOpenedAtMs,
     this.hintSheetMs = 0,
-    this.ad = RoundAd.none,
     this.hintNotice,
     this.hintNoticeId = 0,
   }) : remainingMs = remainingMs ?? windowMs;
@@ -138,6 +138,9 @@ class RoundView {
   final int? feedbackStartedAtMs;
   final int feedbackMs;
 
+  /// The player has asked for this round's hint (one try a round).
+  final bool hintAsked;
+
   /// A rewarded ad removed two wrong options ([removedIds]) this round; its points are halved.
   final bool hintUsed;
   final Set<int> removedIds;
@@ -147,9 +150,6 @@ class RoundView {
   final int? hintSheetOpenedAtMs;
   final int hintSheetMs;
 
-  /// A full-screen ad over the round.
-  final RoundAd ad;
-
   /// The last hint that did not come, and a number that changes with each one, so the screen tells
   /// the player once.
   final HintNotice? hintNotice;
@@ -157,41 +157,9 @@ class RoundView {
 
   bool get isCorrect => chosenId != null && chosenId == correctId;
 
-  /// The round can offer a hint: answering, with no hint taken yet and nothing covering it. The
-  /// button shows only while a rewarded ad is also loaded.
-  bool get hintOffered => phase == RoundPhase.answering && !hintUsed && hintSheetOpenedAtMs == null && ad == RoundAd.none;
-
-  /// The same round under [ad].
-  RoundView withAd(RoundAd ad) => RoundView(
-    number: number,
-    total: total,
-    kind: kind,
-    options: options,
-    windowMs: windowMs,
-    remainingMs: remainingMs,
-    phase: phase,
-    attempt: attempt,
-    chosenId: chosenId,
-    correctId: correctId,
-    points: points,
-    timedOut: timedOut,
-    valid: valid,
-    score: score,
-    speedBonus: speedBonus,
-    trackName: trackName,
-    artistName: artistName,
-    clipPlaying: ad == RoundAd.none && clipPlaying,
-    answerClockStartMs: ad == RoundAd.none ? answerClockStartMs : null,
-    feedbackStartedAtMs: feedbackStartedAtMs,
-    feedbackMs: feedbackMs,
-    hintUsed: hintUsed,
-    removedIds: removedIds,
-    hintSheetOpenedAtMs: hintSheetOpenedAtMs,
-    hintSheetMs: hintSheetMs,
-    ad: ad,
-    hintNotice: hintNotice,
-    hintNoticeId: hintNoticeId,
-  );
+  /// The round can offer a hint: answering, with the hint not asked for yet and the sheet closed.
+  /// The button shows only while a rewarded ad is also loaded and no ad covers the round.
+  bool get hintOffered => phase == RoundPhase.answering && !hintAsked && hintSheetOpenedAtMs == null;
 }
 
 /// One played round, for the results list.
@@ -303,6 +271,7 @@ class SessionState {
     this.round,
     this.summary,
     this.error,
+    this.ad = RoundAd.none,
   });
 
   final SessionPhase phase;
@@ -310,6 +279,9 @@ class SessionState {
   final RoundView? round;
   final SessionSummary? summary;
   final SessionError? error;
+
+  /// A full-screen ad over the round: an interstitial between rounds, or the hint's rewarded ad.
+  final RoundAd ad;
 
   static const idle = SessionState();
 }
