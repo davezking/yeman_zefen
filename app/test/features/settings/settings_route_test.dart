@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/ads/consent_service.dart';
 import 'package:yeman_zefen/core/auth/auth_service.dart';
 import 'package:yeman_zefen/core/http/api_client.dart';
 import 'package:yeman_zefen/core/widgets/widgets.dart';
@@ -12,6 +13,7 @@ import 'package:yeman_zefen/core/db/app_db.dart';
 import 'package:yeman_zefen/features/packs/data/catalog_refresher.dart';
 import 'package:yeman_zefen/features/settings/application/settings_providers.dart';
 
+import '../../core/ads/fake_consent_platform.dart';
 import '../game/presentation/screen_kit.dart';
 
 const _signedIn = AuthState(uid: 'u1', isAnonymous: false, providers: ['google.com']);
@@ -55,6 +57,22 @@ void main() {
     await tester.pump();
     expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('Playing as a guest'), findsNothing);
+  });
+
+  testWidgets('"Ad privacy choices" shows only where Google requires it, and opens its form', (tester) async {
+    final platform = FakeConsentPlatform()..umpStatus = UmpStatus.obtained;
+    final consent = ConsentService(platform, onAdsAllowed: () async {});
+    addTearDown(consent.dispose);
+    await pumpScreens(tester, location: '/settings', consent: consent);
+    expect(find.text('Ad privacy choices'), findsNothing);
+
+    platform.optionsRequired = true;
+    await tester.runAsync(consent.startup);
+    await tester.pump();
+    await tester.scrollUntilVisible(find.text('Ad privacy choices'), 100);
+    await tester.tap(find.text('Ad privacy choices'));
+    await tester.pump();
+    expect(platform.calls, contains('privacy'));
   });
 
   testWidgets('the sound switch is saved on the phone and read back', (tester) async {

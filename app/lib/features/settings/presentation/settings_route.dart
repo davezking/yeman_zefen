@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/ads/ads_providers.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/remote_config.dart';
@@ -17,10 +18,10 @@ import '../application/settings_providers.dart';
 import 'settings_screen.dart';
 
 /// Settings with the real language, sound, account, offline packs and version. Sign-in opens the
-/// register sheet; sign-out and account deletion leave the player a new guest.
+/// register sheet; sign-out and account deletion leave the player a new guest. "Ad privacy
+/// choices" opens Google's privacy options form, and shows only where Google requires it.
 ///
-/// The ad privacy choices are not wired yet (Phase 4 Sprint 3); their row is shown and does
-/// nothing. About has no page yet.
+/// About has no page yet.
 class SettingsRoute extends ConsumerWidget {
   const SettingsRoute({super.key});
 
@@ -60,7 +61,9 @@ class SettingsRoute extends ConsumerWidget {
       onSignOut: () => signOut(context, ref),
       onDeleteAccount: () => deleteAccount(context, ref),
       onOfflinePlay: () => context.go('/packs'),
-      onAdPrivacy: _notYet,
+      onAdPrivacy: ref.watch(privacyOptionsRequiredProvider)
+          ? () => ref.read(consentServiceProvider).openPrivacyOptions()
+          : null,
       onPrivacy: () {
         if (AppConfig.privacyUrl.isEmpty) return;
         launchUrl(

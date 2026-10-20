@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/ads/ads_providers.dart';
 import 'core/audio/game_audio_session.dart';
 import 'core/auth/account_linker.dart';
 import 'core/auth/auth_service.dart';
@@ -37,5 +38,7 @@ Future<void> main() async {
   container.read(catalogStarterProvider);
   // Checks clip files against their checksums and repairs bad ones; sends queued clip reports.
   container.read(clipHealthStarterProvider);
+  // Refreshes the ad consent status (no prompt), then starts loading ads where they are allowed.
+  container.read(adsStarterProvider);
   runApp(UncontrolledProviderScope(container: container, child: const App()));
 }

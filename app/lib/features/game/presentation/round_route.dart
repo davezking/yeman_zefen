@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ads/ads_providers.dart';
+import '../../../core/ads/consent_service.dart';
 import '../../../core/l10n/display_name.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
@@ -87,10 +89,34 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
     setState(() => _leaveOpen = false);
     if (_resultsWaiting) {
       _resultsWaiting = false;
-      context.go('/results');
+      _goToResults();
       return;
     }
     _controller.resume();
+  }
+
+  /// The game is over. Where Google says ad consent is required, the consent screen comes first
+  /// (H15); on iOS elsewhere, Apple's tracking question shows over Results.
+  void _goToResults() {
+    final consent = ref.read(consentServiceProvider);
+    switch (consent.askAfterGame) {
+      case ConsentAsk.form:
+        context.go('/consent');
+      case ConsentAsk.tracking:
+        unawaited(consent.requestTracking());
+        context.go('/results');
+      case ConsentAsk.none:
+        context.go('/results');
+    }
+  }
+
+  void _tellHint(HintNotice notice) {
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(notice == HintNotice.notFinished ? l10n.adNotFinished : l10n.adUnavailable)),
+      );
   }
 
   void _leave() {
@@ -114,12 +140,14 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
         if (_leaveOpen) {
           _resultsWaiting = true;
         } else {
-          context.go('/results');
+          _goToResults();
         }
       }
       final round = next.round;
       final before = previous?.round;
       if (round == null) return;
+      final notice = round.hintNotice;
+      if (notice != null && round.hintNoticeId != before?.hintNoticeId) _tellHint(notice);
       // The result of an answer: a tap you can feel, if the player wants one.
       if (round.phase == RoundPhase.feedback && (before?.phase != RoundPhase.feedback || before?.number != round.number)) {
         _haptic(round);
@@ -154,17 +182,18 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
           locale: Localizations.localeOf(context),
           nowMs: ref.read(sessionEnvironmentProvider).monotonicMs(),
           leaveOpen: _leaveOpen,
+          rewardedReady: ref.watch(rewardedReadyProvider),
         ),
         onAnswer: (index) {
           if (!_leaveOpen && index >= 0 && index < round.options.length) _controller.answer(round.options[index].id);
         },
-        onHint: () {},
+        onHint: _controller.openHint,
         onContinue: _controller.skipFeedback,
         onLeaveRequested: _requestLeave,
         onLeaveConfirmed: _leave,
         onLeaveCancelled: _keepPlaying,
-        onWatchHintAd: () {},
-        onDeclineHint: () {},
+        onWatchHintAd: _controller.watchHintAd,
+        onDeclineHint: _controller.declineHint,
         onResume: _controller.resume,
       );
     } else {
@@ -227,13 +256,14 @@ class _Message extends StatelessWidget {
 ///
 /// Names are resolved to [locale]'s script here, on every build, so a language switch changes the
 /// screen at once. [leaveOpen] puts the "Leave this game?" question over the round, with the
-/// timer stopped.
+/// timer stopped. [rewardedReady] says a rewarded ad is loaded, so the hint can be offered.
 proto.RoundView screenViewOf(
   SessionState state, {
   required AppLocalizations l10n,
   required Locale locale,
   required int nowMs,
   bool leaveOpen = false,
+  bool rewardedReady = false,
 }) {
   final round = state.round!;
   final config = state.config;
@@ -288,10 +318,13 @@ proto.RoundView screenViewOf(
           : round.remainingMs)
       .clamp(0, window);
 
+  final sheetOpenedAt = round.hintSheetOpenedAtMs;
+  final sheetLeftMs = sheetOpenedAt == null ? 0 : (round.hintSheetMs - (nowMs - sheetOpenedAt)).clamp(0, round.hintSheetMs);
+
   final feedbackStart = round.feedbackStartedAtMs;
   final feedbackLeftMs = feedbackStart == null ? 0 : (round.feedbackMs - (nowMs - feedbackStart)).clamp(0, round.feedbackMs);
 
-  final stopped = interrupted || leaveOpen;
+  final stopped = interrupted || leaveOpen || sheetOpenedAt != null || round.ad != RoundAd.none;
   return proto.RoundView(
     roundNumber: round.number,
     totalRounds: round.total,
@@ -314,6 +347,9 @@ proto.RoundView screenViewOf(
     secondsLeft: (leftMs / 1000).ceil(),
     timerPaused: stopped,
     pickedIndex: indexOf(round.chosenId) < 0 ? null : indexOf(round.chosenId),
+    removed: {for (final id in round.removedIds) if (indexOf(id) >= 0) indexOf(id)},
+    hintAvailable: rewardedReady && round.hintOffered,
+    hintUsed: round.hintUsed,
     points: round.points ?? 0,
     speedBonus: round.speedBonus,
     valid: round.valid,
@@ -322,6 +358,11 @@ proto.RoundView screenViewOf(
         ? proto.RoundOverlay.leaveDialog
         : interrupted
             ? proto.RoundOverlay.paused
-            : proto.RoundOverlay.none,
+            : switch (round.ad) {
+                RoundAd.interstitial => proto.RoundOverlay.interstitial,
+                RoundAd.rewarded => proto.RoundOverlay.rewardedAd,
+                RoundAd.none => sheetOpenedAt != null ? proto.RoundOverlay.hintSheet : proto.RoundOverlay.none,
+              },
+    overlaySeconds: sheetOpenedAt != null ? (sheetLeftMs / 1000).ceil() : 0,
   );
 }

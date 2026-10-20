@@ -9,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'features/account/ui/register_prompt_on_results.dart';
 import 'features/game/debug/clip_playback_debug_screen.dart';
 import 'features/game/debug/sessions_debug_screen.dart';
+import 'features/game/presentation/consent_route.dart';
 import 'features/game/presentation/home_route.dart';
 import 'features/game/presentation/mode_route.dart';
 import 'features/game/presentation/results_route.dart';
@@ -33,6 +34,7 @@ GoRouter buildRouter({String initialLocation = '/'}) => GoRouter(
     GoRoute(path: '/settings', builder: (context, state) => const SettingsRoute()),
     GoRoute(path: '/packs', builder: (context, state) => const OfflinePlayRoute()),
     GoRoute(path: '/play', builder: (context, state) => const RoundRoute()),
+    GoRoute(path: '/consent', builder: (context, state) => const ConsentRoute()),
     GoRoute(path: '/results', builder: (context, state) => const RegisterPromptOnResults(child: ResultsRoute())),
     GoRoute(path: '/leaderboard', builder: (context, state) => const LeaderboardPage()),
     GoRoute(

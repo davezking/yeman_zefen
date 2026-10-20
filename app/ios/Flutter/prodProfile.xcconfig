@@ -4,3 +4,6 @@
 ASSET_PREFIX=prod
 BUNDLE_NAME=Yeman Zefen
 BUNDLE_DISPLAY_NAME=Yeman Zefen
+
+// The AdMob app id (docs/ops.md, Ads). Google's sample id until the AdMob app exists.
+ADMOB_APP_ID=ca-app-pub-3940256099942544~1458002511

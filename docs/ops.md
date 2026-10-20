@@ -479,3 +479,46 @@ dart run tool/fetch_starter_pack.dart --api-base https://<api host>   # prod or 
 - On first start, and after an update that changes the starter manifest (pack version or publish time), the app copies each clip once into `starter/` in its support directory (`just_audio` is handed file paths) and records it as a `starter` clip. Starter clips are never evicted.
 - **Republish the starter pack only when a new app build should pick it up.** Old app versions keep their bundled copy.
 - `app/assets/starter/` has no clips until a `starter` pack is published and the tool has been run. Do that before the first release build.
+
+## Ads (AdMob and consent)
+
+The app shows an interstitial between rounds and a rewarded ad behind the hint (FR-19). The code is in `app/lib/core/ads/`; the rules are in `docs/design/screens.md` (round and hint sheet) and `docs/scoring.md` (hint halves the points).
+
+### Where the ids go
+
+| What | Dev flavor | Prod flavor |
+|---|---|---|
+| Ad unit ids (interstitial and rewarded, per platform) | `app/config/dev.json`: Google's test units | `app/config/prod.json`: the real units. **Empty means no ads and no consent prompts.** |
+| Android AdMob app id | `admobAppIds["dev"]` in `app/android/app/build.gradle.kts` (Google's sample id) | `admobAppIds["prod"]` in the same file |
+| iOS AdMob app id | `ADMOB_APP_ID` in `app/ios/Flutter/dev*.xcconfig` (Google's sample id) | `ADMOB_APP_ID` in `app/ios/Flutter/prod*.xcconfig` |
+
+The keys in `config/<flavor>.json` are `ADMOB_INTERSTITIAL_ANDROID`, `ADMOB_REWARDED_ANDROID`, `ADMOB_INTERSTITIAL_IOS` and `ADMOB_REWARDED_IOS`. The prod app ids are Google's sample ids until the AdMob apps exist. **Before release, set the real prod app ids and ad units together.** Real units with the sample app id load no ads, and the sample app id must never ship with real units. Ad unit and app ids are not secrets; they are in every build.
+
+### One-time setup
+
+1. **AdMob:** create an Android app and an iOS app, each with one interstitial and one rewarded ad unit. Put the ids in the places above.
+2. **Privacy & messaging (AdMob → Privacy & messaging):** create a **European regulations** (GDPR) message for both apps, covering the EEA, the UK and Switzerland. Without it, Google's consent check reports consent as not required, and personalized ads can reach players who never agreed. Optionally add a **US state regulations** message.
+3. **iOS:** Apple's tracking question is shown by the app after Google's form (`NSUserTrackingUsageDescription` in `Info.plist`). Do not also turn on AdMob's *IDFA explainer* message, or players get two explanations. Google's full SKAdNetwork list belongs in `SKAdNetworkItems` in `Info.plist` once third-party buyers or mediation are used. Only Google's own id is there now.
+4. **Store forms:** the Play Data safety form and Apple's privacy labels must declare advertising data (device or advertising id, coarse location, usage data) collected by the Google Mobile Ads SDK.
+
+### app-ads.txt
+
+AdMob checks that the developer website listed on the store pages hosts an `app-ads.txt` file. Ads are limited until it does.
+
+1. In AdMob → Apps → *app-ads.txt*, copy the line, which looks like `google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0`.
+2. Serve it as plain text at the root of the developer website's domain: `https://<domain>/app-ads.txt`. It must not be on a subdomain or a path, must not redirect to another domain, and must answer HTTP 200 with `text/plain`. With Cloudflare Pages, put the file in the site's build output root (for example `public/app-ads.txt`).
+3. Use the same domain as the *Website* field in the Play Console and the *Marketing URL* in App Store Connect. Both store apps must list it.
+4. AdMob crawls the file within about 24 hours. Check the status in AdMob → Apps → *app-ads.txt*.
+
+### When ads and prompts appear
+
+- Every app start refreshes Google's consent status without showing anything. No ad is requested until Google says ads may be requested.
+- Where consent is required, the consent screen (H15) and Google's form appear after a finished game, before Results, and again after each game until consent is answered. On iOS, Apple's tracking question follows the form. Elsewhere on iOS, the tracking question shows over Results after the first finished game.
+- Settings shows **Ad privacy choices** only where Google requires privacy options (consent regions). It opens Google's privacy options form.
+- Interstitials show only between rounds, after the feedback and before the next clip, once `interstitialEveryRounds` rounds (from `/v1/config`, default 3) have been played since the last one. They never show in a player's first session, after the last round, or while audio plays. The round count carries over between sessions while the app runs.
+- The hint button shows only while a rewarded ad is loaded. The answer timer is paused while the hint sheet is open and while the ad plays. Each session payload reports `ads.interstitialShown` and `ads.rewardedCompleted`.
+
+### Testing consent and ads
+
+- The dev flavor uses Google's test ad units, which are safe to tap.
+- To see the consent form outside Europe, run a dev build once and copy the hashed device id the ads SDK logs. Put it in `AD_TEST_DEVICE_IDS` in `config/dev.local.json`, and set `UMP_DEBUG_GEOGRAPHY` to `eea` (or `other`). Debug geography applies only to listed test devices and only in the dev flavor. Google's check goes by IP address, not by the phone's region setting. A device that has already answered keeps its answer: reinstall the app to start over.

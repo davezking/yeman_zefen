@@ -6,6 +6,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/net/network_kind.dart';
+import '../../../core/theme/tokens.dart';
 
 typedef TimerFactory = Timer Function(Duration duration, void Function() callback);
 
@@ -24,6 +25,7 @@ class SessionEnvironment {
     this.networkProbe,
     this.feedbackDuration = const Duration(seconds: 1),
     this.wrongFeedbackDuration = const Duration(seconds: 5),
+    this.hintSheetDuration = TimingTokens.hintSheetMax,
   });
 
   factory SessionEnvironment.real() {
@@ -71,4 +73,7 @@ class SessionEnvironment {
   /// How long a wrong answer or a time-out stays on screen: long enough to read the right answer.
   /// A tap ends it sooner ([SessionController.skipFeedback]).
   final Duration wrongFeedbackDuration;
+
+  /// How long the hint sheet stays open before it closes by itself, as "No thanks" would.
+  final Duration hintSheetDuration;
 }

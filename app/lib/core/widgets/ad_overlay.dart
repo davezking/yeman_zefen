@@ -4,9 +4,10 @@ import '../theme/app_text.dart';
 import '../theme/theme_context.dart';
 import '../theme/tokens.dart';
 
-/// The stand-in for a full-screen ad (the interstitial between rounds, and the
-/// rewarded ad behind the hint): a dark screen with an "Ad" badge and its
-/// countdown, and a caption underneath. Real ads replace this in Phase 5.
+/// What covers the round around a full-screen ad (the interstitial between
+/// rounds, and the rewarded ad behind the hint): a dark screen with an "Ad"
+/// badge, and a caption underneath. In the game it sits under the real ad while
+/// that loads and shows; the prototype uses it as the fake ad, with a countdown.
 class AdOverlay extends StatelessWidget {
   const AdOverlay({super.key, required this.badge, required this.caption});
 

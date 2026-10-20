@@ -3,5 +3,11 @@
   "API_BASE": "http://10.0.2.2:8787",
   "STORE_URL": "https://play.google.com/store/apps/details?id=com.yemanzefen.yeman_zefen",
   "GOOGLE_SERVER_CLIENT_ID": "",
-  "APPLE_ON_ANDROID": false
+  "APPLE_ON_ANDROID": false,
+  "ADMOB_INTERSTITIAL_ANDROID": "ca-app-pub-3940256099942544/1033173712",
+  "ADMOB_REWARDED_ANDROID": "ca-app-pub-3940256099942544/5224354917",
+  "ADMOB_INTERSTITIAL_IOS": "ca-app-pub-3940256099942544/4411468910",
+  "ADMOB_REWARDED_IOS": "ca-app-pub-3940256099942544/1712485313",
+  "UMP_DEBUG_GEOGRAPHY": "",
+  "AD_TEST_DEVICE_IDS": ""
 }

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/ads/ad_policy.dart';
+import '../../../core/ads/ad_service.dart';
+import '../../../core/ads/ads_providers.dart';
 import '../../../core/audio/audio_providers.dart';
 import '../../../core/audio/clip_player.dart';
 import '../../../core/audio/clip_voice.dart';
@@ -68,6 +71,35 @@ class _Abandoned extends _Outcome {
   const _Abandoned();
 }
 
+/// "Watch ad" on the hint sheet. The answer clock stopped when the sheet opened, at [atMs].
+class _HintAd extends _Outcome {
+  const _HintAd(this.atMs);
+  final int atMs;
+}
+
+/// The hint of the round being answered.
+class _RoundHint {
+  _RoundHint(this.windowMs);
+
+  final int windowMs;
+  var used = false;
+  var removedIds = <int>{};
+
+  /// While the sheet is open: when it opened (monotonic ms). The answer clock is stopped then.
+  int? sheetOpenedAtMs;
+  var ad = RoundAd.none;
+  HintNotice? notice;
+  var noticeId = 0;
+
+  /// Draws the round again.
+  void Function()? refresh;
+
+  void tell(HintNotice next) {
+    notice = next;
+    noticeId++;
+  }
+}
+
 /// How a round ended when it was not played to an answer: [clipError] says the clip file was
 /// missing or would not play (counted as a clip error), otherwise no clip arrived in time and the
 /// round was skipped without penalty. [failure] says how the clip of [trackId] failed to play,
@@ -90,6 +122,13 @@ class _RoundResult {
 /// clip again on resume, but the clock does not start over: the time used
 /// before the pause still counts, and the window only has what was left. So
 /// pausing gains a second listen and nothing else.
+///
+/// Ads (FR-19): an interstitial may show between rounds, after the feedback and before the next
+/// clip, as [AdPolicy] allows. The hint sheet stops the answer clock while it is open; "Watch ad"
+/// stops the clip too and shows a rewarded ad. A reward removes two wrong options and halves the
+/// round's points. Either way the clip then plays again and the window carries on from where the
+/// sheet opened, as after a call. While an ad is up, the app leaving the foreground is the ad, not
+/// the player, and does not pause the round.
 class SessionController extends Notifier<SessionState> {
   static const _scorer = Scorer();
 
@@ -116,6 +155,17 @@ class SessionController extends Notifier<SessionState> {
 
   /// The app is in the background. The next clip waits for Resume.
   var _backgrounded = false;
+
+  /// The round being answered: its hint. Null between rounds.
+  _RoundHint? _hint;
+  Timer? _hintSheetTimer;
+
+  /// A full-screen ad is showing.
+  var _adShowing = false;
+
+  /// This session's ads, for the payload.
+  var _interstitialsShown = 0;
+  var _rewardsCompleted = 0;
 
   @override
   SessionState build() {
@@ -158,6 +208,8 @@ class SessionController extends Notifier<SessionState> {
     final round = state.round;
     if (pending == null || pending.isCompleted || round == null || round.phase != RoundPhase.answering) return;
     if (!round.options.any((o) => o.id == optionId)) return;
+    final hint = _hint;
+    if (_adShowing || hint?.sheetOpenedAtMs != null || (hint?.removedIds.contains(optionId) ?? false)) return;
     final responseMs = ref.read(sessionEnvironmentProvider).monotonicMs() - _roundStartedMs;
     unawaited(_stopPlayer());
     pending.complete(_Answered(optionId, responseMs));
@@ -168,12 +220,85 @@ class SessionController extends Notifier<SessionState> {
   /// Between rounds, or while a clip loads, the next clip waits for Resume.
   void pauseForBackground() {
     if (state.phase != SessionPhase.preparing && state.phase != SessionPhase.playing) return;
+    // A full-screen ad takes the screen from the app; that is not the player leaving.
+    if (_adShowing) return;
     _backgrounded = true;
     unawaited(_stopPlayer());
+    _interruptRound();
+  }
+
+  /// "Hint" on the round: opens the sheet and stops the answer clock. The clip keeps playing. Only
+  /// while a rewarded ad is loaded, and once a round.
+  void openHint() {
+    final hint = _hint;
     final pending = _outcome;
-    if (pending != null && !pending.isCompleted) {
-      pending.complete(_Interrupted(ref.read(sessionEnvironmentProvider).monotonicMs()));
+    final round = state.round;
+    if (hint == null || pending == null || pending.isCompleted || round == null || !round.hintOffered) return;
+    if (_adShowing || !ref.read(adServiceProvider).rewardedReady.value) return;
+    final env = ref.read(sessionEnvironmentProvider);
+    hint.sheetOpenedAtMs = env.monotonicMs();
+    _windowTimer?.cancel();
+    _windowTimer = null;
+    _hintSheetTimer?.cancel();
+    _hintSheetTimer = env.timer(env.hintSheetDuration, declineHint);
+    hint.refresh?.call();
+  }
+
+  /// "No thanks", or the sheet's time ran out: the answer clock carries on from where it stopped.
+  void declineHint() {
+    final hint = _hint;
+    final openedAt = hint?.sheetOpenedAtMs;
+    if (hint == null || openedAt == null) return;
+    _closeHintSheet(hint);
+    final pending = _outcome;
+    if (pending == null || pending.isCompleted) return;
+    final env = ref.read(sessionEnvironmentProvider);
+    final now = env.monotonicMs();
+    // The time the sheet was open does not count.
+    _roundStartedMs += now - openedAt;
+    _startWindow(env, pending, hint.windowMs - (now - _roundStartedMs));
+    hint.refresh?.call();
+  }
+
+  /// "Watch ad" on the hint sheet.
+  void watchHintAd() {
+    final hint = _hint;
+    final openedAt = hint?.sheetOpenedAtMs;
+    final pending = _outcome;
+    if (hint == null || openedAt == null || pending == null || pending.isCompleted) return;
+    if (!ref.read(adServiceProvider).rewardedReady.value) {
+      // The ad went away while the sheet was open.
+      hint.tell(HintNotice.unavailable);
+      declineHint();
+      return;
     }
+    _hintSheetTimer?.cancel();
+    _hintSheetTimer = null;
+    pending.complete(_HintAd(openedAt));
+  }
+
+  void _closeHintSheet(_RoundHint hint) {
+    hint.sheetOpenedAtMs = null;
+    _hintSheetTimer?.cancel();
+    _hintSheetTimer = null;
+  }
+
+  /// A call, another app or the background stopped the round. The time used ends where the answer
+  /// clock stopped: now, or when the hint sheet opened.
+  void _interruptRound() {
+    final pending = _outcome;
+    if (pending == null || pending.isCompleted) return;
+    final hint = _hint;
+    final atMs = hint?.sheetOpenedAtMs ?? ref.read(sessionEnvironmentProvider).monotonicMs();
+    if (hint != null) _closeHintSheet(hint);
+    pending.complete(_Interrupted(atMs));
+  }
+
+  void _startWindow(SessionEnvironment env, Completer<_Outcome> pending, int remainingMs) {
+    _windowTimer?.cancel();
+    _windowTimer = env.timer(Duration(milliseconds: remainingMs), () {
+      if (!pending.isCompleted) pending.complete(const _TimedOut());
+    });
   }
 
   /// Plays the paused round's clip again. The answer window carries on from
@@ -262,6 +387,9 @@ class SessionController extends Notifier<SessionState> {
     _windowTimer = null;
     _feedbackTimer?.cancel();
     _feedbackTimer = null;
+    _hintSheetTimer?.cancel();
+    _hintSheetTimer = null;
+    _hint = null;
     final outcome = _outcome;
     _outcome = null;
     if (outcome != null && !outcome.isCompleted) outcome.complete(const _Abandoned());
@@ -351,6 +479,19 @@ class SessionController extends Notifier<SessionState> {
       _set(SessionState(phase: SessionPhase.preparing, config: config));
     }
 
+    final ads = ref.read(adServiceProvider);
+    final policy = ref.read(adPolicyProvider);
+    var firstSession = true;
+    try {
+      firstSession = await store.completedSessionCount() == 0;
+    } catch (_) {
+      // Unreadable: treated as the first session, which shows no interstitials.
+    }
+    check();
+    policy.beginSession(firstSession: firstSession);
+    _interstitialsShown = 0;
+    _rewardsCompleted = 0;
+
     final reporter = ref.read(clipReporterProvider);
     final kind = ClipKind.forMode(config.mode);
     final recorder = SessionRecorder(id: env.newId(), config: config, startedAtMs: env.epochMs());
@@ -412,8 +553,11 @@ class SessionController extends Notifier<SessionState> {
         check();
       } else {
         played.add(summary);
+        policy.roundPlayed();
       }
+      if (i < total - 1) await _maybeInterstitial(runId, ads, policy, player, config);
     }
+    _hint = null;
 
     final interrupted = _interruptedSub;
     _interruptedSub = null;
@@ -427,7 +571,12 @@ class SessionController extends Notifier<SessionState> {
 
     final offlineAtEnd = await _networkOf(env) == NetworkKind.none;
     check();
-    final payload = recorder.finish(endedAtMs: env.epochMs(), offline: offlineAtStart || offlineAtEnd);
+    final payload = recorder.finish(
+      endedAtMs: env.epochMs(),
+      offline: offlineAtStart || offlineAtEnd,
+      interstitialShown: _interstitialsShown,
+      rewardedCompleted: _rewardsCompleted,
+    );
     final totalScore = played.fold<int>(0, (sum, r) => sum + r.points);
 
     SessionSaveResult? saved;
@@ -508,6 +657,9 @@ class SessionController extends Notifier<SessionState> {
     int? feedbackStartedAtMs;
     var feedbackMs = 0;
 
+    final hint = _RoundHint(windowMs);
+    _hint = hint;
+
     RoundView view(
       RoundPhase phase,
       int attempt, {
@@ -516,13 +668,25 @@ class SessionController extends Notifier<SessionState> {
       bool timedOut = false,
       bool valid = true,
     }) {
+      final answering = phase == RoundPhase.answering;
+      final sheetOpenedAt = answering ? hint.sheetOpenedAtMs : null;
+      final ad = answering ? hint.ad : RoundAd.none;
+      // The clock runs only while nothing covers the round.
+      final clockRuns = answering && sheetOpenedAt == null && ad == RoundAd.none;
       return RoundView(
         score: scoreBefore + (phase == RoundPhase.feedback ? points ?? 0 : 0),
         speedBonus: speedBonus,
         trackName: trackName,
         artistName: artistName,
-        clipPlaying: clipPlaying && phase == RoundPhase.answering,
-        answerClockStartMs: phase == RoundPhase.answering ? _roundStartedMs : null,
+        clipPlaying: clipPlaying && answering && ad == RoundAd.none,
+        answerClockStartMs: clockRuns ? _roundStartedMs : null,
+        hintUsed: hint.used,
+        removedIds: hint.removedIds,
+        hintSheetOpenedAtMs: sheetOpenedAt,
+        hintSheetMs: env.hintSheetDuration.inMilliseconds,
+        ad: ad,
+        hintNotice: hint.notice,
+        hintNoticeId: hint.noticeId,
         feedbackStartedAtMs: phase == RoundPhase.feedback ? feedbackStartedAtMs : null,
         feedbackMs: phase == RoundPhase.feedback ? feedbackMs : 0,
         number: index + 1,
@@ -530,7 +694,7 @@ class SessionController extends Notifier<SessionState> {
         kind: round.kind,
         options: options,
         windowMs: windowMs,
-        remainingMs: windowMs - usedMs,
+        remainingMs: sheetOpenedAt != null ? windowMs - (sheetOpenedAt - _roundStartedMs) : windowMs - usedMs,
         phase: phase,
         attempt: attempt,
         chosenId: chosenId,
@@ -572,7 +736,7 @@ class SessionController extends Notifier<SessionState> {
     Future<_RoundResult> timedOut(int attempt) async {
       await _stopPlayer();
       check();
-      recorder.recordRound(round, chosenId: null, responseMs: windowMs);
+      recorder.recordRound(round, chosenId: null, responseMs: windowMs, hintUsed: hint.used);
       usedMs = windowMs;
       clipPlaying = false;
       speedBonus = 0;
@@ -597,6 +761,9 @@ class SessionController extends Notifier<SessionState> {
     }
 
     var attempt = 0;
+    hint.refresh = () {
+      if (_alive(runId) && state.round?.phase == RoundPhase.answering) show(view(RoundPhase.answering, attempt));
+    };
     while (true) {
       attempt++;
       show(view(RoundPhase.loading, attempt));
@@ -636,9 +803,7 @@ class SessionController extends Notifier<SessionState> {
 
       final pending = Completer<_Outcome>();
       _outcome = pending;
-      _windowTimer = env.timer(Duration(milliseconds: windowMs - usedMs), () {
-        if (!pending.isCompleted) pending.complete(const _TimedOut());
-      });
+      _startWindow(env, pending, windowMs - usedMs);
       clipPlaying = true;
       show(view(RoundPhase.answering, attempt));
       // The reels stop when the clip ends, which can be before the answer window does.
@@ -664,6 +829,37 @@ class SessionController extends Notifier<SessionState> {
           if (usedMs >= windowMs) return timedOut(attempt);
           await waitForResume(attempt);
           continue;
+        case _HintAd(:final atMs):
+          usedMs = atMs - _roundStartedMs;
+          await _stopPlayer();
+          check();
+          hint.sheetOpenedAtMs = null;
+          hint.ad = RoundAd.rewarded;
+          _adShowing = true;
+          show(view(RoundPhase.answering, attempt));
+          RewardedResult result;
+          try {
+            result = await ref.read(adServiceProvider).showRewarded();
+          } catch (_) {
+            result = RewardedResult.unavailable;
+          } finally {
+            _adShowing = false;
+            hint.ad = RoundAd.none;
+          }
+          check();
+          switch (result) {
+            case RewardedResult.earned:
+              hint.used = true;
+              final wrong = [...round.optionIds.where((id) => !round.isCorrect(id))]..shuffle(env.rng());
+              hint.removedIds = wrong.take(2).toSet();
+              _rewardsCompleted++;
+            case RewardedResult.notFinished:
+              hint.tell(HintNotice.notFinished);
+            case RewardedResult.unavailable:
+              hint.tell(HintNotice.unavailable);
+          }
+          // The clip plays again and the window carries on from where the sheet opened.
+          continue;
         case _Answered(:final optionId, :final responseMs):
           final correct = round.isCorrect(optionId);
           final score = _scorer.scoreRound(
@@ -671,8 +867,9 @@ class SessionController extends Notifier<SessionState> {
             difficulty: config.difficulty,
             correct: correct,
             responseMs: responseMs,
+            hintUsed: hint.used,
           );
-          recorder.recordRound(round, chosenId: optionId, responseMs: responseMs);
+          recorder.recordRound(round, chosenId: optionId, responseMs: responseMs, hintUsed: hint.used);
           // The bar stays where the answer stopped it.
           usedMs = responseMs;
           final feedbackDuration = correct ? env.feedbackDuration : env.wrongFeedbackDuration;
@@ -703,9 +900,31 @@ class SessionController extends Notifier<SessionState> {
   }
 
   void _onInterrupted() {
-    final pending = _outcome;
-    if (pending != null && !pending.isCompleted) {
-      pending.complete(_Interrupted(ref.read(sessionEnvironmentProvider).monotonicMs()));
+    // An ad's own sound can take the audio; the clip is already stopped then.
+    if (_adShowing) return;
+    _interruptRound();
+  }
+
+  /// Between rounds, after the feedback: an interstitial when [policy] allows one and one is loaded.
+  /// Never while audio plays, and not while the app is away or the player is being asked to leave.
+  Future<void> _maybeInterstitial(int runId, AdService ads, AdPolicy policy, ClipPlayer player, SessionConfig config) async {
+    if (!_alive(runId) || _backgrounded || !ads.interstitialReady) return;
+    if (!policy.shouldShowInterstitial(audioPlaying: player.isPlaying, moreRounds: true)) return;
+    final round = state.round;
+    if (round != null) _set(SessionState(phase: SessionPhase.playing, config: config, round: round.withAd(RoundAd.interstitial)));
+    _adShowing = true;
+    var shown = false;
+    try {
+      shown = await ads.showInterstitial();
+    } catch (_) {
+      // Not shown: the next round starts.
+    } finally {
+      _adShowing = false;
+    }
+    if (!_alive(runId)) throw const _Cancelled();
+    if (shown) {
+      policy.interstitialShown();
+      _interstitialsShown++;
     }
   }
 

@@ -27,6 +27,26 @@ enum RoundPhase {
   feedback,
 }
 
+/// A full-screen ad covering the round.
+enum RoundAd {
+  none,
+
+  /// Between rounds, after the feedback.
+  interstitial,
+
+  /// The rewarded ad behind the hint. The answer window is paused.
+  rewarded,
+}
+
+/// What the player is told after asking for a hint that did not come.
+enum HintNotice {
+  /// The rewarded ad was closed before the reward.
+  notFinished,
+
+  /// No ad could be shown.
+  unavailable,
+}
+
 class AnswerOption {
   const AnswerOption({required this.id, required this.name});
   final int id;
@@ -59,6 +79,13 @@ class RoundView {
     this.answerClockStartMs,
     this.feedbackStartedAtMs,
     this.feedbackMs = 0,
+    this.hintUsed = false,
+    this.removedIds = const {},
+    this.hintSheetOpenedAtMs,
+    this.hintSheetMs = 0,
+    this.ad = RoundAd.none,
+    this.hintNotice,
+    this.hintNoticeId = 0,
   }) : remainingMs = remainingMs ?? windowMs;
 
   /// 1-based position in the session. A skipped round still uses up its number.
@@ -111,7 +138,60 @@ class RoundView {
   final int? feedbackStartedAtMs;
   final int feedbackMs;
 
+  /// A rewarded ad removed two wrong options ([removedIds]) this round; its points are halved.
+  final bool hintUsed;
+  final Set<int> removedIds;
+
+  /// While the hint sheet is open: when it opened (monotonic ms) and how long it stays open. The
+  /// answer window is paused meanwhile.
+  final int? hintSheetOpenedAtMs;
+  final int hintSheetMs;
+
+  /// A full-screen ad over the round.
+  final RoundAd ad;
+
+  /// The last hint that did not come, and a number that changes with each one, so the screen tells
+  /// the player once.
+  final HintNotice? hintNotice;
+  final int hintNoticeId;
+
   bool get isCorrect => chosenId != null && chosenId == correctId;
+
+  /// The round can offer a hint: answering, with no hint taken yet and nothing covering it. The
+  /// button shows only while a rewarded ad is also loaded.
+  bool get hintOffered => phase == RoundPhase.answering && !hintUsed && hintSheetOpenedAtMs == null && ad == RoundAd.none;
+
+  /// The same round under [ad].
+  RoundView withAd(RoundAd ad) => RoundView(
+    number: number,
+    total: total,
+    kind: kind,
+    options: options,
+    windowMs: windowMs,
+    remainingMs: remainingMs,
+    phase: phase,
+    attempt: attempt,
+    chosenId: chosenId,
+    correctId: correctId,
+    points: points,
+    timedOut: timedOut,
+    valid: valid,
+    score: score,
+    speedBonus: speedBonus,
+    trackName: trackName,
+    artistName: artistName,
+    clipPlaying: ad == RoundAd.none && clipPlaying,
+    answerClockStartMs: ad == RoundAd.none ? answerClockStartMs : null,
+    feedbackStartedAtMs: feedbackStartedAtMs,
+    feedbackMs: feedbackMs,
+    hintUsed: hintUsed,
+    removedIds: removedIds,
+    hintSheetOpenedAtMs: hintSheetOpenedAtMs,
+    hintSheetMs: hintSheetMs,
+    ad: ad,
+    hintNotice: hintNotice,
+    hintNoticeId: hintNoticeId,
+  );
 }
 
 /// One played round, for the results list.
