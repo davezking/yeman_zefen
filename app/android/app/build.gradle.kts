@@ -1,4 +1,5 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -9,6 +10,13 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// The upload key for release builds (docs/release-android.md). app/android/key.properties is gitignored;
+// CI writes it from secrets. Without it, dev builds are signed with the debug key and a prod release build
+// is refused, so a prod AAB can never be debug-signed by accident.
+val keyPropertiesFile = rootProject.file("key.properties")
+val hasReleaseKey = keyPropertiesFile.exists()
+val keyProperties = Properties().apply { if (hasReleaseKey) keyPropertiesFile.inputStream().use { load(it) } }
 
 android {
     namespace = "com.yemanzefen.yeman_zefen"
@@ -35,12 +43,31 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
         }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val prodRelease = Regex("(assemble|bundle|package|sign)ProdRelease.*")
+    if (!hasReleaseKey && allTasks.any { it.project == project && prodRelease.matches(it.name) }) {
+        throw GradleException(
+            "A prod release build needs the upload key: create app/android/key.properties " +
+                "(storeFile, storePassword, keyAlias, keyPassword). See docs/release-android.md.",
+        )
     }
 }
 

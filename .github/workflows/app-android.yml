@@ -1,0 +1,163 @@
+# Release build of the prod Android app: a signed, obfuscated AAB for Google Play.
+#
+#   git tag app-v0.2.0 && git push origin app-v0.2.0
+#
+# The tag's version (without a -rc1 style suffix) must equal the name in app/pubspec.yaml, which is the
+# single source of the version. The build number (Android versionCode) is the run number of this workflow,
+# so it only ever goes up.
+#
+# Everything secret lives in the `release` environment (Settings > Environments), so only this job can read
+# it, and a required reviewer there gates every release. One-time setup, the secrets and the checks:
+# docs/release-android.md.
+name: app-android
+
+on:
+  push:
+    tags: ["app-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Android release (signed AAB)
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from the tag
+        id: version
+        env:
+          # A repository variable (not a secret). Raise it when versionCodes were used outside this workflow.
+          BUILD_NUMBER_OFFSET: ${{ vars.ANDROID_BUILD_NUMBER_OFFSET || '0' }}
+        run: |
+          set -euo pipefail
+          tag_version=${GITHUB_REF_NAME#app-v}
+          tag_version=${tag_version%%-*}
+          pubspec_version=$(sed -n 's/^version: *\([^+ ]*\)+.*/\1/p' pubspec.yaml)
+          if [ -z "$pubspec_version" ] || [ "$tag_version" != "$pubspec_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME is version '$tag_version' but app/pubspec.yaml says '$pubspec_version'. Update pubspec.yaml, merge, and tag again."
+            exit 1
+          fi
+          echo "name=$pubspec_version" >> "$GITHUB_OUTPUT"
+          echo "number=$((GITHUB_RUN_NUMBER + BUILD_NUMBER_OFFSET))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Stops a build that would ship a placeholder API domain or Google's sample AdMob id with real ad units.
+      - run: tool/check_release_config.sh android
+
+      - name: Upload key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret ANDROID_${name/STORE_PASSWORD/KEYSTORE_PASSWORD} is not set in the release environment (docs/release-android.md)."
+              exit 1
+            fi
+          done
+          keystore="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          # Fails here, with a clear message, on bad base64, a wrong password or a wrong alias.
+          keytool -list -keystore "$keystore" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null
+          umask 077
+          {
+            echo "storeFile=$keystore"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      # --obfuscate with --split-debug-info hides Dart symbol names; the symbols stay in build/symbols and
+      # go to Crashlytics below. R8 shrinks and obfuscates the Java side, and the Crashlytics Gradle plugin
+      # uploads its mapping file during this build (prod release only, app/android/app/build.gradle.kts).
+      - name: Build the AAB
+        run: >
+          flutter build appbundle --release --flavor prod
+          --dart-define-from-file=config/prod.json
+          --obfuscate --split-debug-info=build/symbols
+          --build-name=${{ steps.version.outputs.name }}
+          --build-number=${{ steps.version.outputs.number }}
+
+      - name: Check the signature
+        run: |
+          set -euo pipefail
+          aab=build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          jarsigner -verify "$aab" | tee /dev/stderr | grep -q "jar verified"
+          fingerprint=$(keytool -printcert -jarfile "$aab" | sed -n 's/^ *SHA256: *//p' | head -1)
+          {
+            echo "### Android release ${{ steps.version.outputs.name }} (${{ steps.version.outputs.number }})"
+            echo "Signing certificate SHA-256: \`$fingerprint\`"
+            echo "It must match the upload certificate in Play Console (App integrity > App signing > Upload key certificate)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The Dart symbols of this obfuscated build. Without them, Dart stack traces in Crashlytics are unreadable.
+      - name: Upload Dart symbols to Crashlytics
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::The secret FIREBASE_SERVICE_ACCOUNT_JSON is not set in the release environment (docs/release-android.md)."
+            exit 1
+          fi
+          credentials="$RUNNER_TEMP/firebase-service-account.json"
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$credentials"
+          app_id=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.yemanzefen.yeman_zefen") | .client_info.mobilesdk_app_id' android/app/src/prod/google-services.json)
+          GOOGLE_APPLICATION_CREDENTIALS="$credentials" npx --yes firebase-tools@15 crashlytics:symbols:upload --app="$app_id" build/symbols
+
+      - name: Zip the symbols
+        run: cd build && zip -qr symbols.zip symbols
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ steps.version.outputs.name }}-${{ steps.version.outputs.number }}
+          path: |
+            app/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+            app/build/app/outputs/mapping/prodRelease/mapping.txt
+            app/build/symbols.zip
+          retention-days: 90
+
+      # Optional: to Play's internal testing track. Off until the app exists in Play Console and its first
+      # AAB was uploaded by hand (docs/release-android.md). Turn on with the repository variable PLAY_UPLOAD=true.
+      # The action is third-party and gets the Play service account: pin it to a commit once you rely on it.
+      - name: Upload to Play (internal track)
+        if: vars.PLAY_UPLOAD == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.yemanzefen.yeman_zefen
+          releaseFiles: app/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          mappingFile: app/build/app/outputs/mapping/prodRelease/mapping.txt
+          track: internal
+          status: completed
+
+      - name: Remove the key
+        if: always()
+        run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks" "$RUNNER_TEMP/firebase-service-account.json"

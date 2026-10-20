@@ -527,7 +527,7 @@ AdMob checks that the developer website listed on the store pages hosts an `app-
 
 - **Worker logs:** `[observability]` is enabled in `api/wrangler.toml` (top level and `env.prod`). Each request writes one JSON line (`src/lib/requestLog.ts`): `requestId`, `route` (the pattern, so IDs stay out), `status`, `latencyMs`, `uidHash` (first 16 hex of SHA-256 of the UID), `country`, and `errorCode` on failures. Tokens, bodies and emails are never logged. Read them in the Cloudflare dashboard under Workers Logs.
 - **App crashes:** Crashlytics collects in the prod flavor only (`lib/core/crash/crash_reporting.dart`). The user is the UID, never an email. Non-fatal issues have fixed labels: `pack_install_failed` (not on cancel or a full phone), `sync_parked`, `audio_play_failed` (not when the clip was stopped or interrupted).
-- **Symbols:** the Crashlytics Gradle plugin (`app/android`) uploads the R8 mapping file on prod release builds; dev builds, including CI, skip the upload. iOS dSYMs are not uploaded yet, so iOS release stack traces stay unreadable until the dSYM upload step is added to the Xcode build.
+- **Symbols:** the Crashlytics Gradle plugin (`app/android`) uploads the R8 mapping file on prod release builds; dev builds, including CI, skip the upload. The release workflow also uploads the Dart symbols of the obfuscated build (`docs/release-android.md`). On iOS, `make ios-symbols` uploads the dSYMs and Dart symbols after each release build (`docs/release-ios.md`, step 6); it is a manual step.
 
 ## Rate limiting
 
