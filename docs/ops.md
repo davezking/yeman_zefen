@@ -259,6 +259,34 @@ Options: `--limit N`, `--since YYYY-MM-DD`, `--dry-run`, `--delay S`, `--batch-s
 Under `wrangler dev` there is no S3 endpoint for the local bucket, so the waveform only loads against real R2
 credentials; the rest of the page works without it.
 
+## Domains: your own, or the free Cloudflare ones
+
+A Worker, a Pages site and an R2 bucket each come with a free address. You can start on those and move to your own
+domain later, with one catch (last row).
+
+| What | Free address | Your own domain |
+|---|---|---|
+| API (Worker) | `https://yz-api-prod.<your-subdomain>.workers.dev`, shown by `npm run deploy` | `api.<domain>`: uncomment `routes` under `[env.prod]` in `api/wrangler.toml` |
+| Admin site (Pages) | `https://<project>.pages.dev` | `admin.<domain>` on the Pages project (Custom domains) |
+| Clips (R2) | `https://pub-<hash>.r2.dev`: bucket › Settings › **Public Development URL** › Enable. Limited speed, meant for testing | `cdn.<domain>`: bucket › Settings › Custom Domains |
+
+With the free addresses, set `ADMIN_ORIGIN` to the `pages.dev` address, `CDN_BASE_URL` to the `r2.dev` address and
+`API_BASE` in `app/config/prod.json` to the `workers.dev` address.
+
+**What works:** the app, sign-in, leaderboards, sessions, `/account-deletion`, and clip downloads.
+
+**What does not, or is unproven:**
+
+- **The leaderboard cache.** The Cache API stores nothing on `workers.dev`, so every leaderboard read goes to D1. It
+  still works; it just uses more of the database's free reads.
+- **The admin site's login.** The admin routes are protected by Cloudflare Access (see "Admin authentication"), which
+  this setup builds as one application covering the admin and API hostnames. That needs hostnames on a domain in your
+  Cloudflare account. We have not tried it on `pages.dev` plus `workers.dev`. Without Access working, the Worker
+  refuses every `/admin/*` call (it fails closed), so the admin site cannot be used. To run the admin site you need
+  your own domain (about $10 a year at Cloudflare Registrar).
+- **Moving later is not free.** `API_BASE` is compiled into the app. Players on a build with the old address stop
+  working when it changes, so choose the address you will keep before the first store release.
+
 ## Admin SPA on Cloudflare Pages
 
 The admin SPA (`admin/`) is a static Vite build hosted on Cloudflare Pages at `admin.<domain>`, behind the

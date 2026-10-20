@@ -9,7 +9,7 @@ enabled = true
 
 [vars]
 ENV = "dev"
-FIREBASE_PROJECT_ID = "yeman-zefen-dev"
+FIREBASE_PROJECT_ID = "yman-zefen-dev" # sic: Firebase project ids cannot be renamed (docs/ops.md)
 ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
 ACCESS_AUD = ""
 CONFIG_INTERSTITIAL_EVERY_ROUNDS = "3"
@@ -50,6 +50,10 @@ bucket_name = "yz-source"
 # Production. Bindings and vars are not inherited by environments, so repeat them.
 [env.prod]
 name = "yz-api-prod"
+# Where the API is reached. With nothing below it is served at https://yz-api-prod.<your-account>.workers.dev
+# (free, fine for a beta; the leaderboard cache does not work there, docs/ops.md "Domains"). To use your own
+# domain (api.example.com), uncomment and replace the host; the domain must be on your Cloudflare account.
+# routes = [{ pattern = "api.example.com", custom_domain = true }]
 
 [env.prod.observability]
 enabled = true
@@ -60,7 +64,7 @@ crons = ["30 0 * * *"]
 
 [env.prod.vars]
 ENV = "prod"
-FIREBASE_PROJECT_ID = "yeman-zefen"
+FIREBASE_PROJECT_ID = "yeman-zefen-prod"
 ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
 ACCESS_AUD = ""
 CONFIG_INTERSTITIAL_EVERY_ROUNDS = "3"
@@ -107,7 +111,7 @@ enabled = true
 
 [env.staging.vars]
 ENV = "staging"
-FIREBASE_PROJECT_ID = "yeman-zefen-dev"
+FIREBASE_PROJECT_ID = "yman-zefen-dev" # sic: Firebase project ids cannot be renamed (docs/ops.md)
 ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
 ACCESS_AUD = ""
 CONFIG_INTERSTITIAL_EVERY_ROUNDS = "3"
