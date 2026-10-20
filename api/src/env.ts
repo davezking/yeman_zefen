@@ -4,7 +4,7 @@ export type Bindings = {
   IP_LIMITER?: RateLimit;
   CLIPS: R2Bucket;
   SOURCE: R2Bucket;
-  ENV: "dev" | "prod";
+  ENV: "dev" | "staging" | "prod";
   FIREBASE_PROJECT_ID: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;

@@ -601,6 +601,18 @@ describe("D1 cost", () => {
     expect(await board("u-cost")).toHaveLength(4);
   });
 
+  it("a typical session writes 20 D1 rows for a new player and 14 for a returning one", async () => {
+    // What the free plan bills (meta.rows_written) counts index entries too, which is why this is
+    // far above the 6 table rows of docs/architecture.md section 9. New player: the users row (2),
+    // 4 leaderboard rows (12 with their two indexes), the session row (4), the rate-limit bucket (2).
+    // Returning player: the leaderboard rows are updated (a points index entry moves), and so on.
+    const now = Date.now();
+    const rounds = Array.from({ length: 10 }, (_, i) => (i % 2 ? artistRound(i % 5) : songRound(i % 5)));
+    const first = await cost("u-rows", honest({ generationId: ERA, rounds, clientStartedAt: now - 120_000 }));
+    const second = await cost("u-rows", honest({ generationId: ERA, rounds, clientStartedAt: now - 120_000 }));
+    expect([first.rowsWritten, second.rowsWritten]).toEqual([20, 14]);
+  });
+
   it("does not grow with the number of rounds", async () => {
     const now = Date.now();
     const few = await cost("u-few", honest({ rounds: [songRound(0)] }));

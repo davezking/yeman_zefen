@@ -137,7 +137,8 @@ export async function resetCatalog(): Promise<void> {
  */
 export function countingDb(real: D1Database) {
   // `writes` counts statements that write (INSERT/UPDATE/DELETE/REPLACE), a subset of `queries`.
-  const counter = { queries: 0, writes: 0 };
+  // `rowsWritten` is D1's own count (meta.rows_written): rows plus the index entries they touch, which is what the free plan bills.
+  const counter = { queries: 0, writes: 0, rowsWritten: 0 };
   const isWrite = (sql: string) => /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql);
   class CountedStatement {
     constructor(
@@ -147,13 +148,17 @@ export function countingDb(real: D1Database) {
     bind(...values: unknown[]) {
       return new CountedStatement(this.inner.bind(...values), this.sql);
     }
-    run() {
+    async run() {
       this.count();
-      return this.inner.run();
+      const r = await this.inner.run();
+      counter.rowsWritten += r.meta.rows_written ?? 0;
+      return r;
     }
-    all() {
+    async all() {
       this.count();
-      return this.inner.all();
+      const r = await this.inner.all();
+      counter.rowsWritten += r.meta.rows_written ?? 0;
+      return r;
     }
     first(column?: string) {
       this.count();
@@ -170,9 +175,11 @@ export function countingDb(real: D1Database) {
   }
   const wrapped = {
     prepare: (query: string) => new CountedStatement(real.prepare(query), query),
-    batch: (statements: CountedStatement[]) => {
+    batch: async (statements: CountedStatement[]) => {
       for (const s of statements) s.count();
-      return real.batch(statements.map((s) => s.inner));
+      const results = await real.batch(statements.map((s) => s.inner));
+      for (const r of results) counter.rowsWritten += r.meta.rows_written ?? 0;
+      return results;
     },
   } as unknown as D1Database;
   return { db: wrapped, counter };
