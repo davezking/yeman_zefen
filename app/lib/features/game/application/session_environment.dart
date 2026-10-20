@@ -3,9 +3,11 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/net/network_kind.dart';
+import '../../../core/theme/tokens.dart';
 
 typedef TimerFactory = Timer Function(Duration duration, void Function() callback);
 
@@ -24,6 +26,10 @@ class SessionEnvironment {
     this.networkProbe,
     this.feedbackDuration = const Duration(seconds: 1),
     this.wrongFeedbackDuration = const Duration(seconds: 5),
+    this.hintSheetDuration = TimingTokens.hintSheetMax,
+    this.isForeground,
+    this.adMaxDuration = const Duration(minutes: 3),
+    this.foregroundWait = const Duration(milliseconds: 1500),
   });
 
   factory SessionEnvironment.real() {
@@ -40,6 +46,11 @@ class SessionEnvironment {
       },
       rng: Random.new,
       networkProbe: currentNetworkKind,
+      // Not known before the first frame: counted as in front.
+      isForeground: () {
+        final now = WidgetsBinding.instance.lifecycleState;
+        return now == null || now == AppLifecycleState.resumed;
+      },
     );
   }
 
@@ -71,4 +82,17 @@ class SessionEnvironment {
   /// How long a wrong answer or a time-out stays on screen: long enough to read the right answer.
   /// A tap ends it sooner ([SessionController.skipFeedback]).
   final Duration wrongFeedbackDuration;
+
+  /// How long the hint sheet stays open before it closes by itself, as "No thanks" would.
+  final Duration hintSheetDuration;
+
+  /// The app is in front of the player. Null: always counted as in front.
+  final bool Function()? isForeground;
+
+  /// A full-screen ad that has not reported closing after this is given up, and the game goes on.
+  final Duration adMaxDuration;
+
+  /// After an ad closes with the app not in front, how long to wait for it to come back before the
+  /// next clip waits for Resume instead.
+  final Duration foregroundWait;
 }

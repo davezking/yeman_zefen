@@ -58,7 +58,8 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback onSignOut;
   final VoidCallback onDeleteAccount;
   final VoidCallback onOfflinePlay;
-  final VoidCallback onAdPrivacy;
+  /// Null hides the row: Google does not require privacy options here.
+  final VoidCallback? onAdPrivacy;
   final VoidCallback onPrivacy;
   final VoidCallback onAbout;
   final VoidCallback onHome;
@@ -159,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
         badge: offlineUpdateAvailable,
         onTap: onOfflinePlay,
       ),
-      SettingsRow(title: l10n.settingsAdPrivacy, onTap: onAdPrivacy),
+      if (onAdPrivacy != null) SettingsRow(title: l10n.settingsAdPrivacy, onTap: onAdPrivacy),
     ];
 
     return Scaffold(

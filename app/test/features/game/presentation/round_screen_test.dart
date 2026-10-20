@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yeman_zefen/core/ads/consent_service.dart';
 import 'package:yeman_zefen/core/l10n/display_name.dart';
 import 'package:yeman_zefen/features/game/application/session_state.dart';
 import 'package:yeman_zefen/features/game/domain/session_config.dart';
@@ -12,6 +13,7 @@ import 'package:yeman_zefen/prototype/labels.dart';
 import 'package:yeman_zefen/prototype/models.dart' as proto;
 import 'package:yeman_zefen/core/widgets/widgets.dart';
 
+import '../../../core/ads/fake_consent_platform.dart';
 import 'screen_kit.dart';
 
 /// The cassette's reels turn for as long as a clip plays, so a playing round never "settles".
@@ -262,6 +264,91 @@ void main() {
     });
   });
 
+  group('ads and the hint', () {
+    testWidgets('the hint button shows while a rewarded ad is loaded, and opens the sheet', (tester) async {
+      // A phone-sized screen, so the button under the answers is on it.
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final h = await pumpScreens(tester, location: '/play', state: playing(roundView(answerClockStartMs: 0)), rewardedReady: true);
+      await tester.tap(find.text('Hint'));
+      await settle(tester);
+      expect(h.session.hintsOpened, 1);
+    });
+
+    testWidgets('no hint button without a loaded ad', (tester) async {
+      await pumpScreens(tester, location: '/play', state: playing(roundView(answerClockStartMs: 0)));
+      expect(find.text('Hint'), findsNothing);
+    });
+
+    testWidgets('the sheet: Watch ad and No thanks go to the engine', (tester) async {
+      final h = await pumpScreens(
+        tester,
+        location: '/play',
+        state: playing(roundView(remainingMs: 7000, hintSheetOpenedAtMs: 0)),
+        rewardedReady: true,
+      );
+      await settle(tester);
+      expect(find.text('Hint: remove 2 answers'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
+      await tester.tap(find.text('Watch ad'));
+      await tester.tap(find.text('No thanks'));
+      expect((h.session.hintAdsWatched, h.session.hintsDeclined), (1, 1));
+    });
+
+    testWidgets('a used hint says so, and a hint that did not come is told once', (tester) async {
+      final h = await pumpScreens(tester, location: '/play', state: playing(roundView(answerClockStartMs: 0)), rewardedReady: true);
+      h.session.show(playing(roundView(answerClockStartMs: 0, attempt: 2, hintNotice: HintNotice.notFinished, hintNoticeId: 1)));
+      await settle(tester);
+      expect(find.text('Watch the whole ad to get the hint.'), findsOneWidget);
+
+      h.session.show(playing(roundView(answerClockStartMs: 0, attempt: 3, hintUsed: true, removedIds: {11, 13}, hintNotice: HintNotice.notFinished, hintNoticeId: 1)));
+      await tester.pump(const Duration(seconds: 10));
+      await settle(tester);
+      expect(find.text('Watch the whole ad to get the hint.'), findsNothing, reason: 'the same notice is not told again');
+      expect(find.text('Hint used · half points'), findsOneWidget);
+      expect(find.text('Hint'), findsNothing);
+    });
+
+    testWidgets('under a real ad the stand-in shows its caption, with no countdown', (tester) async {
+      await pumpScreens(tester, location: '/play', state: playing(roundView(remainingMs: 5000), ad: RoundAd.rewarded));
+      await settle(tester);
+      expect(find.text('Your hint is on its way…'), findsOneWidget);
+      expect(find.text('Ad'), findsOneWidget);
+    });
+
+    testWidgets('where consent is required, the consent screen and Google\'s form come before the results', (tester) async {
+      final platform = FakeConsentPlatform()..umpStatus = UmpStatus.required;
+      final consent = ConsentService(platform, onAdsAllowed: () async {});
+      addTearDown(consent.dispose);
+      await consent.startup();
+      final h = await pumpScreens(tester, location: '/play', state: playing(roundView()), consent: consent);
+
+      h.session.show(SessionState(
+        phase: SessionPhase.finished,
+        config: config,
+        summary: const SessionSummary(
+          sessionId: 'test-session',
+          config: config,
+          totalScore: 1200,
+          rounds: [],
+          skipped: 0,
+          flagged: false,
+          bestBefore: null,
+          isNewBest: true,
+        ),
+      ));
+      await settle(tester);
+      expect(h.location, '/consent');
+      expect(find.text('Ads keep this game free'), findsOneWidget);
+
+      await tester.tap(find.text('Continue'));
+      await settle(tester);
+      expect(platform.calls, contains('form'));
+      expect(h.location, '/results');
+    });
+  });
+
   group('moving between screens', () {
     testWidgets('goes to the results when the session finishes', (tester) async {
       final h = await pumpScreens(tester, location: '/play', state: playing(roundView()));
@@ -426,8 +513,14 @@ void main() {
 
     setUp(() async => l10n = await AppLocalizations.delegate.load(const Locale('en')));
 
-    proto.RoundView view(RoundView round, {int nowMs = 0, bool leaveOpen = false, Locale locale = const Locale('en')}) =>
-        screenViewOf(playing(round), l10n: l10n, locale: locale, nowMs: nowMs, leaveOpen: leaveOpen);
+    proto.RoundView view(
+      RoundView round, {
+      int nowMs = 0,
+      bool leaveOpen = false,
+      Locale locale = const Locale('en'),
+      RoundAd ad = RoundAd.none,
+    }) =>
+        screenViewOf(playing(round, ad: ad), l10n: l10n, locale: locale, nowMs: nowMs, leaveOpen: leaveOpen);
 
     test('the countdown follows the engine\'s clock: a window of 10 s that began at 1000', () {
       final round = roundView(answerClockStartMs: 1000);
@@ -479,6 +572,47 @@ void main() {
       expect(phaseOf(roundView(phase: RoundPhase.feedback, chosenId: 12, correctId: 12)), proto.RoundPhase.correct);
       expect(phaseOf(roundView(phase: RoundPhase.feedback, chosenId: 13, correctId: 12)), proto.RoundPhase.wrong);
       expect(phaseOf(roundView(phase: RoundPhase.feedback, correctId: 12, timedOut: true)), proto.RoundPhase.timeout);
+    });
+
+    test('the hint sheet: the timer stopped where it opened, and its own countdown', () {
+      final round = roundView(remainingMs: 6000, hintSheetOpenedAtMs: 20000);
+      final v = view(round, nowMs: 22500);
+      expect(v.overlay, proto.RoundOverlay.hintSheet);
+      expect(v.overlaySeconds, 6, reason: '8 s sheet, 2.5 s gone');
+      expect(v.timerPaused, isTrue);
+      expect(v.timeFraction, closeTo(0.6, 0.001));
+      expect(view(round, nowMs: 40000).overlaySeconds, 0);
+    });
+
+    test('the hint button needs a loaded rewarded ad and a round that offers it', () {
+      SessionState state(RoundView r) => playing(r);
+      proto.RoundView v(RoundView r, {required bool ready}) =>
+          screenViewOf(state(r), l10n: l10n, locale: const Locale('en'), nowMs: 0, rewardedReady: ready);
+      expect(v(roundView(answerClockStartMs: 0), ready: true).hintAvailable, isTrue);
+      expect(v(roundView(answerClockStartMs: 0), ready: false).hintAvailable, isFalse);
+      expect(v(roundView(answerClockStartMs: 0, hintUsed: true), ready: true).hintAvailable, isFalse);
+      expect(v(roundView(answerClockStartMs: 0, hintAsked: true), ready: true).hintAvailable, isFalse, reason: 'one try a round');
+      expect(
+        screenViewOf(playing(roundView(answerClockStartMs: 0), ad: RoundAd.interstitial), l10n: l10n, locale: const Locale('en'), nowMs: 0, rewardedReady: true).hintAvailable,
+        isFalse,
+      );
+      expect(v(roundView(phase: RoundPhase.loading), ready: true).hintAvailable, isFalse);
+    });
+
+    test('a used hint: the removed options by position, and the hint marked used', () {
+      final v = view(roundView(answerClockStartMs: 0, hintUsed: true, removedIds: {11, 14}));
+      expect(v.removed, {0, 3});
+      expect(v.hintUsed, isTrue);
+    });
+
+    test('ads cover the round with the timer stopped and the reels still', () {
+      final rewarded = view(roundView(remainingMs: 5000), ad: RoundAd.rewarded, nowMs: 99999);
+      expect((rewarded.overlay, rewarded.timerPaused, rewarded.clipPlaying), (proto.RoundOverlay.rewardedAd, true, false));
+      expect(rewarded.timeFraction, closeTo(0.5, 0.001));
+      final interstitial = view(roundView(phase: RoundPhase.feedback, chosenId: 12), ad: RoundAd.interstitial);
+      expect(interstitial.overlay, proto.RoundOverlay.interstitial);
+      // The leave question and the paused notice come first.
+      expect(view(roundView(), ad: RoundAd.rewarded, leaveOpen: true).overlay, proto.RoundOverlay.leaveDialog);
     });
 
     test('names are in the language asked for, so a switch changes the screen at once', () async {

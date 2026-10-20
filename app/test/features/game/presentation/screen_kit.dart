@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yeman_zefen/app.dart';
+import 'package:yeman_zefen/core/ads/ads_providers.dart';
+import 'package:yeman_zefen/core/ads/consent_service.dart';
 import 'package:yeman_zefen/core/auth/auth_service.dart';
 import 'package:yeman_zefen/core/config/remote_config.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
@@ -54,9 +56,21 @@ class RecordingSessionController extends SessionController {
   var left = 0;
   var feedbackSkipped = 0;
   var replayed = 0;
+  var hintsOpened = 0;
+  var hintAdsWatched = 0;
+  var hintsDeclined = 0;
 
   @override
   SessionState build() => initial;
+
+  @override
+  void openHint() => hintsOpened++;
+
+  @override
+  void watchHintAd() => hintAdsWatched++;
+
+  @override
+  void declineHint() => hintsDeclined++;
 
   @override
   void playAgain() => replayed++;
@@ -105,6 +119,12 @@ RoundView roundView({
   int? answerClockStartMs,
   int? feedbackStartedAtMs,
   int feedbackMs = 0,
+  bool hintAsked = false,
+  bool hintUsed = false,
+  Set<int> removedIds = const {},
+  int? hintSheetOpenedAtMs,
+  HintNotice? hintNotice,
+  int hintNoticeId = 0,
 }) {
   return RoundView(
     score: score,
@@ -115,6 +135,14 @@ RoundView roundView({
     answerClockStartMs: answerClockStartMs,
     feedbackStartedAtMs: feedbackStartedAtMs,
     feedbackMs: feedbackMs,
+    // A used hint was asked for.
+    hintAsked: hintAsked || hintUsed,
+    hintUsed: hintUsed,
+    removedIds: removedIds,
+    hintSheetOpenedAtMs: hintSheetOpenedAtMs,
+    hintSheetMs: 8000,
+    hintNotice: hintNotice,
+    hintNoticeId: hintNoticeId,
     number: number,
     total: total,
     kind: kind,
@@ -136,7 +164,8 @@ RoundView roundView({
   );
 }
 
-SessionState playing(RoundView round) => SessionState(phase: SessionPhase.playing, config: config, round: round);
+SessionState playing(RoundView round, {RoundAd ad = RoundAd.none}) =>
+    SessionState(phase: SessionPhase.playing, config: config, round: round, ad: ad);
 
 /// A pack service that records installs and their Wi-Fi rule. [onInstall] can hold one open.
 class FakePackService implements PackService {
@@ -187,6 +216,8 @@ Future<Harness> pumpScreens(
   double textScale = 1.0,
   bool themed = true,
   AccountManager? accountManager,
+  bool rewardedReady = false,
+  ConsentService? consent,
 }) async {
   final router = buildRouter(initialLocation: location);
   final db = AppDb(NativeDatabase.memory());
@@ -247,6 +278,8 @@ Future<Harness> pumpScreens(
         ),
       ),
       if (accountManager != null) accountManagerProvider.overrideWithValue(accountManager),
+      rewardedReadyProvider.overrideWithValue(rewardedReady),
+      if (consent != null) consentServiceProvider.overrideWithValue(consent),
     ],
   );
   addTearDown(container.dispose);

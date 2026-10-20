@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:path/path.dart' as p;
+import 'package:yeman_zefen/core/ads/ads_providers.dart';
 import 'package:yeman_zefen/core/audio/audio_providers.dart';
 import 'package:yeman_zefen/core/audio/clip_player.dart';
 import 'package:yeman_zefen/core/db/app_db.dart';
@@ -25,6 +26,7 @@ import 'package:yeman_zefen/features/packs/data/clip_downloader.dart';
 import 'package:yeman_zefen/features/packs/data/clip_providers.dart';
 import 'package:yeman_zefen/features/packs/data/packs_providers.dart';
 
+import '../../../core/ads/fake_ad_service.dart';
 import '../../../core/audio/fake_clip_voice.dart';
 
 class FakeTimer implements Timer {
@@ -141,6 +143,12 @@ class SessionKit {
 
   late final KitDownloader downloader;
 
+  /// The ads. None are loaded until a test loads them.
+  final ads = FakeAdService();
+
+  /// The app is in front of the player.
+  var foreground = true;
+
   /// What the phone is connected to. Null follows [offline].
   NetworkKind? network;
 
@@ -166,6 +174,7 @@ class SessionKit {
         supportDirectoryProvider.overrideWith((ref) async => kit.dir),
         clipPlayerProvider.overrideWithValue(kit.player),
         clipDownloaderProvider.overrideWithValue(kit.downloader),
+        adServiceProvider.overrideWithValue(kit.ads),
         apiClientProvider.overrideWithValue(
           ApiClient(
             baseUrl: 'https://api.test',
@@ -194,6 +203,7 @@ class SessionKit {
             isOffline: () async => kit.offline,
             networkProbe: () async => kit.network ?? (kit.offline ? NetworkKind.none : NetworkKind.unmetered),
             rng: () => Random(kit.seed),
+            isForeground: () => kit.foreground,
             feedbackDuration: feedback,
             wrongFeedbackDuration: wrongFeedback ?? feedback,
           ),
@@ -332,6 +342,7 @@ class SessionKit {
 
   Future<void> dispose() async {
     container.dispose();
+    ads.dispose();
     await player.dispose();
     await interruptions.close();
     await db.close();

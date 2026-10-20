@@ -475,6 +475,10 @@ class _Overlays extends StatelessWidget {
   final VoidCallback onLeaveCancelled;
   final VoidCallback? onResume;
 
+  /// "Ad · 2" with a countdown; just "Ad" behind a real ad, which keeps its own time.
+  String _adBadge(AppLocalizations l10n) =>
+      view.overlaySeconds > 0 ? '${l10n.adLabel} · ${view.overlaySeconds}' : l10n.adLabel;
+
   @override
   Widget build(BuildContext context) {
     final game = context.game;
@@ -505,14 +509,14 @@ class _Overlays extends StatelessWidget {
       case RoundOverlay.rewardedAd:
         layer = Positioned.fill(
           child: AdOverlay(
-            badge: '${l10n.adLabel} · ${view.overlaySeconds}',
+            badge: _adBadge(l10n),
             caption: l10n.adRewardCaption,
           ),
         );
       case RoundOverlay.interstitial:
         layer = Positioned.fill(
           child: AdOverlay(
-            badge: '${l10n.adLabel} · ${view.overlaySeconds}',
+            badge: _adBadge(l10n),
             caption: l10n.adInterstitialCaption,
           ),
         );

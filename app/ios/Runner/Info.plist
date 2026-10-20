@@ -24,6 +24,16 @@
     <string>????</string>
     <key>CFBundleVersion</key>
     <string>$(FLUTTER_BUILD_NUMBER)</string>
+    <!-- AdMob: the app id per flavor (ios/Flutter/*.xcconfig), and Google's SKAdNetwork id. -->
+    <key>GADApplicationIdentifier</key>
+    <string>$(ADMOB_APP_ID)</string>
+    <key>SKAdNetworkItems</key>
+    <array>
+      <dict>
+        <key>SKAdNetworkIdentifier</key>
+        <string>cstr6suwn9.skadnetwork</string>
+      </dict>
+    </array>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIApplicationSceneManifest</key>
@@ -53,6 +63,9 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <!-- Apple's tracking question, asked after Google's consent form (lib/core/ads/consent_service.dart). -->
+    <key>NSUserTrackingUsageDescription</key>
+    <string>Ads keep Yeman Zefen free. Allowing tracking lets them be more relevant to you.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Lets the app reach the development server on your network.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
