@@ -1,8 +1,9 @@
 // Rate limits on the player API (/v1). Why two mechanisms: see docs/ops.md "Rate limiting".
 //
-// - Per IP, 300 requests a minute across /v1: Cloudflare's Workers Rate Limiting binding
-//   (IP_LIMITER). It is counted at the edge, costs no D1 query, and exists on every plan. Its
-//   period can only be 10 or 60 seconds, so it cannot do the per-hour player limits.
+// - Per IP, 3000 requests a minute across /v1 (`limit` of IP_LIMITER in wrangler.toml): Cloudflare's
+//   Workers Rate Limiting binding. It is counted at the edge and costs no D1 query. Its period can
+//   only be 10 or 60 seconds, so it cannot do the per-hour player limits. The limit is high because
+//   Ethiopian mobile traffic goes out through carrier NAT: many players share one IP.
 // - Per player (UID): a token bucket in D1, one statement per limited request. The bucket's size is
 //   the burst (an offline player syncing queued sessions), its refill rate is the hourly limit.
 //
@@ -12,8 +13,6 @@ import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env";
 import { ApiError } from "./errors";
 
-/** Requests per minute per IP across /v1. Mirrors `limit` of IP_LIMITER in wrangler.toml. */
-export const IP_LIMIT_PER_MINUTE = 300;
 /** The IP binding's period (wrangler.toml); the best Retry-After it lets us give. */
 const IP_PERIOD_S = 60;
 

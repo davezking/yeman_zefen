@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runScheduled } from "../src/cron/rollups";
@@ -94,10 +94,13 @@ describe("per-player limits on /v1", () => {
   });
 
   it("does not count a request with a bad token", async () => {
-    const res = await (await import("cloudflare:workers")).exports.default.fetch(
+    const before = await env.DB.prepare("SELECT COUNT(*) AS n FROM rate_limits").first<{ n: number }>();
+    const res = await exports.default.fetch(
       new Request("https://api.test/v1/sessions", { method: "POST", headers: { authorization: "Bearer nope" } }),
     );
     expect(res.status).toBe(401);
+    const after = await env.DB.prepare("SELECT COUNT(*) AS n FROM rate_limits").first<{ n: number }>();
+    expect(after!.n).toBe(before!.n);
   });
 });
 

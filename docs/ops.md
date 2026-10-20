@@ -533,7 +533,7 @@ AdMob checks that the developer website listed on the store pages hosts an `app-
 
 Two mechanisms, because Cloudflare's Workers Rate Limiting binding only counts in 10 or 60 second periods, so it cannot do the per-hour player limits.
 
-- **Per IP, 300 requests a minute across `/v1`:** the Workers Rate Limiting binding `IP_LIMITER` (`[[ratelimits]]` in `api/wrangler.toml`, separate `namespace_id` for dev and prod). It is counted at the edge, costs no D1 query, and the binding is available on the Free plan. No WAF rule is needed. Re-check the plan's terms in the Cloudflare docs before launch. Without the binding (local dev) or without a `cf-connecting-ip`, the check is skipped. Counters are per Cloudflare location, so the limit is approximate by design.
+- **Per IP, 3000 requests a minute across `/v1`:** the Workers Rate Limiting binding `IP_LIMITER` (`[[ratelimits]]` in `api/wrangler.toml`, separate `namespace_id` for dev and prod). It is counted at the edge and costs no D1 query, so no WAF rule is needed. **Not yet verified:** that the binding is available on the account's plan (check the Cloudflare docs before launch; if it is not, use a WAF rate-limiting rule with the same limit). The task asked for 300; it is 3000 because Ethiopian mobile traffic goes out through carrier NAT, so thousands of players can share one IP, and the per-player buckets already guard the endpoints that write. Watch the 429 rate per route in Workers Logs after launch. Without the binding (local dev) or without a `cf-connecting-ip`, the check is skipped. Counters are per Cloudflare location, so the limit is approximate by design.
 - **Per player (UID):** a token bucket in D1 (`rate_limits`, `src/lib/rateLimit.ts`), one atomic statement per limited request, taken after the token is verified and before the body is read. The bucket size is the burst; the refill is the hourly limit.
 
 | Route | Burst | Sustained |
@@ -545,6 +545,6 @@ Two mechanisms, because Cloudflare's Workers Rate Limiting binding only counts i
 
 A refused request is `429` with `{"error":{"code":"rate_limited",...}}` and `Retry-After` in seconds (60 for the IP limit). Refusals do not spend a token. The nightly job deletes buckets idle for a day, so the table stays as small as the day's active players. Each limited request costs one more D1 statement (see `test/sessions.test.ts` "D1 cost"), and the nightly run's query budget is 49 for that reason.
 
-**App:** a 429 on `POST /v1/sessions` holds the whole sync queue until `Retry-After` is over, even for a forced pass (`session_sync.dart`). A player with more than 20 queued sessions drains them 20 at once, then one a minute.
+**App:** a 429 on `POST /v1/sessions` holds the whole sync queue for the server's `Retry-After` (30 s when there is none), even for a forced pass, and a wake-up resumes it when the hold ends (`session_sync.dart`). A player with more than 20 queued sessions drains them 20 at once, then one a minute.
 
 **Checks to do once deployed:** sync 15 queued sessions on a test build (all succeed); post 100 sessions in a loop with a script and see 429s after the 20th with a sensible `Retry-After`. The `namespace_id`s (`1001`, `1002`) are arbitrary: change them if the account already uses them.
