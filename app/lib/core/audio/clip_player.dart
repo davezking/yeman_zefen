@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../crash/crash_reporting.dart';
 import 'clip_voice.dart';
 
 enum ClipStopReason {
@@ -166,8 +167,13 @@ class ClipPlayer {
     final watch = Stopwatch()..start();
     try {
       await slot.voice.start();
-    } catch (_) {
-      if (identical(_playingSlot, slot)) _detach();
+    } catch (e, stack) {
+      // A stop or interruption during the start detaches the slot and pauses the voice, which
+      // fails the start. Only a start nobody stopped is a playback failure.
+      if (identical(_playingSlot, slot)) {
+        _detach();
+        recordNonFatal(e, stack, reason: 'audio_play_failed');
+      }
       rethrow;
     }
     if (!identical(_playingSlot, slot)) {

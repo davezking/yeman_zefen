@@ -1,8 +1,11 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -63,4 +66,9 @@ val admobAppIds = mapOf(
 )
 android.productFlavors.configureEach {
     manifestPlaceholders["admobAppId"] = admobAppIds.getValue(name)
+    // Only prod release builds upload their R8 mapping file to Crashlytics; dev (and CI) builds skip it.
+    val flavorName = name
+    (this as ExtensionAware).extensions.configure<CrashlyticsExtension> {
+        mappingFileUploadEnabled = flavorName == "prod"
+    }
 }

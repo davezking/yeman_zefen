@@ -23,6 +23,8 @@ plugins {
     // START: FlutterFire Configuration
     id("com.google.gms.google-services") version("4.4.2") apply false
     // END: FlutterFire Configuration
+    // Crashlytics build id, and the R8 mapping upload for prod release builds (docs/ops.md).
+    id("com.google.firebase.crashlytics") version("3.0.3") apply false
     id("org.jetbrains.kotlin.android") version "2.4.0" apply false
 }
 

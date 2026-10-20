@@ -43,6 +43,8 @@ export type Variables = {
   service?: { clientId: string };
   /** Set by requireUser() on authenticated /v1 routes. */
   user?: PlayerUser;
+  /** Set by onError() so the request log can name the error. */
+  errorCode?: string;
 };
 
 export type AppEnv = { Bindings: Bindings; Variables: Variables };

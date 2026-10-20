@@ -6,6 +6,7 @@ import 'package:drift/native.dart' show SqliteException;
 import 'package:drift/isolate.dart' show DriftRemoteException;
 import 'package:path/path.dart' as p;
 
+import '../../../core/crash/crash_reporting.dart';
 import '../../../core/db/app_db.dart';
 import '../domain/pack_install_progress.dart';
 import 'checksum.dart';
@@ -175,8 +176,10 @@ class PackInstaller {
       problem = '"$slug" is not a valid pack slug';
     }
     if (problem != null) {
+      final failure = PackInstallException(problem);
       _emit(PackInstallProgress(slug: expectedSlug, state: PackInstallState.failed, error: problem));
-      throw PackInstallException(problem);
+      recordNonFatal(failure, StackTrace.current, reason: 'pack_install_failed');
+      throw failure;
     }
 
     final paths = _TrackPaths.of(manifest);
@@ -214,7 +217,7 @@ class PackInstaller {
       });
       _checkCancelled(token);
       replacedStream = await _register(manifest, manifestJson, paths);
-    } catch (e) {
+    } catch (e, stack) {
       PackInstallException storageFull() => PackInstallException(
             '$e',
             failure: PackInstallFailure.storageFull,
@@ -235,6 +238,10 @@ class PackInstaller {
           ? PackInstallState.cancelled
           : PackInstallState.failed;
       _emit(tracker.snapshot(state, error: failure.message));
+      // A full phone is the player's to fix, not a bug.
+      if (state == PackInstallState.failed && failure.failure != PackInstallFailure.storageFull) {
+        recordNonFatal(failure, stack, reason: 'pack_install_failed');
+      }
       throw failure;
     }
 
