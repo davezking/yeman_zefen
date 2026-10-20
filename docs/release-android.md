@@ -10,6 +10,10 @@ git tag app-v0.2.0 && git push origin app-v0.2.0
 
 Each run produces two files from the same build, both signed with the upload key: the **AAB** (what Play takes) and an **APK** (`app-prod-release.apk`, what you install on a phone by sending the file, for beta testers outside Play). Download them from the run page (Actions > the run > Artifacts).
 
+**The APK and the Play version cannot replace each other.** With Play App Signing, phones that install from Play get the app signed with Google's key; the APK is signed with your upload key. Android refuses to install one over the other ("App not installed"), so a tester moving from the APK to Play (or back) must uninstall first. Uninstalling deletes the guest sign-in on the phone, so a guest's scores are lost: tell testers to **register an account before switching** (their scores then come back when they sign in). Put this in the message that goes with the APK.
+
+The APK is universal (every phone CPU type in one file), so it is larger than what Play delivers to a phone. That keeps it simple for testers: one file for everyone. If its size is a problem on mobile data, `--split-per-abi` on the APK build makes one file per CPU type; most phones need `app-arm64-v8a-prod-release.apk`, and testers would have to pick the right one.
+
 You do not need a terminal to tag: on GitHub open **Releases > Draft a new release**, type the tag (for example `app-v0.2.0`) under "Choose a tag" and pick "Create new tag", then publish (a pre-release is fine). That starts the run.
 
 The tag's version (a `-rc1` suffix is allowed) must equal the name in `pubspec.yaml`, or the run fails at the first step. **The version has one source: `pubspec.yaml`.** The build number (Android `versionCode`) is the workflow's run number plus the optional repository variable `ANDROID_BUILD_NUMBER_OFFSET`, so it only goes up. Play rejects a `versionCode` it has seen: if you ever upload a build made elsewhere, set the offset above it.

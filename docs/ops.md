@@ -268,7 +268,7 @@ domain later, with one catch (last row).
 |---|---|---|
 | API (Worker) | `https://yz-api-prod.<your-subdomain>.workers.dev`, shown by `npm run deploy` | `api.<domain>`: uncomment `routes` under `[env.prod]` in `api/wrangler.toml` |
 | Admin site (Pages) | `https://<project>.pages.dev` | `admin.<domain>` on the Pages project (Custom domains) |
-| Clips (R2) | `https://pub-<hash>.r2.dev`: bucket › Settings › Public access › Allow. Limited speed, meant for testing | `cdn.<domain>`: bucket › Settings › Custom Domains |
+| Clips (R2) | `https://pub-<hash>.r2.dev`: bucket › Settings › **Public Development URL** › Enable. Limited speed, meant for testing | `cdn.<domain>`: bucket › Settings › Custom Domains |
 
 With the free addresses, set `ADMIN_ORIGIN` to the `pages.dev` address, `CDN_BASE_URL` to the `r2.dev` address and
 `API_BASE` in `app/config/prod.json` to the `workers.dev` address.
