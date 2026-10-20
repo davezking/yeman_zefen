@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:drift/drift.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/crash/crash_reporting.dart';
 import '../../../core/db/app_db.dart';
 import '../../../core/http/api_client.dart';
 
@@ -185,6 +186,8 @@ class SessionSync {
   }
 
   Future<void> _park(PendingSession row, String reason) {
+    // The reason text can carry server messages, so only the fixed label goes to Crashlytics.
+    recordNonFatal(StateError('session parked'), null, reason: 'sync_parked');
     return (db.update(db.pendingSessions)..where((t) => t.id.equals(row.id))).write(
       PendingSessionsCompanion(
         parked: const Value(true),

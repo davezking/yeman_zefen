@@ -4,6 +4,7 @@ import type { AppEnv, Bindings } from "./env";
 import { adminCors } from "./lib/cors";
 import { onError, onNotFound } from "./lib/errors";
 import { requestId } from "./lib/requestId";
+import { requestLog } from "./lib/requestLog";
 import { admin } from "./routes/admin";
 import { devCdn } from "./routes/devCdn";
 import { health } from "./routes/health";
@@ -12,6 +13,7 @@ import { v1 } from "./routes/v1";
 const app = new Hono<AppEnv>();
 
 app.use("*", requestId());
+app.use("*", requestLog());
 app.onError(onError);
 app.notFound(onNotFound);
 

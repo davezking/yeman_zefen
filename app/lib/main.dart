@@ -10,6 +10,7 @@ import 'core/config/app_config.dart';
 import 'core/config/firebase_bootstrap.dart';
 import 'core/l10n/locale_provider.dart';
 import 'core/config/remote_config.dart';
+import 'core/crash/crash_reporting.dart';
 import 'core/profile/profile_sync.dart';
 import 'features/game/application/session_sync_providers.dart';
 import 'features/packs/data/clip_providers.dart';
@@ -18,11 +19,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConfig.assertConfigured();
   await initializeFirebase();
+  await installCrashReporting();
   await configureGameAudioSession();
   final container = ProviderContainer();
   // Creating the service starts the anonymous sign-in without waiting for it:
   // with no network the game still starts with its bundled and cached clips.
   container.read(authServiceProvider);
+  // Keeps the Crashlytics user set to the signed-in UID.
+  container.read(crashUserStarterProvider);
   // Tells the server who the player is once signed in, and again on each app open (at most every 6 hours).
   container.read(profileSyncStarterProvider);
   // Finishes the server side of an account link that was cut off (offline, or the app closed).

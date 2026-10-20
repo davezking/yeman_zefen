@@ -6,6 +6,7 @@ import 'package:drift/native.dart' show SqliteException;
 import 'package:drift/isolate.dart' show DriftRemoteException;
 import 'package:path/path.dart' as p;
 
+import '../../../core/crash/crash_reporting.dart';
 import '../../../core/db/app_db.dart';
 import '../domain/pack_install_progress.dart';
 import 'checksum.dart';
@@ -214,7 +215,7 @@ class PackInstaller {
       });
       _checkCancelled(token);
       replacedStream = await _register(manifest, manifestJson, paths);
-    } catch (e) {
+    } catch (e, stack) {
       PackInstallException storageFull() => PackInstallException(
             '$e',
             failure: PackInstallFailure.storageFull,
@@ -235,6 +236,9 @@ class PackInstaller {
           ? PackInstallState.cancelled
           : PackInstallState.failed;
       _emit(tracker.snapshot(state, error: failure.message));
+      if (state == PackInstallState.failed) {
+        recordNonFatal(failure, stack, reason: 'pack_install_failed');
+      }
       throw failure;
     }
 

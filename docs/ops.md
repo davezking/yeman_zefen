@@ -522,3 +522,9 @@ AdMob checks that the developer website listed on the store pages hosts an `app-
 
 - The dev flavor uses Google's test ad units, which are safe to tap.
 - To see the consent form outside Europe, run a dev build once and copy the hashed device id the ads SDK logs. Put it in `AD_TEST_DEVICE_IDS` in `config/dev.local.json`, and set `UMP_DEBUG_GEOGRAPHY` to `eea` (or `other`). Debug geography applies only to listed test devices and only in the dev flavor. Google's check goes by IP address, not by the phone's region setting. A device that has already answered keeps its answer: reinstall the app to start over.
+
+## Logs and crash reports
+
+- **Worker logs:** `[observability]` is enabled in `api/wrangler.toml` (top level and `env.prod`). Each request writes one JSON line (`src/lib/requestLog.ts`): `requestId`, `route` (the pattern, so IDs stay out), `status`, `latencyMs`, `uidHash` (first 16 hex of SHA-256 of the UID), `country`, and `errorCode` on failures. Tokens, bodies and emails are never logged. Read them in the Cloudflare dashboard under Workers Logs.
+- **App crashes:** Crashlytics collects in the prod flavor only (`lib/core/crash/crash_reporting.dart`). The user is the UID, never an email. Non-fatal issues have fixed labels: `pack_install_failed`, `sync_parked`, `audio_play_failed`.
+- **Symbols:** Android mapping files and iOS dSYMs are not uploaded yet. Stack traces from release builds stay unreadable until the Crashlytics Gradle plugin and the iOS dSYM upload step are added.
