@@ -1,9 +1,9 @@
 import { Alert, Anchor, Badge, Button, Group, Loader, Stack, Table, Tabs, Text, Title } from "@mantine/core";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useModerationQueue, type QueueAnomaly, type QueueSession } from "../api/moderation";
+import { useModerationQueue, type QueueAnomaly, type QueueNameReport, type QueueSession } from "../api/moderation";
 import { ModerationActionModal, type PendingAction } from "../components/ModerationActionModal";
-import { anomalyDays, anomalyRules, flagLabels, ruleLabel } from "../lib/moderation";
+import { anomalyDays, anomalyRules, flagLabels, nameReportDetails, ruleLabel } from "../lib/moderation";
 
 const when = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 const nameOf = (u: { displayName: string | null; userId: string }) => u.displayName ?? u.userId;
@@ -17,7 +17,7 @@ export function ModerationPage() {
     <Stack>
       <Title order={2}>Moderation</Title>
       <Text size="sm" c="dimmed">
-        Flags raised by the nightly check, and sessions the server flagged when they were played. Every action needs a note and is logged with your email.
+        Flags raised by the nightly check, sessions the server flagged when they were played, and display names players reported. Every action needs a note and is logged with your email.
       </Text>
       {queue.isPending && <Loader size="sm" />}
       {queue.isError && <Alert color="red">Could not load the queue: {queue.error.message}</Alert>}
@@ -31,12 +31,18 @@ export function ModerationPage() {
             <Tabs.Tab value="sessions" rightSection={<Badge variant="light" color={data.sessions.length ? "orange" : "gray"}>{count(data.sessions.length, data.sessionsMore)}</Badge>}>
               Flagged sessions
             </Tabs.Tab>
+            <Tabs.Tab value="names" rightSection={<Badge variant="light" color={data.nameReports.length ? "red" : "gray"}>{count(data.nameReports.length, data.nameReportsMore)}</Badge>}>
+              Name reports
+            </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="flags" pt="md">
             <Anomalies rows={data.anomalies} more={data.anomaliesMore} onAct={setPending} />
           </Tabs.Panel>
           <Tabs.Panel value="sessions" pt="md">
             <Sessions rows={data.sessions} more={data.sessionsMore} onAct={setPending} />
+          </Tabs.Panel>
+          <Tabs.Panel value="names" pt="md">
+            <NameReports rows={data.nameReports} more={data.nameReportsMore} onAct={setPending} />
           </Tabs.Panel>
         </Tabs>
       )}
@@ -84,6 +90,47 @@ function Anomalies({ rows, more, onAct }: { rows: QueueAnomaly[]; more: boolean;
                       </Button>
                     )}
                     <Button size="compact-sm" variant="default" onClick={() => onAct({ kind: "dismissFlag", flagId: r.id, name })}>Dismiss</Button>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            );
+          })}
+        </Table.Tbody>
+      </Table>
+      {more && <Text size="sm" c="dimmed">Showing the oldest {rows.length}. Close some to see the rest.</Text>}
+    </Stack>
+  );
+}
+
+function NameReports({ rows, more, onAct }: { rows: QueueNameReport[]; more: boolean; onAct: (a: PendingAction) => void }) {
+  if (rows.length === 0) return <Text c="dimmed">No reported names.</Text>;
+  return (
+    <Stack gap="xs">
+      <Text size="sm" c="dimmed">
+        Shadow-banning hides the player from everyone else's leaderboards and closes the report. If the name is fine, dismiss it.
+      </Text>
+      <Table verticalSpacing="xs">
+        <Table.Thead>
+          <Table.Tr><Table.Th>Reported name</Table.Th><Table.Th>Player now</Table.Th><Table.Th ta="right">Reports</Table.Th><Table.Th>Last report</Table.Th><Table.Th /></Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {rows.map((r) => {
+            const d = nameReportDetails(r.details);
+            const name = nameOf(r);
+            return (
+              <Table.Tr key={r.id}>
+                <Table.Td><Text size="sm" fw={600}>{d.reportedName ?? "—"}</Text></Table.Td>
+                <Table.Td><PlayerLink userId={r.userId} name={name} banned={r.shadowBanned} /></Table.Td>
+                <Table.Td ta="right"><Text size="sm">{d.reports} from {d.reporters} {d.reporters === 1 ? "player" : "players"}</Text></Table.Td>
+                <Table.Td><Text size="sm">{d.lastReportedAt ? when(d.lastReportedAt) : "—"}</Text></Table.Td>
+                <Table.Td>
+                  <Group gap="xs" justify="flex-end" wrap="nowrap">
+                    {!r.shadowBanned && (
+                      <Button size="compact-sm" color="red" variant="light" onClick={() => onAct({ kind: "ban", userId: r.userId, name, banned: true, reviewItemId: r.id })}>
+                        Shadow-ban
+                      </Button>
+                    )}
+                    <Button size="compact-sm" variant="default" onClick={() => onAct({ kind: "dismissFlag", flagId: r.id, name, nameReport: true })}>Dismiss</Button>
                   </Group>
                 </Table.Td>
               </Table.Tr>

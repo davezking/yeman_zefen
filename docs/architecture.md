@@ -183,6 +183,8 @@ All JSON. Errors use the shape `{ error: { code, message } }`. Versioned under `
 | `GET /v1/leaderboard?period=all\|week&generation=` | Top 100. Registered, non-shadow-banned users only. |
 | `GET /v1/leaderboard/me?period=&generation=` | Caller's points and rank (registered only) |
 | `POST /v1/reports/clip` | `{ trackId, clipType, error }` (`file_missing \| decode_error \| too_short`): a clip would not play on the phone. Adds to one open `missing_audio` review item per track. 10 per user per day (`429 rate_limited`). |
+| `POST /v1/reports/name` | `{ displayName }`: a player reports a name on the leaderboard as offensive. Each visible registered player with exactly that name (up to 5, never the reporter) gets one open `name_report` review item, handled in the moderation queue (shadow-ban resolves it, or dismiss). Always `202`, so it does not reveal who exists. 5 burst, 10 per hour per user. |
+| `GET /account-deletion` | Public HTML page (English and Amharic) for Google Play's account-deletion link: the in-app steps and an email address (`PRIVACY_CONTACT_EMAIL`) for asking without the app. `503 not_configured` until that var is set. |
 
 **Session payload (shape):**
 ```json

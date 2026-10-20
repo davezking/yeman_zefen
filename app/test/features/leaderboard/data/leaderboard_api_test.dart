@@ -69,6 +69,24 @@ void main() {
   });
 
   group('LeaderboardApi', () {
+    test('reportName posts the name as shown', () async {
+      http.Request? sent;
+      final client = ApiClient(
+        baseUrl: 'https://api.test',
+        idToken: _token,
+        client: MockClient((req) async {
+          sent = req;
+          return http.Response('{"accepted":true}', 202, headers: {'content-type': 'application/json'});
+        }),
+      );
+
+      await LeaderboardApi(client).reportName('Bad Name');
+
+      expect(sent?.method, 'POST');
+      expect(sent?.url.path, '/v1/reports/name');
+      expect(jsonDecode(sent!.body), {'displayName': 'Bad Name'});
+    });
+
     test('asks for the period and era, and parses the rows', () async {
       Uri? asked;
       final client = ApiClient(

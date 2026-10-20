@@ -5,6 +5,7 @@ import { adminCors } from "./lib/cors";
 import { onError, onNotFound } from "./lib/errors";
 import { requestId } from "./lib/requestId";
 import { requestLog } from "./lib/requestLog";
+import { accountDeletion } from "./routes/accountDeletion";
 import { admin } from "./routes/admin";
 import { devCdn } from "./routes/devCdn";
 import { health } from "./routes/health";
@@ -18,6 +19,7 @@ app.onError(onError);
 app.notFound(onNotFound);
 
 app.route("/health", health);
+app.route("/account-deletion", accountDeletion);
 app.route("/cdn", devCdn);
 app.route("/v1", v1);
 // CORS runs before the admin routers so preflight OPTIONS requests are answered without auth.

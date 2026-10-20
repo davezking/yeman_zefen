@@ -529,6 +529,39 @@ AdMob checks that the developer website listed on the store pages hosts an `app-
 - **App crashes:** Crashlytics collects in the prod flavor only (`lib/core/crash/crash_reporting.dart`). The user is the UID, never an email. Non-fatal issues have fixed labels: `pack_install_failed` (not on cancel or a full phone), `sync_parked`, `audio_play_failed` (not when the clip was stopped or interrupted).
 - **Symbols:** the Crashlytics Gradle plugin (`app/android`) uploads the R8 mapping file on prod release builds; dev builds, including CI, skip the upload. The release workflow also uploads the Dart symbols of the obfuscated build (`docs/release-android.md`). On iOS, `make ios-symbols` uploads the dSYMs and Dart symbols after each release build (`docs/release-ios.md`, step 6); it is a manual step.
 
+## Account deletion page (`GET /account-deletion`)
+
+Google Play requires a web link where people can ask for their account to be deleted without the app. The Worker serves
+one at `https://api.<domain>/account-deletion`, in English and Amharic: the in-app steps (Settings › Account › Delete
+account) and an email address for requests. Set the address in `api/wrangler.toml` (`PRIVACY_CONTACT_EMAIL` under
+`[env.prod.vars]`, not a secret) and deploy. Until it is set, the page answers `503 not_configured`, so a missing
+address is obvious when you open the link. Enter the URL in Play Console (App content › Data safety) and in
+`docs/store/review-notes.md`. The Amharic text needs the same native-speaker review as `app_am.arb`.
+
+The page promises deletion within 30 days. A request by email is handled by hand:
+
+1. Check the request came from the account's own address (reply to it if unsure). Find the user in Firebase Console ›
+   Authentication by email and copy the UID.
+2. Run the server step `DELETE /v1/me` runs (`api/src/routes/me.ts`), in one go:
+   ```sh
+   npx wrangler d1 execute yz-db --env prod --remote --command "
+     DELETE FROM leaderboard_entries WHERE user_id = '<uid>';
+     UPDATE game_sessions SET user_id = 'deleted' WHERE user_id = '<uid>';
+     DELETE FROM users WHERE id = '<uid>';"
+   ```
+3. Delete the user in Firebase Console. For a Sign in with Apple account, the app's Apple tokens cannot be revoked
+   from here; the person can remove the app under their Apple ID's "Sign in with Apple" settings, so say so in the reply.
+4. Reply to confirm.
+
+## Name reports (moderation)
+
+Players can tap a name on the leaderboard to report it as offensive (`POST /v1/reports/name`). Reports show up in the
+admin site under **Moderation › Name reports**, one row per reported player, with the name as it was reported and the
+player's current name. **Shadow-ban** hides the player from everyone else's boards and closes the report; **Dismiss**
+closes it without a change. Both need a note and are logged. Names are also checked against the blocklist when they are
+set (`api/src/lib/blocklist.ts`); add a term there when reports show a pattern. The Amharic part of that list is still
+empty and needs a native speaker.
+
 ## Rate limiting
 
 Two mechanisms, because Cloudflare's Workers Rate Limiting binding only counts in 10 or 60 second periods, so it cannot do the per-hour player limits.
@@ -541,6 +574,7 @@ Two mechanisms, because Cloudflare's Workers Rate Limiting binding only counts i
 | `POST /v1/sessions` | 20 | 60 / hour |
 | `POST /v1/me/merge` | 5 | 5 / hour |
 | `PUT /v1/me` | 30 | 30 / hour |
+| `POST /v1/reports/name` | 5 | 10 / hour |
 | `POST /v1/reports/clip` | | 10 / day (own counter, `clip_report_counts`) |
 
 A refused request is `429` with `{"error":{"code":"rate_limited",...}}` and `Retry-After` in seconds (60 for the IP limit). Refusals do not spend a token. The nightly job deletes buckets idle for a day, so the table stays as small as the day's active players. Each limited request costs one more D1 statement (see `test/sessions.test.ts` "D1 cost"), and the nightly run's query budget is 49 for that reason.

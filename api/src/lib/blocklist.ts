@@ -20,6 +20,8 @@ export const DISPLAY_NAME_BLOCKLIST: readonly string[] = [
   "shit",
   "bitch",
   "asshole",
+  // Amharic profanity (Fidel): empty until a native speaker supplies the terms. BLOCKING for launch,
+  // see docs/store/review-notes.md. Each term is matched as a whole word, like the ones above.
 ];
 
 /** Lowercase, drop spaces and trailing digits, so "Ad Min 2" compares equal to "admin". */

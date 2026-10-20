@@ -28,6 +28,7 @@ export const UID_RULES = {
   sessions: { burst: 20, perHour: 60 },
   merge: { burst: 5, perHour: 5 },
   me: { burst: 30, perHour: 30 },
+  nameReports: { burst: 5, perHour: 10 },
 } as const satisfies Record<string, BucketRule>;
 
 export type UidRule = keyof typeof UID_RULES;

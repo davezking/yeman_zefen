@@ -1,8 +1,8 @@
 import { env, exports } from "cloudflare:workers";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
-import { MAX_REPORTERS, REPORTS_PER_DAY } from "../src/routes/v1/reports";
-import { countingDb, installFirebaseJwks, makeArtist, makeTrack, player, removeFirebaseJwks, resetCatalog, signFirebaseToken } from "./helpers";
+import { MAX_REPORTERS, NAME_REPORT_MATCHES, REPORTS_PER_DAY } from "../src/routes/v1/reports";
+import { countingDb, installFirebaseJwks, rawRequest, makeArtist, makeTrack, player, removeFirebaseJwks, resetCatalog, signFirebaseToken } from "./helpers";
 
 beforeAll(installFirebaseJwks);
 afterAll(removeFirebaseJwks);
@@ -173,5 +173,112 @@ describe("POST /v1/reports/clip", () => {
     );
     expect(res.status).toBe(202);
     expect(counter.queries).toBe(3);
+  });
+});
+
+describe("POST /v1/reports/name", () => {
+  beforeEach(async () => {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM users WHERE id <> 'deleted'"),
+      env.DB.prepare("DELETE FROM rate_limits"),
+    ]);
+  });
+
+  type Who = { name: string; anonymous?: boolean; banned?: boolean; deleted?: boolean };
+  const user = (id: string, w: Who) =>
+    env.DB.prepare(
+      "INSERT INTO users (id, display_name, is_anonymous, country, created_at, shadow_banned, deleted_at) VALUES (?1, ?2, ?3, 'ET', 1, ?4, ?5)",
+    )
+      .bind(id, w.name, w.anonymous ? 1 : 0, w.banned ? 1 : 0, w.deleted ? 5 : null)
+      .run();
+  const reportName = (uid: string, body: unknown) => player(uid, "/v1/reports/name", { method: "POST", body });
+
+  type NameItem = { entity_ref: string; status: string; details: { displayName: string; reports: number; reporters: string[] } };
+  async function nameItems(): Promise<NameItem[]> {
+    const { results } = await env.DB.prepare(
+      "SELECT entity_ref, status, details_json FROM review_items WHERE reason = 'name_report' AND entity_type = 'user' ORDER BY id",
+    ).all<{ entity_ref: string; status: string; details_json: string }>();
+    return results.map((r) => ({ entity_ref: r.entity_ref, status: r.status, details: JSON.parse(r.details_json) }));
+  }
+
+  it("opens one item per visible player with that name, never the reporter, a guest, or a hidden or deleted player", async () => {
+    await user("p1", { name: "Bad Name" });
+    await user("p2", { name: "Bad Name" });
+    await user("me", { name: "Bad Name" });
+    await user("guest", { name: "Bad Name", anonymous: true });
+    await user("banned", { name: "Bad Name", banned: true });
+    await user("gone", { name: "Bad Name", deleted: true });
+    await user("other", { name: "Fine Name" });
+
+    const res = await reportName("me", { displayName: "  Bad   Name " });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ accepted: true });
+    const all = await nameItems();
+    expect(all.map((i) => i.entity_ref).sort()).toEqual(["p1", "p2"]);
+    expect(all[0]).toMatchObject({ status: "open", details: { displayName: "Bad Name", reports: 1, reporters: ["me"] } });
+  });
+
+  it("answers the same when no one has the name", async () => {
+    const res = await reportName("me", { displayName: "Nobody" });
+    expect(res.status).toBe(202);
+    expect(await nameItems()).toEqual([]);
+  });
+
+  it("gathers later reports in the open item, counting each reporter once", async () => {
+    await user("p1", { name: "Bad Name" });
+    await reportName("r1", { displayName: "Bad Name" });
+    await reportName("r2", { displayName: "Bad Name" });
+    await reportName("r2", { displayName: "Bad Name" });
+    const all = await nameItems();
+    expect(all).toHaveLength(1);
+    expect(all[0]!.details).toMatchObject({ reports: 3, reporters: ["r1", "r2"] });
+  });
+
+  it("opens a new item once the last one was closed", async () => {
+    await user("p1", { name: "Bad Name" });
+    await reportName("r1", { displayName: "Bad Name" });
+    await env.DB.prepare("UPDATE review_items SET status = 'dismissed'").run();
+    await reportName("r2", { displayName: "Bad Name" });
+    expect((await nameItems()).map((i) => i.status)).toEqual(["dismissed", "open"]);
+  });
+
+  it(`reports at most ${NAME_REPORT_MATCHES} players at once`, async () => {
+    for (let i = 0; i < NAME_REPORT_MATCHES + 2; i++) await user(`p${i}`, { name: "Common" });
+    await reportName("r1", { displayName: "Common" });
+    expect(await nameItems()).toHaveLength(NAME_REPORT_MATCHES);
+  });
+
+  it("rejects a bad body", async () => {
+    for (const body of [{}, { displayName: "" }, { displayName: "   " }, { displayName: "x".repeat(25) }, { displayName: "Ok", extra: 1 }]) {
+      expect((await reportName("r1", body)).status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("needs a signed-in player (a guest is fine)", async () => {
+    expect((await rawRequest("/v1/reports/name", { method: "POST", body: JSON.stringify({ displayName: "x" }) })).status).toBe(401);
+  });
+
+  it("is rate limited per player", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) codes.push((await reportName("r1", { displayName: `Name ${i}` })).status);
+    expect(codes).toEqual([202, 202, 202, 202, 202, 429]);
+    expect((await reportName("r2", { displayName: "Name" })).status).toBe(202);
+  });
+
+  it("costs one statement after the rate limit, however many players match", async () => {
+    for (let i = 0; i < NAME_REPORT_MATCHES; i++) await user(`p${i}`, { name: "Common" });
+    const { db, counter } = countingDb(env.DB);
+    const token = await signFirebaseToken("r1");
+    const res = await app.fetch(
+      new Request("https://api.test/v1/reports/name", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ displayName: "Common" }),
+      }),
+      { ...env, DB: db },
+    );
+    expect(res.status).toBe(202);
+    // The rate-limit upsert, then the report.
+    expect(counter.queries).toBe(2);
   });
 });

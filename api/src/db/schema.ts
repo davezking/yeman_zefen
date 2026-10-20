@@ -27,7 +27,10 @@ export const REVIEW_REASONS = [
   "short_audio",
   "era_unknown",
   "score_anomaly",
+  "name_report",
 ] as const;
+/** The reasons that are flags about a player (entity_type 'user'), handled in moderation, not the track review queue. */
+export const PLAYER_FLAG_REASONS = ["score_anomaly", "name_report"] as const satisfies readonly (typeof REVIEW_REASONS)[number][];
 export const REVIEW_STATUSES = ["open", "resolved", "dismissed"] as const;
 export const ADMIN_ROLES = ["admin", "editor"] as const;
 export const MODERATION_ACTIONS = ["shadow_ban", "shadow_unban", "void_session", "dismiss_session", "dismiss_flag", "resolve_flag"] as const;

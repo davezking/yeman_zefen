@@ -24,6 +24,7 @@ class LeaderboardScreen extends StatelessWidget {
     required this.onEra,
     required this.onSignIn,
     this.onRetry,
+    this.onReport,
   });
 
   final LeaderboardView view;
@@ -36,6 +37,10 @@ class LeaderboardScreen extends StatelessWidget {
 
   /// Offline with nothing saved: loads the board again. No button when null.
   final VoidCallback? onRetry;
+
+  /// A row or podium place was tapped to report its name as offensive. Rows with no name, and
+  /// the player's own name, cannot be reported. Nothing is tappable when null.
+  final ValueChanged<LeaderboardEntry>? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +142,11 @@ class LeaderboardScreen extends StatelessWidget {
               child: v.state == LeaderboardState.loading
                   ? const _Loading()
                   : showBoard
-                  ? _Board(podium: podium, rest: rest)
+                  ? _Board(
+                      podium: podium,
+                      rest: rest,
+                      reporter: onReport == null ? null : _Reporter(onReport!, v.user.displayName),
+                    )
                   : _Message(
                       icon: v.state == LeaderboardState.empty
                           ? Icons.emoji_events_outlined
@@ -161,6 +170,18 @@ class LeaderboardScreen extends StatelessWidget {
 }
 
 /// The era dropdown chip.
+/// [LeaderboardScreen.onReport] for the board's rows: a row with no name, or with the player's
+/// own name, has nothing to report.
+class _Reporter {
+  const _Reporter(this.onReport, this.ownName);
+
+  final ValueChanged<LeaderboardEntry> onReport;
+  final String? ownName;
+
+  VoidCallback? tapFor(LeaderboardEntry e) =>
+      e.name.isEmpty || e.name == ownName ? null : () => onReport(e);
+}
+
 class _EraFilter extends StatelessWidget {
   const _EraFilter({
     required this.label,
@@ -235,10 +256,11 @@ class _EraFilter extends StatelessWidget {
 }
 
 class _Board extends StatelessWidget {
-  const _Board({required this.podium, required this.rest});
+  const _Board({required this.podium, required this.rest, this.reporter});
 
   final List<LeaderboardEntry> podium;
   final List<LeaderboardEntry> rest;
+  final _Reporter? reporter;
 
   @override
   Widget build(BuildContext context) {
@@ -250,10 +272,10 @@ class _Board extends StatelessWidget {
         SpacingTokens.n8,
       ),
       children: [
-        _Podium(entries: podium),
+        _Podium(entries: podium, reporter: reporter),
         const SizedBox(height: SpacingTokens.n14),
         for (final e in rest) ...[
-          _Row(entry: e),
+          _Row(entry: e, reporter: reporter),
           const SizedBox(height: SpacingTokens.n8),
         ],
       ],
@@ -264,9 +286,10 @@ class _Board extends StatelessWidget {
 /// The top three: second and third at the sides, first larger and in the middle
 /// with a crown.
 class _Podium extends StatelessWidget {
-  const _Podium({required this.entries});
+  const _Podium({required this.entries, this.reporter});
 
   final List<LeaderboardEntry> entries;
+  final _Reporter? reporter;
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +305,7 @@ class _Podium extends StatelessWidget {
       children: [
         for (var i = 0; i < order.length; i++) ...[
           if (i > 0) const SizedBox(width: SpacingTokens.n16),
-          Flexible(child: _PodiumPlace(entry: order[i])),
+          Flexible(child: _PodiumPlace(entry: order[i], reporter: reporter)),
         ],
       ],
     );
@@ -290,9 +313,10 @@ class _Podium extends StatelessWidget {
 }
 
 class _PodiumPlace extends StatelessWidget {
-  const _PodiumPlace({required this.entry});
+  const _PodiumPlace({required this.entry, this.reporter});
 
   final LeaderboardEntry entry;
+  final _Reporter? reporter;
 
   @override
   Widget build(BuildContext context) {
@@ -302,59 +326,66 @@ class _PodiumPlace extends StatelessWidget {
     final grouped = NumberFormat.decimalPattern(
       Localizations.localeOf(context).toString(),
     ).format(entry.points);
-    return Semantics(
-      container: true,
-      label: '${entry.rank}, ${entry.name}, ${l10n.lbPoints(entry.points)}',
-      child: ExcludeSemantics(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (first) ...[
-              const _Crown(),
+    final report = reporter?.tapFor(entry);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: report,
+      child: Semantics(
+        container: true,
+        label: '${entry.rank}, ${entry.name}, ${l10n.lbPoints(entry.points)}',
+        onTap: report,
+        onTapHint: report == null ? null : l10n.lbReportHint,
+        child: ExcludeSemantics(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (first) ...[
+                const _Crown(),
+                const SizedBox(height: SpacingTokens.n4),
+              ],
+              AvatarTile(
+                bordered: true,
+                colorIndex: entry.colorIndex,
+                size: first ? SizeTokens.podiumFirst : SizeTokens.podiumOther,
+              ),
               const SizedBox(height: SpacingTokens.n4),
+              Text(
+                entry.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.withWeight(
+                  text.caption,
+                  first ? FontWeight.w800 : FontWeight.w700,
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: first
+                      ? ColorTokens.surfaceDark
+                      : ColorTokens.paletteWhite,
+                  borderRadius: BorderRadius.circular(RadiusTokens.pill),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.n10,
+                    vertical: SpacingTokens.n2,
+                  ),
+                  child: Text(
+                    grouped,
+                    style:
+                        AppTextStyles.withWeight(
+                          AppTextStyles.latin(text.caption),
+                          FontWeight.w700,
+                        ).copyWith(
+                          color: first
+                              ? ColorTokens.primaryAccentOnDark
+                              : ColorTokens.textPrimary,
+                        ),
+                  ),
+                ),
+              ),
             ],
-            AvatarTile(
-              bordered: true,
-              colorIndex: entry.colorIndex,
-              size: first ? SizeTokens.podiumFirst : SizeTokens.podiumOther,
-            ),
-            const SizedBox(height: SpacingTokens.n4),
-            Text(
-              entry.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.withWeight(
-                text.caption,
-                first ? FontWeight.w800 : FontWeight.w700,
-              ),
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: first
-                    ? ColorTokens.surfaceDark
-                    : ColorTokens.paletteWhite,
-                borderRadius: BorderRadius.circular(RadiusTokens.pill),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.n10,
-                  vertical: SpacingTokens.n2,
-                ),
-                child: Text(
-                  grouped,
-                  style:
-                      AppTextStyles.withWeight(
-                        AppTextStyles.latin(text.caption),
-                        FontWeight.w700,
-                      ).copyWith(
-                        color: first
-                            ? ColorTokens.primaryAccentOnDark
-                            : ColorTokens.textPrimary,
-                      ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -401,9 +432,10 @@ class _CrownPainter extends CustomPainter {
 
 /// A rank 4 and below: rank, avatar, name, points on a translucent white row.
 class _Row extends StatelessWidget {
-  const _Row({required this.entry, this.highlighted = false});
+  const _Row({required this.entry, this.highlighted = false, this.reporter});
 
   final LeaderboardEntry entry;
+  final _Reporter? reporter;
 
   /// The player's own row.
   final bool highlighted;
@@ -416,54 +448,61 @@ class _Row extends StatelessWidget {
       AppTextStyles.latin(text.bodySmall),
       FontWeight.w700,
     );
-    return Semantics(
-      container: true,
-      label: '${entry.rank}, ${entry.name}, ${l10n.lbPoints(entry.points)}',
-      child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: highlighted
-                ? ColorTokens.surfaceCard
-                : ColorTokens.surfaceCardOnYellow,
-            borderRadius: BorderRadius.circular(RadiusTokens.large),
-            border: highlighted
-                ? Border.all(
-                    color: ColorTokens.surfaceDark,
-                    width: SizeTokens.eraRing,
-                  )
-                : null,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: SizeTokens.leaderboardRowMinHeight,
+    final report = reporter?.tapFor(entry);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: report,
+      child: Semantics(
+        container: true,
+        label: '${entry.rank}, ${entry.name}, ${l10n.lbPoints(entry.points)}',
+        onTap: report,
+        onTapHint: report == null ? null : l10n.lbReportHint,
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: highlighted
+                  ? ColorTokens.surfaceCard
+                  : ColorTokens.surfaceCardOnYellow,
+              borderRadius: BorderRadius.circular(RadiusTokens.large),
+              border: highlighted
+                  ? Border.all(
+                      color: ColorTokens.surfaceDark,
+                      width: SizeTokens.eraRing,
+                    )
+                  : null,
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: SpacingTokens.n14,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: SizeTokens.leaderboardRowMinHeight,
               ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: SpacingTokens.n24,
-                    child: Text(entry.rank.toString(), style: numbers),
-                  ),
-                  AvatarTile(
-                    colorIndex: entry.colorIndex,
-                    size: SizeTokens.leaderboardAvatar,
-                  ),
-                  const SizedBox(width: SpacingTokens.n12),
-                  Expanded(
-                    child: Text(
-                      highlighted ? l10n.lbYou : entry.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.withWeight(
-                        text.bodySmall,
-                        highlighted ? FontWeight.w800 : FontWeight.w600,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.n14,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: SpacingTokens.n24,
+                      child: Text(entry.rank.toString(), style: numbers),
+                    ),
+                    AvatarTile(
+                      colorIndex: entry.colorIndex,
+                      size: SizeTokens.leaderboardAvatar,
+                    ),
+                    const SizedBox(width: SpacingTokens.n12),
+                    Expanded(
+                      child: Text(
+                        highlighted ? l10n.lbYou : entry.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.withWeight(
+                          text.bodySmall,
+                          highlighted ? FontWeight.w800 : FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(l10n.lbPoints(entry.points), style: numbers),
-                ],
+                    Text(l10n.lbPoints(entry.points), style: numbers),
+                  ],
+                ),
               ),
             ),
           ),

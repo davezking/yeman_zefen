@@ -6,7 +6,7 @@ export type PendingAction =
   | { kind: "ban"; userId: string; name: string; banned: boolean; reviewItemId?: number }
   | { kind: "void"; sessionId: string; score: number }
   | { kind: "dismissSession"; sessionId: string }
-  | { kind: "dismissFlag"; flagId: number; name: string };
+  | { kind: "dismissFlag"; flagId: number; name: string; nameReport?: boolean };
 
 /** The note dialog for one pending action; render it only while there is one. */
 export function ModerationActionModal({ action, onClose }: { action: PendingAction; onClose: () => void }) {
@@ -66,13 +66,15 @@ export function ModerationActionModal({ action, onClose }: { action: PendingActi
         <NoteModal
           opened
           onClose={onClose}
-          title="Dismiss anomaly flag"
+          title={action.nameReport ? "Dismiss name report" : "Dismiss anomaly flag"}
           confirmLabel="Dismiss"
           color="blue"
           loading={dismissFlag.isPending}
           onConfirm={(note) => dismissFlag.mutate({ flagId: action.flagId, note }, done)}
         >
-          {action.name} stays on the leaderboards. The nightly pass will not raise the same day again.
+          {action.nameReport
+            ? `${action.name} stays on the leaderboards. A new report of the name opens a new item.`
+            : `${action.name} stays on the leaderboards. The nightly pass will not raise the same day again.`}
         </NoteModal>
       );
   }

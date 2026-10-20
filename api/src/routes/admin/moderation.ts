@@ -2,9 +2,13 @@
 // (shadow-ban, void a session, dismiss a flag). Every action needs a note and is written to
 // moderation_log with the admin's email, in the same batch (one transaction) as its effect.
 //
-// D1 cost is constant per request: the queue is 2 queries, the drill-down 5, an action 2 to 6.
+// A player flag is a review item about a user: a nightly `score_anomaly`, or a `name_report` from
+// other players (routes/v1/reports.ts). A ban can resolve either; dismiss closes either.
+//
+// D1 cost is constant per request: the queue is 3 queries, the drill-down 5, an action 2 to 6.
 import { Hono } from "hono";
 import { z } from "zod";
+import { PLAYER_FLAG_REASONS } from "../../db/schema";
 import type { AppEnv } from "../../env";
 import { requireRole } from "../../lib/accessAuth";
 import { ApiError } from "../../lib/errors";
@@ -17,6 +21,7 @@ export const QUEUE_LIMIT = 100;
 export const RECENT_SESSIONS = 25;
 export const LOG_LIMIT = 50;
 export const VOIDED = "voided";
+const PLAYER_FLAG_SQL = `(${PLAYER_FLAG_REASONS.map((r) => `'${r}'`).join(", ")})`;
 
 const adminOnly = requireRole("admin");
 
@@ -26,11 +31,12 @@ const banBody = z
   .strictObject({
     banned: z.boolean(),
     note,
-    /** The anomaly flag this ban answers; it is resolved in the same step. */
+    /** The player flag (anomaly or name report) this ban answers; it is resolved in the same step. */
     reviewItemId: z.number().int().positive().optional(),
   })
   .refine((b) => b.banned || b.reviewItemId === undefined, { message: "only a ban can resolve a flag", path: ["reviewItemId"] });
 const textId = z.string().min(1).max(128);
+const isPlayerFlag = (reason: string) => (PLAYER_FLAG_REASONS as readonly string[]).includes(reason);
 
 /** The rounds of a stored session, trimmed to what a moderator reads (not the options shown). */
 function roundsOf(eventsJson: string) {
@@ -58,6 +64,15 @@ const ANOMALY_QUEUE_SQL = `
    ORDER BY r.id
    LIMIT ${QUEUE_LIMIT + 1}`;
 
+// Open reports of offensive display names, oldest first (review_items_status_reason_idx).
+const NAME_QUEUE_SQL = `
+  SELECT r.id, r.entity_ref AS userId, r.details_json AS detailsJson, u.display_name AS displayName,
+         COALESCE(u.shadow_banned, 0) AS shadowBanned
+    FROM review_items r LEFT JOIN users u ON u.id = r.entity_ref
+   WHERE r.reason = 'name_report' AND r.status = 'open' AND r.entity_type = 'user'
+   ORDER BY r.id
+   LIMIT ${QUEUE_LIMIT + 1}`;
+
 // Flagged sessions nobody has voided or dismissed yet, newest first (game_sessions_flagged_idx).
 const SESSION_QUEUE_SQL = `
   SELECT s.id, s.user_id AS userId, u.display_name AS displayName, u.shadow_banned AS shadowBanned, s.mode, s.difficulty,
@@ -76,9 +91,14 @@ type SessionRow = {
 
 // At most QUEUE_LIMIT of each come back (`more` says there are others); closing items brings the rest up.
 moderationRoutes.get("/moderation/queue", adminOnly, async (c) => {
-  const [anomalies, sessions] = await c.env.DB.batch([c.env.DB.prepare(ANOMALY_QUEUE_SQL), c.env.DB.prepare(SESSION_QUEUE_SQL)]);
+  const [anomalies, sessions, names] = await c.env.DB.batch([
+    c.env.DB.prepare(ANOMALY_QUEUE_SQL),
+    c.env.DB.prepare(SESSION_QUEUE_SQL),
+    c.env.DB.prepare(NAME_QUEUE_SQL),
+  ]);
   const a = anomalies!.results as AnomalyRow[];
   const s = sessions!.results as SessionRow[];
+  const n = names!.results as AnomalyRow[];
   return c.json({
     anomalies: a.slice(0, QUEUE_LIMIT).map(({ detailsJson, shadowBanned, ...row }) => ({
       ...row,
@@ -88,6 +108,12 @@ moderationRoutes.get("/moderation/queue", adminOnly, async (c) => {
     anomaliesMore: a.length > QUEUE_LIMIT,
     sessions: s.slice(0, QUEUE_LIMIT).map(({ shadowBanned, ...row }) => ({ ...row, shadowBanned: shadowBanned === 1 })),
     sessionsMore: s.length > QUEUE_LIMIT,
+    nameReports: n.slice(0, QUEUE_LIMIT).map(({ detailsJson, shadowBanned, ...row }) => ({
+      ...row,
+      shadowBanned: shadowBanned === 1,
+      details: parseStoredJson(detailsJson),
+    })),
+    nameReportsMore: n.length > QUEUE_LIMIT,
   });
 });
 
@@ -160,12 +186,12 @@ const FLAG_SQL = "SELECT entity_type AS entityType, entity_ref AS userId, reason
 // player was already banned (the ban then changes and logs nothing).
 const RESOLVE_FLAG_SQL = `
   UPDATE review_items SET status = 'resolved', resolved_by = ?3, resolved_at = ?4
-   WHERE id = ?1 AND entity_type = 'user' AND entity_ref = ?2 AND reason = 'score_anomaly' AND status = 'open'
+   WHERE id = ?1 AND entity_type = 'user' AND entity_ref = ?2 AND reason IN ${PLAYER_FLAG_SQL} AND status = 'open'
    RETURNING id`;
 
 // Banning hides the player from everyone else's boards at once (those reads filter on shadow_banned; the
 // cached top 100 follows within its 60 s). Their points are kept, so lifting the ban restores them.
-// A `reviewItemId` must be this player's open anomaly flag; otherwise nothing is done (404 or 409).
+// A `reviewItemId` must be one of this player's open flags; otherwise nothing is done (404 or 409).
 moderationRoutes.post("/users/:id/shadow-ban", adminOnly, async (c) => {
   const userId = parse(textId, c.req.param("id"), "id");
   const body = parse(banBody, await readJson(c));
@@ -175,8 +201,8 @@ moderationRoutes.post("/users/:id/shadow-ban", adminOnly, async (c) => {
   if (!exists) throw new ApiError(404, "not_found", `User ${userId} not found`);
   if (body.reviewItemId !== undefined) {
     const flag = await DB.prepare(FLAG_SQL).bind(body.reviewItemId).first<{ entityType: string; userId: string | null; reason: string; status: string }>();
-    if (!flag || flag.entityType !== "user" || flag.reason !== "score_anomaly" || flag.userId !== userId) {
-      throw new ApiError(404, "not_found", `Flag ${body.reviewItemId} is not an anomaly flag for user ${userId}`);
+    if (!flag || flag.entityType !== "user" || !isPlayerFlag(flag.reason) || flag.userId !== userId) {
+      throw new ApiError(404, "not_found", `Flag ${body.reviewItemId} is not a flag for user ${userId}`);
     }
     if (flag.status !== "open") throw new ApiError(409, "already_closed", `Flag ${body.reviewItemId} is already ${flag.status}`);
   }
@@ -300,7 +326,7 @@ moderationRoutes.post("/sessions/:id/dismiss", adminOnly, async (c) => {
 
 const DISMISS_FLAG_SQL = `
   UPDATE review_items SET status = 'dismissed', resolved_by = ?2, resolved_at = ?3
-   WHERE id = ?1 AND entity_type = 'user' AND reason = 'score_anomaly' AND status = 'open'
+   WHERE id = ?1 AND entity_type = 'user' AND reason IN ${PLAYER_FLAG_SQL} AND status = 'open'
    RETURNING entity_ref AS userId`;
 
 const LOG_FLAG_SQL = `
@@ -319,7 +345,7 @@ moderationRoutes.post("/moderation/flags/:id/dismiss", adminOnly, async (c) => {
   ]);
   if (closed!.results.length === 0) {
     const existing = await DB.prepare("SELECT status, reason FROM review_items WHERE id = ?1").bind(id).first<{ status: string; reason: string }>();
-    if (!existing || existing.reason !== "score_anomaly") throw new ApiError(404, "not_found", `Flag ${id} not found`);
+    if (!existing || !isPlayerFlag(existing.reason)) throw new ApiError(404, "not_found", `Flag ${id} not found`);
     throw new ApiError(409, "already_closed", `Flag ${id} is already ${existing.status}`);
   }
   return c.json({ id, status: "dismissed" });
