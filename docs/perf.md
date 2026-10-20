@@ -8,7 +8,7 @@ Targets (`docs/architecture.md` §9): p95 under 300 ms for `GET /v1/packs`, `GET
 
 ### 1. Query plans on a full-size database (done)
 
-`api/scripts/seed-perf.ts` filled a local D1 with the volume the task asks for: 1,000 tracks, 20,000 users, 300,000 sessions (about 1.5 KB of events each) and 83,000 leaderboard rows (all-time, plus 8 weeks, by era). `EXPLAIN QUERY PLAN` for each route's SQL:
+`api/scripts/seed-perf.ts` filled a local D1 with the volume the task asks for: 1,000 tracks, 20,000 users, 300,000 sessions (about 1.5 KB of events each) and 83,000 leaderboard rows (all-time, plus 8 weeks, by era). (That run's `events_json` was malformed by a bug in the script, since fixed; it did not change row sizes or plans.) `EXPLAIN QUERY PLAN` for each route's SQL:
 
 | Route | Plan |
 |---|---|
@@ -32,7 +32,7 @@ The same statements the Worker runs, in SQLite on the local file, 500 iterations
 | session: the two reads | 0.07 ms | 0.18 ms | 0.25 ms |
 | session: the three writes | 0.16 ms | 0.24 ms | 0.29 ms |
 
-The SQL is not where the 300 ms would go. What a player waits for is the round trips to D1 (a session makes 4 to 5 in sequence: the rate-limit bucket, the two reads, the write batch), Firebase token verification (the signing keys are cached per isolate, so a cold isolate adds one fetch to Google), and the network. Those only show up on the real run.
+The SQL is not where the 300 ms would go. What a player waits for is the round trips to D1 (a session makes 3 in sequence: the rate-limit bucket, the batch of two reads, the write batch; a fourth only when two requests race on the same session id), Firebase token verification (the signing keys are cached per isolate, so a cold isolate adds one fetch to Google), and the network. Those only show up on the real run.
 
 ### 3. D1 rows written per session (done, the write budget is wrong)
 
@@ -45,9 +45,23 @@ The SQL is not where the 300 ms would go. What a player waits for is the round t
 
 `docs/architecture.md` §9 budgeted about 6 rows per session by counting table rows only. Billed, a session costs more than twice that, so the free plan lasts about **3,000 DAU**, not 12–15k (§9 is corrected). At 2 sessions per player per day, 14 rows a session is 28 rows per player a day, so 100k rows a day covers about 3,400 players, less the nightly roll-up. Next step: plan to move to Workers Paid ($5/month) once the beta goes past about 2,500 DAU.
 
+### 4. Database size (done, this is the first free-plan limit)
+
+The seeded database is **648 MB**, 587 MB of it `game_sessions`: about 1.96 KB a row, most of it `events_json`. D1's Free plan caps a database at 500 MB (from memory; check the Cloudflare docs), so the full 300k-session seed does not fit a Free-plan staging database. Seed about 200k (`--sessions 200000`) there, or run staging on Workers Paid.
+
+The same applies to prod. The nightly job now trims `events_json` of sessions older than 90 days to what is still read (each round's track, points and correctness, and the ads): 1.5 KB becomes 0.5 KB, so a row drops to about 0.96 KB (`api/src/cron/rollups.ts`, `api/test/eventsTrim.test.ts`). That slows growth but does not stop it:
+
+| DAU (2 sessions each) | 90 days of full rows | Then grows by | 500 MB reached after |
+|---|---|---|---|
+| 500 | 176 MB | 1 MB / day | about a year |
+| 1,000 | 353 MB | 1.9 MB / day | about 5 months |
+| 2,000 | (over 500 MB) | | about 2 months |
+
+So storage, not writes, is the first free-plan limit: plan Workers Paid (10 GB per database) once the beta is past about 1,000 DAU. The trim runs on at most 5,000 sessions a night (one statement) and only looks at a 7-day band past 90 days, so a band the job missed for more than a week stays untrimmed.
+
 ## Load model
 
-`ops/load/mix.js` (k6): 70 % leaderboard reads, 20 % session posts (10 rounds, valid, from registered players so the leaderboard rows are written), 10 % pack lists.
+`ops/load/mix.js` (k6): 70 % leaderboard reads, 20 % session posts (10 rounds, valid, from 100 registered players so the leaderboard rows are written), 10 % pack lists. The players are reused Firebase accounts (`perf-<n>@example.com`): the first run creates them, later runs only sign in.
 
 2,000 DAU peak hour, from these assumptions: 2 sessions per player per day, a quarter of the day's sessions in the peak hour, so about 1,000 session posts an hour. Sessions are 20 % of requests, so about 1.4 requests a second; the test uses **2 rps**. It then runs 5x (10 rps) and 10x (20 rps) to show headroom.
 

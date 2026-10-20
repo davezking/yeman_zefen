@@ -28,6 +28,11 @@ if (!remote && !flag("local")) {
   console.error("Say where: --local or --remote");
   process.exit(1);
 }
+// Without --env, wrangler takes the top-level database, whose name (yz-db) is also prod's.
+if (remote && env !== "staging") {
+  console.error("--remote is only for staging: add --env staging (and --db yz-db-staging).");
+  process.exit(1);
+}
 const TRACKS = 1000;
 const ARTISTS = 150;
 const USERS = 20_000;
@@ -95,7 +100,8 @@ run(
 
 // One session is ~10 rounds and ~1 KB of events, like a real one.
 const ROUND = `{"trackId":1,"question":"song","optionIds":[1,2,3,4],"chosenId":1,"responseMs":3100,"hintUsed":false,"points":120,"correct":true,"valid":true}`;
-const EVENTS = `[${Array.from({ length: 10 }, () => ROUND).join(",")}]`;
+const EVENTS_JSON = `{"clientEndedAt":0,"rounds":[${Array.from({ length: 10 }, () => ROUND).join(",")}],"ads":{"interstitialShown":1,"rewardedCompleted":0}}`;
+JSON.parse(EVENTS_JSON); // fail here, not in D1, if the template is ever broken
 for (let from = 1; from <= SESSIONS; from += CHUNK) {
   const count = Math.min(CHUNK, SESSIONS - from + 1);
   run(
@@ -107,7 +113,7 @@ for (let from = 1; from <= SESSIONS; from += CHUNK) {
             CASE ${H("i", 10)} % 3 WHEN 0 THEN 'easy' WHEN 1 THEN 'medium' ELSE 'hard' END,
             ${now} - (${H("i", 11)} % ${WEEKS * 7}) * ${DAY_MS} - 120000, ${now} - (${H("i", 11)} % ${WEEKS * 7}) * ${DAY_MS},
             10, 200 + ${H("i", 12)} % 1300, '[1,2,3,4,5,6,7,8,9,10]',
-            '{"clientEndedAt":0,"rounds":${EVENTS.slice(1, -1).replaceAll("'", "''")},"ads":{"interstitialShown":1,"rewardedCompleted":0}}',
+            '${EVENTS_JSON.replaceAll("'", "''")}',
             ${H("i", 13)} % 10 = 0, 'ET', 0
        FROM n;`,
     `sessions ${from}..${from + count - 1}`,

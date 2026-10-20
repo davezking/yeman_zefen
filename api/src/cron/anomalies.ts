@@ -28,8 +28,8 @@ export const WEEKLY_LEAD_FACTOR = 3;
 
 /** analytics_daily metric that marks a day's pass as done (value = users flagged), so missed days are retried. */
 export const ANOMALY_PASS_METRIC = "anomaly_pass";
-/** D1 queries one pass makes at most: users, rounds, board, percentile, and one batch (flags + marker). */
-export const ANOMALY_QUERIES = 5;
+/** D1 queries one pass makes at most: users, rounds, board, percentile, and a batch of two (flags + marker; each counts). */
+export const ANOMALY_QUERIES = 6;
 
 const HOUR_MS = 3_600_000;
 const GENERATION_ALL = 0;

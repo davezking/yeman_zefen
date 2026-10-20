@@ -87,7 +87,11 @@ type Payload = z.infer<typeof sessionPayloadSchema>;
 
 export type SessionResult = { score: number; rounds: { points: number; correct: boolean }[]; flagged: boolean };
 
-/** What events_json holds: the events as sent, plus each round's result (replays return it). */
+/**
+ * What events_json holds: the events as sent, plus each round's result (replays return it). After
+ * 90 days the nightly job trims each round to `trackId`, `points` and `correct` (src/cron/rollups.ts),
+ * which is all a replay reads.
+ */
 type StoredEvents = {
   clientEndedAt: number;
   rounds: (Payload["rounds"][number] & { points: number; correct: boolean; valid: boolean })[];

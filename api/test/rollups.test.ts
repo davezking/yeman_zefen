@@ -198,8 +198,12 @@ describe("runScheduled", () => {
     await rollUpDay(env, "2026-10-12");
     await rollUpDay(env, "2026-10-13");
     expect(await missingDates(env, NOW)).toEqual(["2026-10-09", "2026-10-10", "2026-10-11", "2026-10-14", "2026-10-15"]);
+    // Yesterday first, then the oldest, up to MAX_DAYS_PER_RUN (4); a second run takes the rest.
     const done = await runScheduled(env, NOW);
-    expect(done.map((d) => d.date)).toEqual(["2026-10-09", "2026-10-10", "2026-10-11", "2026-10-14", "2026-10-15"]);
+    expect(done.map((d) => d.date)).toEqual(["2026-10-09", "2026-10-10", "2026-10-11", "2026-10-15"]);
+    expect(await missingDates(env, NOW)).toEqual(["2026-10-14"]);
+    // Every run recomputes yesterday too.
+    expect((await runScheduled(env, NOW)).map((d) => d.date)).toEqual(["2026-10-14", "2026-10-15"]);
     expect(await missingDates(env, NOW)).toEqual([]);
     // Next night: only the new yesterday is missing; older days are not recomputed.
     const next = await runScheduled(env, NOW + MS);
@@ -250,11 +254,13 @@ describe("runScheduled", () => {
         bind: (...v: unknown[]) => ({ v, inner: real.prepare(sql).bind(...v), all: () => real.prepare(sql).bind(...v).all() }),
       }),
       batch: (stmts: { v: unknown[]; inner: D1PreparedStatement }[]) =>
-        stmts[0]!.v[0] === "2026-10-12" ? Promise.reject(new Error("boom")) : real.batch(stmts.map((x) => x.inner)),
+        stmts[0]!.v[0] === "2026-10-11" ? Promise.reject(new Error("boom")) : real.batch(stmts.map((x) => x.inner)),
     } as unknown as D1Database;
-    await expect(runScheduled({ DB: flaky }, NOW)).rejects.toThrow(/2026-10-12/);
-    // The 12th is still missing; the 13th and 14th were cut by the per-run cap, not by the failure.
-    expect(await missingDates(env, NOW)).toEqual(["2026-10-12", "2026-10-13", "2026-10-14"]);
+    await expect(runScheduled({ DB: flaky }, NOW)).rejects.toThrow(/2026-10-11/);
+    // The 11th is still missing; the 12th to 14th were cut by the per-run cap, not by the failure.
+    expect(await missingDates(env, NOW)).toEqual(["2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14"]);
+    await runScheduled(env, NOW);
+    expect(await missingDates(env, NOW)).toEqual(["2026-10-14"]);
     await runScheduled(env, NOW);
     expect(await missingDates(env, NOW)).toEqual([]);
   });

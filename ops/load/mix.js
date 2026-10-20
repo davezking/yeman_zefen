@@ -5,10 +5,11 @@
 //          -e FIREBASE_API_KEY=<dev project web API key> \
 //          --summary-trend-stats="avg,med,p(90),p(95),p(99),max" ops/load/mix.js
 //
-// Players: setup() creates USERS email/password accounts in the Firebase project the staging Worker
-// verifies against (the dev project) and signs them in, so every request carries a real ID token
-// (valid for an hour: keep a run under that). They are registered players, so their sessions also
-// write leaderboard rows, which is the expensive path.
+// Players: setup() signs in USERS email/password accounts (perf-<n>@example.com) in the Firebase
+// project the staging Worker verifies against (the dev project), creating only the ones that do not
+// exist yet: Firebase limits new accounts per IP per hour, so the first run makes them and later runs
+// reuse them. Every request carries a real ID token (valid for an hour: keep a run under that). They
+// are registered players, so their sessions also write leaderboard rows, which is the expensive path.
 import http from "k6/http";
 import { check, fail } from "k6";
 import { Counter } from "k6/metrics";
@@ -16,7 +17,9 @@ import { Counter } from "k6/metrics";
 const BASE_URL = (__ENV.BASE_URL || "").replace(/\/$/, "");
 const API_KEY = __ENV.FIREBASE_API_KEY || "";
 const IDENTITY_URL = (__ENV.IDENTITY_URL || "https://identitytoolkit.googleapis.com").replace(/\/$/, "");
-const USERS = Number(__ENV.USERS || 200);
+// 100 players keep each under the per-player session limit (20 at once, 60 an hour) at the 10x stage.
+const USERS = Number(__ENV.USERS || 100);
+const PASSWORD = __ENV.PERF_PASSWORD || "perf-load-test-only";
 // Track ids seeded by api/scripts/seed-perf.ts on an empty database: 1..1000.
 const TRACK_MAX = Number(__ENV.TRACK_MAX || 1000);
 // Requests per second for the three stages. 2 rps is the 2,000 DAU peak hour (see docs/perf.md);
@@ -76,19 +79,30 @@ function uuid() {
 
 const int = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
+function identity(method, body) {
+  return http.post(`${IDENTITY_URL}/v1/accounts:${method}?key=${API_KEY}`, JSON.stringify({ ...body, returnSecureToken: true }), {
+    headers: { "content-type": "application/json" },
+    tags: { route: "setup" },
+    responseCallback: http.expectedStatuses(200, 400),
+  });
+}
+
 export function setup() {
   if (!API_KEY) fail("Set -e FIREBASE_API_KEY=... (the Firebase dev project's web API key)");
-  const run = Date.now().toString(36);
   const tokens = [];
+  let created = 0;
   for (let i = 0; i < USERS; i++) {
-    const res = http.post(
-      `${IDENTITY_URL}/v1/accounts:signUp?key=${API_KEY}`,
-      JSON.stringify({ email: `perf-${run}-${i}@example.com`, password: `Pw-${run}-${i}-x`, returnSecureToken: true }),
-      { headers: { "content-type": "application/json" }, tags: { route: "setup" } },
-    );
-    if (res.status !== 200) fail(`sign-up ${i} failed: ${res.status} ${res.body}`);
+    const account = { email: `perf-${i}@example.com`, password: PASSWORD };
+    let res = identity("signInWithPassword", account);
+    if (res.status !== 200) {
+      // An unknown email reads as EMAIL_NOT_FOUND, or INVALID_LOGIN_CREDENTIALS with email enumeration protection on.
+      res = identity("signUp", account);
+      created++;
+    }
+    if (res.status !== 200) fail(`player ${i}: ${res.status} ${res.body}`);
     tokens.push(res.json("idToken"));
   }
+  console.log(`${USERS} players signed in (${created} created)`);
   return { tokens };
 }
 

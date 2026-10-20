@@ -109,10 +109,36 @@ const INSERT_SQL = [ROYALTY_SQL, ADS_SQL, TOTALS_SQL, BREAKDOWN_SQL, RETENTION_S
 const STATEMENTS_PER_DAY = DELETE_SQL.length + INSERT_SQL.length;
 /** D1 queries one cron run may make: the Free plan allows 50, and 1 is kept spare. */
 export const RUN_QUERY_BUDGET = 49;
-/** The run's own statements: missing roll-up days, missing anomaly days, and the rate-limit prune. */
-const RUN_READS = 3;
+/** The run's own statements: missing roll-up days, missing anomaly days, the rate-limit prune, the events trim. */
+const RUN_READS = 4;
 /** A rate-limit bucket idle this long is full again, so its row can go. */
 const RATE_LIMIT_IDLE_MS = DAY_MS;
+/** Sessions older than this keep only what is still read: per-round points, correctness and track, and the ads. */
+export const EVENTS_KEEP_DAYS = 90;
+/** At most this many sessions are trimmed per run, so one statement stays well inside D1's time limit. */
+export const EVENTS_TRIM_PER_RUN = 5000;
+
+// Shrinks events_json (about 1.5 KB for 10 rounds) to what is read after the roll-ups and anomaly
+// passes are done with it: a replay (POST /v1/sessions answers with each round's points and
+// correctness), the moderation view (track, points, correctness) and the ads (roll-up re-runs).
+// About 80 % smaller, which keeps D1 under its database size cap (docs/perf.md).
+// Only a 7-day band past EVENTS_KEEP_DAYS is looked at, through game_sessions_received_idx, so a
+// run reads a few days of sessions, not every old one. ?1 band start, ?2 band end, ?3 limit.
+const TRIM_EVENTS_SQL = `
+  UPDATE game_sessions
+     SET events_json = json_object(
+           'clientEndedAt', json_extract(events_json, '$.clientEndedAt'),
+           'rounds', (SELECT json_group_array(json_object(
+                               'trackId', json_extract(j.value, '$.trackId'),
+                               'points', json_extract(j.value, '$.points'),
+                               'correct', json(CASE WHEN json_extract(j.value, '$.correct') THEN 'true' ELSE 'false' END)))
+                        FROM json_each(events_json, '$.rounds') j),
+           'ads', json(COALESCE(json_extract(events_json, '$.ads'), '{}')),
+           'trimmed', json('true'))
+   WHERE id IN (SELECT id FROM game_sessions
+                 WHERE received_at >= ?1 AND received_at < ?2
+                   AND json_valid(events_json) AND json_extract(events_json, '$.trimmed') IS NULL
+                 LIMIT ?3)`;
 /**
  * Days one run rolls up at most: as many as fit once the reads and one anomaly pass (yesterday's,
  * which every run makes) are paid for. Whatever is left over goes to anomaly passes for missed days.
@@ -204,6 +230,13 @@ export async function runScheduled(env: Pick<Bindings, "DB">, now: number = Date
   } catch (e) {
     failed.push("rate_limits prune");
     console.error("rate_limits prune failed", e);
+  }
+  try {
+    const end = now - EVENTS_KEEP_DAYS * DAY_MS;
+    await env.DB.prepare(TRIM_EVENTS_SQL).bind(end - BACKFILL_DAYS * DAY_MS, end, EVENTS_TRIM_PER_RUN).all();
+  } catch (e) {
+    failed.push("events trim");
+    console.error("events trim failed", e);
   }
   if (failed.length > 0) throw new Error(`nightly run failed for ${failed.join(", ")}`);
   return done;
