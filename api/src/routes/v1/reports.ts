@@ -13,7 +13,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../env";
 import { CLIP_TYPES } from "../../db/schema";
-import { errorBody } from "../../lib/errors";
+import { ApiError } from "../../lib/errors";
 import { parse, readJson } from "../../lib/validate";
 
 export const reports = new Hono<AppEnv>();
@@ -82,7 +82,7 @@ reports.post("/clip", async (c) => {
   if (counted === null) {
     // The count starts over at the next UTC midnight.
     c.header("Retry-After", String(Math.ceil((DAY_MS - (now % DAY_MS)) / 1000)));
-    return c.json(errorBody("rate_limited", `At most ${REPORTS_PER_DAY} clip reports a day`), 429);
+    throw new ApiError(429, "rate_limited", `At most ${REPORTS_PER_DAY} clip reports a day`);
   }
 
   const args = [body.trackId, body.clipType, body.error, now, user.uid] as const;

@@ -1,8 +1,6 @@
-import 'package:flutter/foundation.dart';
-
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
@@ -17,11 +15,8 @@ Future<void> installCrashReporting() async {
   final crashlytics = FirebaseCrashlytics.instance;
   await crashlytics.setCrashlyticsCollectionEnabled(AppConfig.flavor == 'prod');
 
-  final printFlutterError = FlutterError.onError;
-  FlutterError.onError = (details) {
-    printFlutterError?.call(details);
-    crashlytics.recordFlutterFatalError(details);
-  };
+  // Also prints the error to the console, as Flutter's default handler does.
+  FlutterError.onError = crashlytics.recordFlutterFatalError;
   PlatformDispatcher.instance.onError = (error, stack) {
     crashlytics.recordError(error, stack, fatal: true);
     return true;

@@ -168,8 +168,10 @@ class ClipPlayer {
     try {
       await slot.voice.start();
     } catch (e, stack) {
-      if (identical(_playingSlot, slot)) _detach();
-      if (e is! ClipStoppedException) {
+      // A stop or interruption during the start detaches the slot and pauses the voice, which
+      // fails the start. Only a start nobody stopped is a playback failure.
+      if (identical(_playingSlot, slot)) {
+        _detach();
         recordNonFatal(e, stack, reason: 'audio_play_failed');
       }
       rethrow;

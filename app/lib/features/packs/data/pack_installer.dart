@@ -176,8 +176,10 @@ class PackInstaller {
       problem = '"$slug" is not a valid pack slug';
     }
     if (problem != null) {
+      final failure = PackInstallException(problem);
       _emit(PackInstallProgress(slug: expectedSlug, state: PackInstallState.failed, error: problem));
-      throw PackInstallException(problem);
+      recordNonFatal(failure, StackTrace.current, reason: 'pack_install_failed');
+      throw failure;
     }
 
     final paths = _TrackPaths.of(manifest);
@@ -236,7 +238,8 @@ class PackInstaller {
           ? PackInstallState.cancelled
           : PackInstallState.failed;
       _emit(tracker.snapshot(state, error: failure.message));
-      if (state == PackInstallState.failed) {
+      // A full phone is the player's to fix, not a bug.
+      if (state == PackInstallState.failed && failure.failure != PackInstallFailure.storageFull) {
         recordNonFatal(failure, stack, reason: 'pack_install_failed');
       }
       throw failure;

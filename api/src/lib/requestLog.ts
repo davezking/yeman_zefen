@@ -1,5 +1,7 @@
 import type { MiddlewareHandler } from "hono";
+import { routePath } from "hono/route";
 import type { AppEnv } from "../env";
+import { requestCountry } from "./country";
 
 /** SHA-256 of the UID as hex, truncated to 16 characters. The UID itself is never logged. */
 export async function hashUid(uid: string): Promise<string> {
@@ -12,8 +14,9 @@ export async function hashUid(uid: string): Promise<string> {
 
 /**
  * Writes one JSON line per request (Workers Logs picks up console output). Fields: requestId, route
- * (the route pattern, so IDs in paths stay out), status, latencyMs, uidHash, country, and the error
- * code when the request failed. Never tokens, bodies, or emails.
+ * (the endpoint's pattern, so IDs in paths stay out, even when a middleware rejected the request),
+ * status, latencyMs, uidHash, country, and the error code when the request failed. Never tokens,
+ * bodies, or emails.
  */
 export const requestLog = (): MiddlewareHandler<AppEnv> => async (c, next) => {
   const startedAt = Date.now();
@@ -21,11 +24,11 @@ export const requestLog = (): MiddlewareHandler<AppEnv> => async (c, next) => {
   const user = c.get("user");
   const line = {
     requestId: c.get("requestId"),
-    route: c.req.routePath,
+    route: routePath(c, -1),
     status: c.res.status,
     latencyMs: Date.now() - startedAt,
     uidHash: user ? await hashUid(user.uid) : undefined,
-    country: (c.req.raw.cf as { country?: string } | undefined)?.country,
+    country: requestCountry(c.req.raw) ?? undefined,
     errorCode: c.get("errorCode"),
   };
   console.log(JSON.stringify(line));
