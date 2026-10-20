@@ -63,9 +63,11 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <!-- Apple's tracking question, asked after Google's consent form (lib/core/ads/consent_service.dart). -->
+    <!-- Apple's tracking question, asked after Google's consent form (lib/core/ads/consent_service.dart).
+         One string in both languages, English first: it is shown as is, whatever the phone's language. -->
     <key>NSUserTrackingUsageDescription</key>
-    <string>Ads keep Yeman Zefen free. Allowing tracking lets them be more relevant to you.</string>
+    <string>Ads keep Yeman Zefen free. Allowing tracking lets them be more relevant to you.
+ማስታወቂያዎች የማን ዘፈንን ነጻ ያደርጋሉ። መከታተልን መፍቀድ ማስታወቂያዎቹ ለእርስዎ ይበልጥ ተስማሚ እንዲሆኑ ይረዳል።</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Lets the app reach the development server on your network.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
