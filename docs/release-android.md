@@ -8,6 +8,10 @@ A tag push builds a signed, obfuscated prod AAB in GitHub Actions (`.github/work
 git tag app-v0.2.0 && git push origin app-v0.2.0
 ```
 
+Each run produces two files from the same build, both signed with the upload key: the **AAB** (what Play takes) and an **APK** (`app-prod-release.apk`, what you install on a phone by sending the file, for beta testers outside Play). Download them from the run page (Actions > the run > Artifacts).
+
+You do not need a terminal to tag: on GitHub open **Releases > Draft a new release**, type the tag (for example `app-v0.2.0`) under "Choose a tag" and pick "Create new tag", then publish (a pre-release is fine). That starts the run.
+
 The tag's version (a `-rc1` suffix is allowed) must equal the name in `pubspec.yaml`, or the run fails at the first step. **The version has one source: `pubspec.yaml`.** The build number (Android `versionCode`) is the workflow's run number plus the optional repository variable `ANDROID_BUILD_NUMBER_OFFSET`, so it only goes up. Play rejects a `versionCode` it has seen: if you ever upload a build made elsewhere, set the offset above it.
 
 The run refuses to build while `app/config/prod.json` has a placeholder `API_BASE` (still `https://api.TODO-set-domain`) or real ad units with Google's sample AdMob app id (`app/tool/check_release_config.sh`).
@@ -37,7 +41,7 @@ Create a GitHub **environment** named `release` (Settings > Environments), add y
 | `ANDROID_KEYSTORE_PASSWORD` | the store password |
 | `ANDROID_KEY_ALIAS` | `upload` |
 | `ANDROID_KEY_PASSWORD` | the key password |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | a service account key (JSON) of the Firebase project `yeman-zefen` that may upload Crashlytics symbols (Google Cloud > IAM > Service accounts; a Crashlytics role, or Firebase Admin if unsure). The JSON is secret: it can be revoked in the console |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | a service account key (JSON) of the Firebase project `yeman-zefen-prod` that may upload Crashlytics symbols (Google Cloud > IAM > Service accounts; a Crashlytics role, or Firebase Admin if unsure). The JSON is secret: it can be revoked in the console |
 | `PLAY_SERVICE_ACCOUNT_JSON` | only for the Play upload below |
 
 The workflow writes the keystore and `android/key.properties` into the runner's temp directory, checks the passwords and alias with `keytool` before building, and deletes both at the end, even when the build fails.

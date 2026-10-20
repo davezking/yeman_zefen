@@ -1,4 +1,5 @@
-# Release build of the prod Android app: a signed, obfuscated AAB for Google Play.
+# Release build of the prod Android app: a signed, obfuscated AAB for Google Play, and an APK of the same build
+# to install by hand (beta testers, a phone you hold).
 #
 #   git tag app-v0.2.0 && git push origin app-v0.2.0
 #
@@ -144,16 +145,39 @@ jobs:
           app_id=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.yemanzefen.yeman_zefen") | .client_info.mobilesdk_app_id' android/app/src/prod/google-services.json)
           GOOGLE_APPLICATION_CREDENTIALS="$credentials" npx --yes firebase-tools@15 crashlytics:symbols:upload --app="$app_id" build/symbols
 
+      # The same app as an APK, to install directly (Play only takes the AAB). It is signed with the same upload key.
+      # Its own symbols folder: the Dart symbols belong to one exact build, so each build is uploaded with its own.
+      - name: Build the APK
+        run: >
+          flutter build apk --release --flavor prod
+          --dart-define-from-file=config/prod.json
+          --obfuscate --split-debug-info=build/symbols-apk
+          --build-name=${{ steps.version.outputs.name }}
+          --build-number=${{ steps.version.outputs.number }}
+
+      - name: Upload the APK's Dart symbols to Crashlytics
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          credentials="$RUNNER_TEMP/firebase-service-account.json"
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$credentials"
+          app_id=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.yemanzefen.yeman_zefen") | .client_info.mobilesdk_app_id' android/app/src/prod/google-services.json)
+          GOOGLE_APPLICATION_CREDENTIALS="$credentials" npx --yes firebase-tools@15 crashlytics:symbols:upload --app="$app_id" build/symbols-apk
+
       - name: Zip the symbols
-        run: cd build && zip -qr symbols.zip symbols
+        run: cd build && zip -qr symbols.zip symbols symbols-apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-release-${{ steps.version.outputs.name }}-${{ steps.version.outputs.number }}
           path: |
             app/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+            app/build/app/outputs/flutter-apk/app-prod-release.apk
             app/build/app/outputs/mapping/prodRelease/mapping.txt
             app/build/symbols.zip
+          if-no-files-found: error
           retention-days: 90
 
       # Optional: to Play's internal testing track. Off until the app exists in Play Console and its first
