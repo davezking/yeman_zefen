@@ -62,7 +62,16 @@ const flag = async (userId: string) =>
      VALUES ('user', 0, ?1, 'score_anomaly', '{"days":{"2026-10-14":{"rules":["bot_regularity"]}}}', 'open') RETURNING id`,
   ).bind(userId).first<{ id: number }>())!.id;
 
+const nameReport = async (userId: string, reported = userId) =>
+  (await env.DB.prepare(
+    `INSERT INTO review_items (entity_type, entity_id, entity_ref, reason, details_json, status)
+     VALUES ('user', 0, ?1, 'name_report', json_object('displayName', ?2, 'reports', 2, 'reporters', json_array('r1', 'r2')), 'open') RETURNING id`,
+  ).bind(userId, reported).first<{ id: number }>())!.id;
+
 const post = (path: string, body: unknown, as: "admin" | "editor" = "admin") => api(path, { body, as });
+
+const flagState = async (id: number) =>
+  (await env.DB.prepare("SELECT status, resolved_by AS by FROM review_items WHERE id = ?1").bind(id).first<{ status: string; by: string | null }>())!;
 
 describe("access", () => {
   it("is for the admin role only", async () => {
@@ -109,6 +118,26 @@ describe("GET /admin/moderation/queue", () => {
     expect(body.sessions[0]).toMatchObject({ flagReason: "late_answer", shadowBanned: false });
     expect(body.sessions[1]!.shadowBanned).toBe(true);
     expect(body.anomaliesMore || body.sessionsMore).toBe(false);
+  });
+
+  it("lists open name reports apart from the anomaly flags", async () => {
+    await user("u1", { name: "Renamed" });
+    await user("u2");
+    const anomaly = await flag("u2");
+    const report = await nameReport("u1", "Bad Name");
+    const closed = await nameReport("u2");
+    await env.DB.prepare("UPDATE review_items SET status = 'resolved' WHERE id = ?1").bind(closed).run();
+
+    const body = (await (await api("/admin/moderation/queue")).json()) as {
+      anomalies: { id: number }[];
+      nameReports: { id: number; userId: string; displayName: string; shadowBanned: boolean; details: { displayName: string; reports: number } }[];
+      nameReportsMore: boolean;
+    };
+    expect(body.anomalies.map((a) => a.id)).toEqual([anomaly]);
+    expect(body.nameReports).toHaveLength(1);
+    expect(body.nameReports[0]).toMatchObject({ id: report, userId: "u1", displayName: "Renamed", shadowBanned: false });
+    expect(body.nameReports[0]!.details).toMatchObject({ displayName: "Bad Name", reports: 2 });
+    expect(body.nameReportsMore).toBe(false);
   });
 
   it("drops a session once it is voided", async () => {
@@ -194,9 +223,6 @@ describe("POST /admin/users/:id/shadow-ban", () => {
     expect(await logRows()).toHaveLength(1);
   });
 
-  const flagState = async (id: number) =>
-    (await env.DB.prepare("SELECT status, resolved_by AS by FROM review_items WHERE id = ?1").bind(id).first<{ status: string; by: string | null }>())!;
-
   it("resolves the anomaly flag it answers and logs the ban and the resolution", async () => {
     await user("u1");
     const id = await flag("u1");
@@ -241,6 +267,14 @@ describe("POST /admin/users/:id/shadow-ban", () => {
     expect((await flagState(theirs)).status).toBe("open");
     expect((await env.DB.prepare("SELECT shadow_banned AS b FROM users WHERE id = 'u1'").first<{ b: number }>())!.b).toBe(0);
     expect(await logRows()).toEqual([]);
+  });
+
+  it("resolves a name report it answers", async () => {
+    await user("u1");
+    const id = await nameReport("u1");
+    expect((await post("/admin/users/u1/shadow-ban", { banned: true, note: NOTE, reviewItemId: id })).status).toBe(200);
+    expect((await flagState(id)).status).toBe("resolved");
+    expect((await logRows()).map((r) => r.action)).toEqual(["shadow_ban", "resolve_flag"]);
   });
 
   it("only a ban can resolve a flag", async () => {
@@ -434,7 +468,16 @@ describe("dismissing", () => {
     expect(await logRows()).toHaveLength(1);
   });
 
-  it("requires a note, and only dismisses anomaly flags", async () => {
+  it("dismisses a name report with a note, once", async () => {
+    await user("u1");
+    const id = await nameReport("u1");
+    expect((await post(`/admin/moderation/flags/${id}/dismiss`, { note: NOTE })).status).toBe(200);
+    expect((await flagState(id)).status).toBe("dismissed");
+    expect((await post(`/admin/moderation/flags/${id}/dismiss`, { note: NOTE })).status).toBe(409);
+    expect((await logRows()).map((r) => r.action)).toEqual(["dismiss_flag"]);
+  });
+
+  it("requires a note, and only dismisses player flags", async () => {
     await user("u1");
     const id = await flag("u1");
     expect((await post(`/admin/moderation/flags/${id}/dismiss`, {})).status).toBe(400);
@@ -471,6 +514,7 @@ describe("query budget", () => {
     for (let i = 0; i < 30; i++) await session({ id: `s${i}`, userId: "u1", flagged: true, at: RECEIVED + i, rounds });
     for (let i = 0; i < 30; i++) await user(`f${i}`);
     for (let i = 0; i < 30; i++) await flag(`f${i}`);
+    for (let i = 0; i < 30; i++) await nameReport(`f${i}`);
     await board("u1", "all", 0, 5000);
     await board("u1", WEEK, 0, 5000);
 
@@ -481,6 +525,6 @@ describe("query budget", () => {
     const dismissed = await adminWithQueryCount("/admin/sessions/s2/dismiss", { body: { note: NOTE } });
     for (const r of [queue, detail, ban, voided, dismissed]) expect(r.response.status).toBe(200);
     // The admin check is one query; the rest is the endpoint's own.
-    expect([queue.queries, detail.queries, ban.queries, voided.queries, dismissed.queries]).toEqual([3, 6, 4, 5, 3]);
+    expect([queue.queries, detail.queries, ban.queries, voided.queries, dismissed.queries]).toEqual([4, 6, 4, 5, 3]);
   });
 });

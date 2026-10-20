@@ -4,7 +4,7 @@ import { and, asc, eq, gt, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
-import { artists, OUT_OF_CATALOG, REVIEW_REASONS, REVIEW_STATUSES, reviewItems, tracks } from "../../db/schema";
+import { artists, OUT_OF_CATALOG, PLAYER_FLAG_REASONS, REVIEW_REASONS, REVIEW_STATUSES, reviewItems, tracks } from "../../db/schema";
 import type { AppEnv } from "../../env";
 import { ApiError } from "../../lib/errors";
 import { idParam, parse, parseStoredJson } from "../../lib/validate";
@@ -77,11 +77,11 @@ reviewRoutes.get("/review-items/counts", async (c) => {
     .innerJoin(artists, eq(artists.id, tracks.artistId))
     .where(and(eq(reviewItems.entityType, "track"), eq(reviewItems.status, "open"), notInArray(tracks.status, [...OUT_OF_CATALOG])))
     .groupBy(reviewItems.reason);
-  // This is the track queue; score_anomaly items belong to users and are not shown here.
-  type TrackReason = Exclude<(typeof REVIEW_REASONS)[number], "score_anomaly">;
-  const trackReasons = REVIEW_REASONS.filter((r): r is TrackReason => r !== "score_anomaly");
+  // This is the track queue; player flags (PLAYER_FLAG_REASONS) belong to users and are not shown here.
+  type TrackReason = Exclude<(typeof REVIEW_REASONS)[number], (typeof PLAYER_FLAG_REASONS)[number]>;
+  const trackReasons = REVIEW_REASONS.filter((r): r is TrackReason => !(PLAYER_FLAG_REASONS as readonly string[]).includes(r));
   const counts = Object.fromEntries(trackReasons.map((r) => [r, 0])) as Record<TrackReason, number>;
-  for (const r of rows) if (r.reason !== "score_anomaly") counts[r.reason] = r.n;
+  for (const r of rows) if (r.reason in counts) counts[r.reason as TrackReason] = r.n;
   return c.json({ counts });
 });
 

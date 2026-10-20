@@ -28,11 +28,17 @@ const queueAnomalySchema = z.object({
 });
 export type QueueAnomaly = z.infer<typeof queueAnomalySchema>;
 
+/** Same shape as an anomaly; `details` is `{ displayName, reports, reporters, ... }`, see lib/moderation.ts. */
+const queueNameReportSchema = queueAnomalySchema;
+export type QueueNameReport = z.infer<typeof queueNameReportSchema>;
+
 const queueSchema = z.object({
   anomalies: z.array(queueAnomalySchema),
   anomaliesMore: z.boolean(),
   sessions: z.array(queueSessionSchema),
   sessionsMore: z.boolean(),
+  nameReports: z.array(queueNameReportSchema),
+  nameReportsMore: z.boolean(),
 });
 
 const roundSchema = z.object({
@@ -121,7 +127,7 @@ function useAction<V extends { note: string }>(path: (v: V) => string, body: (v:
 
 const e = encodeURIComponent;
 
-/** `reviewItemId` also resolves the anomaly flag the ban answers. */
+/** `reviewItemId` also resolves the flag (anomaly or name report) the ban answers. */
 export const useShadowBan = () =>
   useAction<{ userId: string; banned: boolean; note: string; reviewItemId?: number }>(
     (v) => `/admin/users/${e(v.userId)}/shadow-ban`,

@@ -926,6 +926,48 @@ abstract class AppLocalizations {
   /// **'Loading the leaderboard…'**
   String get lbLoading;
 
+  /// No description provided for @lbReportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this name'**
+  String get lbReportHint;
+
+  /// No description provided for @lbReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this name?'**
+  String get lbReportTitle;
+
+  /// No description provided for @lbReportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Report “{name}” if it is offensive. Our moderators review every report.'**
+  String lbReportBody(String name);
+
+  /// No description provided for @lbReportConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get lbReportConfirm;
+
+  /// No description provided for @lbReportCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get lbReportCancel;
+
+  /// No description provided for @lbReportSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks. Our moderators will review it.'**
+  String get lbReportSent;
+
+  /// No description provided for @lbReportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send the report. Try again later.'**
+  String get lbReportFailed;
+
   /// No description provided for @packsTitle.
   ///
   /// In en, this message translates to:

@@ -12,7 +12,7 @@ class BoardAnswer {
   final LeaderboardEntry? me;
 }
 
-/// `GET /v1/leaderboard` and `GET /v1/leaderboard/me`.
+/// `GET /v1/leaderboard`, `GET /v1/leaderboard/me` and `POST /v1/reports/name`.
 class LeaderboardApi {
   LeaderboardApi(this.api);
 
@@ -40,6 +40,12 @@ class LeaderboardApi {
       query: {'period': periodFor(scope), 'generation': '$generationId'},
     );
     return parseMe(json, displayName: displayName);
+  }
+
+  /// Reports a name on the board as offensive, for the moderators. The server answers the same
+  /// whether or not anyone has that name. Throws an [ApiException] when the request fails.
+  Future<void> reportName(String displayName) async {
+    await api.postJson('/v1/reports/name', body: {'displayName': displayName});
   }
 }
 

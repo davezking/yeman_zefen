@@ -16,7 +16,7 @@ no chat**. If any song's lyrics are sensitive, see the note at the end.
 | Gambling (real or simulated) | No | No real money. The points do not convert to money. |
 | Does the app allow users to interact or exchange information? | **Yes**: players choose a display name, which other players see on the leaderboards with their country. There is no chat or messaging. | Display names are text that players write and others read, so answer yes rather than leave it out. |
 | Does the app share the user's location with other users? | No | Only the country shown in statistics. |
-| Does the app contain user-generated content? | Yes, limited to display names | Names are checked against a blocklist on the server, and administrators can hide a player from others' leaderboards. No posts or uploads. |
+| Does the app contain user-generated content? | Yes, limited to display names | Names are checked against a blocklist on the server, any player can report a name from the leaderboard, and administrators can hide a player from others' leaderboards. No posts or uploads. |
 | Does the app contain ads? | **Yes** | Interstitial and rewarded ads from Google AdMob. |
 | Does the app allow purchases? | No | |
 

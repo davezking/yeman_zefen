@@ -50,10 +50,10 @@ The only text players write that others can see is the display name on the leade
 messaging or upload.
 
 - Names are checked on the server against a blocklist of offensive words, and refused if they match.
-- Administrators review flagged players and can hide a player from every other player's leaderboard (shadow ban),
-  with each decision logged.
-- **[Blocking for Apple guideline 1.2 if the reviewer asks: a way for players to report an offensive name. If one is
-  added, describe it here. The Amharic part of the blocklist still needs a native speaker's review.]**
+- Any player can report a name: tap it on the leaderboard and confirm. Reports go to the administrators' moderation
+  queue.
+- Administrators review reported and flagged players and can hide a player from every other player's leaderboard
+  (shadow ban), with each decision logged.
 
 ## Ads and consent
 
@@ -73,7 +73,8 @@ permission (above). It needs the network.
 - Privacy policy: **[PUBLIC PRIVACY POLICY URL]**
 - The in-app Settings > Privacy row opens the same policy. **[confirm the row is wired to the URL in the release build]**
 - Account deletion removes the account (see the policy, section 5). Play's web deletion page:
-  **[ACCOUNT DELETION URL. BLOCKING for Play]**
+  **https://api.[domain]/account-deletion** (blocking for Play until `PRIVACY_CONTACT_EMAIL` is set and the URL is
+  checked, `docs/ops.md`)
 
 ## Contact
 

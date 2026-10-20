@@ -32,6 +32,8 @@ export type Bindings = {
   CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS: string;
   CONFIG_MIN_APP_VERSION: string;
   CONFIG_DEFAULT_CLIP_MS: string;
+  /** Where people without the app ask for account deletion (GET /account-deletion). Unset: that page answers 503. */
+  PRIVACY_CONTACT_EMAIL?: string;
   /** Dev-only: when ENV=dev, lets a request with no Access header act as this admin email. */
   DEV_ADMIN_EMAIL?: string;
 };

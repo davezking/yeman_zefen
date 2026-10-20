@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUCKETS, anomalyDays, anomalyRules, flagLabels, median, noteProblem, responseHistogram, ruleLabel } from "../src/lib/moderation";
+import { BUCKETS, anomalyDays, anomalyRules, flagLabels, median, nameReportDetails, noteProblem, responseHistogram, ruleLabel } from "../src/lib/moderation";
 
 describe("noteProblem", () => {
   it("requires a note that is not only spaces", () => {
@@ -75,5 +75,22 @@ describe("labels", () => {
     expect(flagLabels(null)).toEqual([]);
     expect(flagLabels("late_answer,voided")).toEqual(["Answer after the window", "Voided by an admin"]);
     expect(flagLabels("brand_new")).toEqual(["brand_new"]);
+  });
+});
+
+describe("nameReportDetails", () => {
+  it("reads the reported name, the counts and the last report", () => {
+    expect(nameReportDetails({ displayName: "Bad Name", reports: 3, reporters: ["a", "b"], lastReportedAt: 5 })).toEqual({
+      reportedName: "Bad Name",
+      reports: 3,
+      reporters: 2,
+      lastReportedAt: 5,
+    });
+  });
+
+  it("reads details it does not know as empty", () => {
+    for (const d of [null, "x", 3, {}, { displayName: 1, reports: "2", reporters: "a" }]) {
+      expect(nameReportDetails(d)).toEqual({ reportedName: null, reports: 0, reporters: 0, lastReportedAt: null });
+    }
   });
 });

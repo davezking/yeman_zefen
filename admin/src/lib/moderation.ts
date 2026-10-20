@@ -51,6 +51,19 @@ export function anomalyDays(details: unknown): { date: string; metrics: Record<s
   return Object.keys(days).sort().map((date) => ({ date, metrics: days[date] ?? {} }));
 }
 
+/** What players reported about a display name (`name_report` details, see api routes/v1/reports.ts). */
+export type NameReport = { reportedName: string | null; reports: number; reporters: number; lastReportedAt: number | null };
+
+export function nameReportDetails(details: unknown): NameReport {
+  const d = (details && typeof details === "object" ? details : {}) as Record<string, unknown>;
+  return {
+    reportedName: typeof d.displayName === "string" ? d.displayName : null,
+    reports: typeof d.reports === "number" ? d.reports : 0,
+    reporters: Array.isArray(d.reporters) ? d.reporters.length : 0,
+    lastReportedAt: typeof d.lastReportedAt === "number" ? d.lastReportedAt : null,
+  };
+}
+
 export const BUCKET_MS = 500;
 export const BUCKETS = 20;
 

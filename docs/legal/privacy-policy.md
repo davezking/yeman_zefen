@@ -27,7 +27,8 @@ will delete it.
 | **Sign-in provider** (Google, email, Apple) | When you sign in. | Signing you back in. | Google (Firebase), Apple (for Sign in with Apple) |
 | **Country** (from your IP address) | Each request to our servers. We store the two-letter country code, not the address. | Country-level statistics, and shown next to your display name on the leaderboards. | Cloudflare (which derives it), and us |
 | **Game sessions**: the tracks you were asked about, your answers, response times, scores, game mode and difficulty, whether it was played offline, and ad views | When you finish a game. Sessions played offline are sent when you are back online. | Scoring, leaderboards, anti-cheating checks, and the usage reports described in section 6. | Us |
-| **Moderation records**: anti-cheating flags on sessions, whether a player is hidden from others' leaderboards, and our administrators' notes on those decisions | When a session looks implausible, or an administrator reviews a player. | Keeping leaderboards fair. | Us |
+| **Moderation records**: anti-cheating flags on sessions, reports from other players about a display name, whether a player is hidden from others' leaderboards, and our administrators' notes on those decisions | When a session looks implausible, when a player reports a name, or when an administrator reviews a player. | Keeping leaderboards fair and names acceptable. | Us |
+| **Reports you send** about another player's display name: the name and your user ID | When you report a name on the leaderboard. | So moderators can review it, and so repeated reports from one person count once. The reported player is not told who reported them. | Us |
 | **Clip problem reports**: the track and the kind of error, if a clip will not play | Automatically, when a clip fails to play on your phone. | Fixing broken audio. | Us |
 | **Crash reports and diagnostics**: the crash stack, device model, operating system version, app version, and your Firebase user ID (never your email) | When the app crashes or a handled error is logged. Only in the released app. | Finding and fixing crashes. | Google (Firebase Crashlytics) and us |
 | **Advertising ID** (Android advertising ID or Apple's IDFA), ad requests and clicks, approximate location from your IP address, and device information | When ads are shown. | Showing ads, and in regions that require it, personalized ads. | Google (AdMob, Google Mobile Ads SDK) |
@@ -87,7 +88,7 @@ iPhone: Settings > Privacy & Security > Tracking). On iPhone, ads are personaliz
   - revokes the app's access to your Apple account, if you signed in with Apple.
   Deletion is immediate on our servers. Our database keeps a point-in-time history for restores (Cloudflare D1
   Time Travel), so deleted data leaves it within [7 days on the Free plan, 30 days on the Paid plan, confirm].
-- **Moderation records** about a player (section 2) are kept after the account is deleted, still under the deleted
+- **Moderation records** about a player, and reports a player sent (section 2), are kept after the account is deleted, still under the deleted
   account's user ID, as a record of the decisions made. They are kept for [retention period, confirm].
 - **Crash reports** are kept by Google for [number of days, confirm Crashlytics retention].
 - **Ad data** is kept by Google under its own policies. (confirm)
@@ -97,7 +98,8 @@ iPhone: Settings > Privacy & Security > Tracking). On iPhone, ads are personaliz
   details such as your IP address. (confirm from a production log entry) They are kept for [number of days, confirm
   Workers Logs retention].
 
-If you cannot delete your account in the app, email us at the contact address in section 1.
+If you cannot delete your account in the app, follow the steps at **[https://api.[domain]/account-deletion]**, or
+email us at the contact address in section 1.
 
 ## 6. Usage reports
 

@@ -322,6 +322,20 @@
   },
   "lbOfflineNone": "Connect to the internet to see the leaderboard.",
   "lbLoading": "Loading the leaderboard…",
+  "lbReportHint": "Report this name",
+  "lbReportTitle": "Report this name?",
+  "lbReportBody": "Report “{name}” if it is offensive. Our moderators review every report.",
+  "@lbReportBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lbReportConfirm": "Report",
+  "lbReportCancel": "Cancel",
+  "lbReportSent": "Thanks. Our moderators will review it.",
+  "lbReportFailed": "Couldn't send the report. Try again later.",
   "packsTitle": "Offline play",
   "packsIntro": "Online, songs load as you play. Download packs to play without internet.",
   "packsWifiOnly": "Download packs on Wi-Fi only",

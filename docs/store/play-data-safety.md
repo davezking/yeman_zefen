@@ -11,7 +11,7 @@ must say the same things.
 |---|---|---|
 | Does the app collect or share any of the required user data types? | **Yes** | Firebase, Crashlytics and AdMob collect data (see below). |
 | Is all user data encrypted in transit? | **Yes** | HTTPS for all requests (Firebase, Cloudflare, AdMob). |
-| Do you provide a way for users to request that their data is deleted? | **Yes**: in the app, Settings > Account > Delete account, and on the web at **[ACCOUNT DELETION URL]**. | Play requires apps that let users create an account to give a web link where they can ask for deletion without reinstalling the app. **BLOCKING:** publish that page (it can be a form or an email address with instructions) and enter its URL here. |
+| Do you provide a way for users to request that their data is deleted? | **Yes**: in the app, Settings > Account > Delete account, and on the web at **https://api.[domain]/account-deletion**. | Play requires apps that let users create an account to give a web link where they can ask for deletion without reinstalling the app. The Worker serves that page (`docs/ops.md`, "Account deletion page"). **BLOCKING:** set `PRIVACY_CONTACT_EMAIL`, deploy, open the URL, and enter it here. |
 | Is the app a Families app (designed for children)? | **No** | Audience is general. |
 | Does the app use an SDK that collects data? | **Yes**: Google Mobile Ads SDK, Firebase Authentication, Firebase Crashlytics, Google UMP. | Each one has to be declared. |
 

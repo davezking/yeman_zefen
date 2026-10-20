@@ -492,6 +492,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lbLoading => 'Loading the leaderboard…';
 
   @override
+  String get lbReportHint => 'Report this name';
+
+  @override
+  String get lbReportTitle => 'Report this name?';
+
+  @override
+  String lbReportBody(String name) {
+    return 'Report “$name” if it is offensive. Our moderators review every report.';
+  }
+
+  @override
+  String get lbReportConfirm => 'Report';
+
+  @override
+  String get lbReportCancel => 'Cancel';
+
+  @override
+  String get lbReportSent => 'Thanks. Our moderators will review it.';
+
+  @override
+  String get lbReportFailed => 'Couldn\'t send the report. Try again later.';
+
+  @override
   String get packsTitle => 'Offline play';
 
   @override

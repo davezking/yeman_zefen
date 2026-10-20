@@ -32,6 +32,7 @@ v1.use("*", async (c, next) => {
 v1.use("/sessions", uidRateLimit("sessions", (m) => m === "POST"));
 v1.use("/me/merge", uidRateLimit("merge", (m) => m === "POST"));
 v1.use("/me", uidRateLimit("me", (m) => m === "PUT"));
+v1.use("/reports/name", uidRateLimit("nameReports", (m) => m === "POST"));
 
 v1.route("/me", me);
 v1.route("/sessions", sessions);

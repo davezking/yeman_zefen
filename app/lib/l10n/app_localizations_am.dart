@@ -486,6 +486,29 @@ class AppLocalizationsAm extends AppLocalizations {
   String get lbLoading => 'የደረጃ ሰንጠረዡን በመጫን ላይ…';
 
   @override
+  String get lbReportHint => 'ይህን ስም ሪፖርት ያድርጉ';
+
+  @override
+  String get lbReportTitle => 'ይህን ስም ሪፖርት ያደርጋሉ?';
+
+  @override
+  String lbReportBody(String name) {
+    return '«$name» አጸያፊ ከሆነ ሪፖርት ያድርጉ። አወያዮቻችን እያንዳንዱን ሪፖርት ይገመግማሉ።';
+  }
+
+  @override
+  String get lbReportConfirm => 'ሪፖርት ያድርጉ';
+
+  @override
+  String get lbReportCancel => 'ይቅር';
+
+  @override
+  String get lbReportSent => 'እናመሰግናለን። አወያዮቻችን ይገመግሙታል።';
+
+  @override
+  String get lbReportFailed => 'ሪፖርቱን መላክ አልተቻለም። ቆይተው እንደገና ይሞክሩ።';
+
+  @override
   String get packsTitle => 'ያለ ኢንተርኔት መጫወት';
 
   @override

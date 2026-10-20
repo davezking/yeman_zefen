@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/http/api_client.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../prototype/models.dart';
 import '../../account/register_prompt_controller.dart';
 import '../../account/ui/register_sheet.dart';
@@ -46,7 +48,32 @@ class LeaderboardPage extends ConsumerWidget {
       onEra: (id) => ref.read(leaderboardQueryProvider.notifier).setEra(id),
       onSignIn: () => _signIn(context, ref),
       onRetry: () => ref.invalidate(leaderboardProvider),
+      onReport: (entry) => _report(context, ref, entry),
     );
+  }
+
+  /// Asks before reporting a name, then says whether the report went.
+  Future<void> _report(BuildContext context, WidgetRef ref, LeaderboardEntry entry) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.lbReportTitle),
+        content: Text(l10n.lbReportBody(entry.name)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.lbReportCancel)),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.lbReportConfirm)),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(leaderboardApiProvider).reportName(entry.name);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.lbReportSent)));
+    } on ApiException {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.lbReportFailed)));
+    }
   }
 
   /// The guest's sign-in bar. Tapping it is the guest asking, so the sheet opens unless the
