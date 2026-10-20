@@ -223,22 +223,47 @@ void main() {
       expect(await queued(), isEmpty);
     });
 
-    test('a forced pass keeps a wait the server asked for (5xx, 429), and sends the rest', () async {
+    test('a forced pass keeps a wait the server asked for (5xx), and sends the rest', () async {
       await queue('busy', createdAt: 1);
-      await queue('limited', createdAt: 2);
-      await queue('fresh', createdAt: 3);
+      await queue('fresh', createdAt: 2);
       server.script.add(error(503, 'unavailable'));
       await sync.syncNow();
-      server.script.add(error(429, 'rate_limited', headers: {'retry-after': '600'}));
-      await sync.syncNow();
       expect((await row('busy')).lastStatus, 503);
-      expect((await row('limited')).lastStatus, 429);
 
       // App start: the sign-in and the first connectivity event both force a pass.
       server.received.clear();
       await Future.wait([sync.syncNow(force: true), sync.syncNow(force: true)]);
       expect(server.received, ['fresh']);
-      expect(await queued(), ['busy', 'limited']);
+      expect(await queued(), ['busy']);
+    });
+
+    test('a 429 holds the whole queue until Retry-After is over, even for a forced pass', () async {
+      for (var i = 1; i <= 15; i++) {
+        await queue('s${i.toString().padLeft(2, '0')}', createdAt: i);
+      }
+      // The server lets 5 through, then asks the player to wait ten minutes.
+      for (var i = 0; i < 5; i++) {
+        server.script.add(http.Response(jsonEncode({'score': 1, 'rounds': [], 'flagged': false}), 200));
+      }
+      server.script.add(error(429, 'rate_limited', headers: {'retry-after': '600'}));
+      await sync.syncNow();
+      expect(server.received, ['s01', 's02', 's03', 's04', 's05', 's06']);
+      expect((await row('s06')).lastStatus, 429);
+      expect((await row('s06')).nextAttemptAt, nowMs + 600000);
+      expect(timers.last.$1, const Duration(seconds: 600));
+
+      // The connection comes back, the app starts, a new session is played: nothing goes out.
+      server.received.clear();
+      await Future.wait([sync.syncNow(force: true), sync.syncNow()]);
+      nowMs += 599000;
+      await sync.syncNow(force: true);
+      expect(server.received, isEmpty);
+
+      // Retry-After is over: the queue drains, oldest first, and nothing is lost.
+      nowMs += 1000;
+      await sync.syncNow();
+      expect(server.received, [for (var i = 6; i <= 15; i++) 's${i.toString().padLeft(2, '0')}']);
+      expect(await queued(), isEmpty);
     });
 
     test('a session tried once in a run is not sent again by a trigger landing mid-run', () async {

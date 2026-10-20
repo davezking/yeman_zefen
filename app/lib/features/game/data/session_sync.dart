@@ -28,6 +28,10 @@ import '../../../core/http/api_client.dart';
 ///   parks it for good. The row stays with `last_error` for debugging.
 /// - Anything that is not the session's fault (offline, a 5xx, 429, a token
 ///   problem) stops the pass and leaves the rest for the next one.
+/// - A 429 is about the player, not the session (the per-player limit on
+///   `POST /v1/sessions`, 20 at once and 60 an hour). Nothing at all is sent
+///   until its `Retry-After` is over, not even by a forced pass: the other
+///   queued sessions would only be refused too.
 class SessionSync {
   SessionSync({
     required this.db,
@@ -62,6 +66,10 @@ class SessionSync {
   bool _againForced = false;
   Timer? _wake;
   bool _disposed = false;
+
+  /// While the clock is before this, the server has said "slow down": nothing is sent.
+  /// Held in memory only; after a restart the first send finds out again.
+  int _rateLimitedUntil = 0;
 
   /// The wait after [attempts] failed attempts: 30 s, 1 min, 2 min, ... up to [maxDelay].
   Duration backoff(int attempts) {
@@ -115,6 +123,7 @@ class SessionSync {
   Future<void> _pass(bool force, Set<String> tried) async {
     while (!_disposed) {
       if (!auth().hasUid) return;
+      if (_nowMs() < _rateLimitedUntil) return;
       final row = await _nextDue(tried, force);
       if (row == null) return;
       tried.add(row.id);
@@ -202,6 +211,7 @@ class SessionSync {
     final attempts = row.attempts + 1;
     var wait = backoff(attempts);
     if (retryAfter != null && retryAfter > wait) wait = retryAfter > maxDelay ? maxDelay : retryAfter;
+    if (error is RateLimitedException) _rateLimitedUntil = _nowMs() + wait.inMilliseconds;
     return (db.update(db.pendingSessions)..where((t) => t.id.equals(row.id))).write(
       PendingSessionsCompanion(
         attempts: Value(attempts),

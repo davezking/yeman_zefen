@@ -308,6 +308,6 @@ describe("POST /v1/me/merge", () => {
       anonymousIdToken: await signFirebaseToken("u-many"),
     }, db);
     expect(res.status).toBe(200);
-    expect(counter.queries).toBe(8);
+    expect(counter.queries).toBe(9); // the rate-limit bucket plus the merge itself
   });
 });

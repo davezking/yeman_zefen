@@ -1,5 +1,7 @@
 export type Bindings = {
   DB: D1Database;
+  /** Per-IP limit on /v1 (Workers Rate Limiting binding). Absent in local dev, where the limit is skipped. */
+  IP_LIMITER?: RateLimit;
   CLIPS: R2Bucket;
   SOURCE: R2Bucket;
   ENV: "dev" | "prod";

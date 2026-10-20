@@ -107,10 +107,12 @@ const RETENTION_SQL = `
 /** The inserts in rollUpDay's batch, after DELETE_SQL; STATEMENTS_PER_DAY is derived from both. */
 const INSERT_SQL = [ROYALTY_SQL, ADS_SQL, TOTALS_SQL, BREAKDOWN_SQL, RETENTION_SQL];
 const STATEMENTS_PER_DAY = DELETE_SQL.length + INSERT_SQL.length;
-/** D1 queries one cron run may make: the Free plan allows 50, and 2 are kept spare. */
-export const RUN_QUERY_BUDGET = 48;
-/** The run's own reads: missing roll-up days, missing anomaly days. */
-const RUN_READS = 2;
+/** D1 queries one cron run may make: the Free plan allows 50, and 1 is kept spare. */
+export const RUN_QUERY_BUDGET = 49;
+/** The run's own statements: missing roll-up days, missing anomaly days, and the rate-limit prune. */
+const RUN_READS = 3;
+/** A rate-limit bucket idle this long is full again, so its row can go. */
+const RATE_LIMIT_IDLE_MS = DAY_MS;
 /**
  * Days one run rolls up at most: as many as fit once the reads and one anomaly pass (yesterday's,
  * which every run makes) are paid for. Whatever is left over goes to anomaly passes for missed days.
@@ -196,6 +198,12 @@ export async function runScheduled(env: Pick<Bindings, "DB">, now: number = Date
       failed.push(`anomalies ${date}`);
       console.error(`anomaly pass ${date} failed`, e);
     }
+  }
+  try {
+    await env.DB.prepare("DELETE FROM rate_limits WHERE updated_at < ?1").bind(now - RATE_LIMIT_IDLE_MS).all();
+  } catch (e) {
+    failed.push("rate_limits prune");
+    console.error("rate_limits prune failed", e);
   }
   if (failed.length > 0) throw new Error(`nightly run failed for ${failed.join(", ")}`);
   return done;
