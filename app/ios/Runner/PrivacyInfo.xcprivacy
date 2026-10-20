@@ -4,8 +4,9 @@
   The app's privacy manifest. It must match the App Store Connect privacy labels
   (docs/store/apple-privacy-labels.md) and the policy (docs/legal/privacy-policy.md).
   Plugins and the Google and Firebase SDKs ship their own manifests, which Xcode merges in.
-  NSPrivacyTrackingDomains is empty until the AdMob tracking domains are confirmed from
-  Google's SDK manifest; Apple requires them to be listed when tracking is true.
+  NSPrivacyTrackingDomains stays empty on purpose: iOS blocks every domain listed here when the
+  player declines tracking, which would stop non-personalized ads too. The Google Mobile Ads SDK
+  declares its own tracking domains in its manifest.
 -->
 <plist version="1.0">
 <dict>

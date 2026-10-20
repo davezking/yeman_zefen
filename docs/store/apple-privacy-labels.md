@@ -10,7 +10,7 @@ Items marked **(confirm)** need checking against the SDK versions in use.
 | Question | Answer |
 |---|---|
 | Does the app use data to track you? | **Yes** |
-| Domains used for tracking | Google AdMob's ad domains (confirm the list from Google's SDK documentation). |
+| Domains used for tracking | None declared by the app itself. The Google Mobile Ads SDK declares its own in its privacy manifest. |
 
 The app asks for tracking permission with App Tracking Transparency, after a finished game, when Google's consent
 form is not required or has been answered. If the player says no, the advertising identifier is not used for
@@ -20,9 +20,9 @@ tracking.
 
 | Apple data type | Collected | Linked to the user | Used to track you | Purposes |
 |---|---|---|---|---|
-| **Contact info** > Email address | Yes (registered players only) | Yes | No | App functionality, account management |
+| **Contact info** > Email address | Yes (registered players only) | Yes | No | App functionality |
 | **Contact info** > Name | Yes (display name, optional) | Yes | No | App functionality |
-| **Identifiers** > User ID | Yes (Firebase user ID) | Yes | No | App functionality, analytics, product personalization |
+| **Identifiers** > User ID | Yes (Firebase user ID) | Yes | No | App functionality, analytics |
 | **Identifiers** > Device ID | Yes (IDFA, only with permission; collected by the AdMob SDK) | Yes (or not linked, confirm) | **Yes**, for advertising | Third-party advertising |
 | **Location** > Coarse location | Yes (country from IP, server side; AdMob also collects it) | Yes | **Yes**, for advertising, through AdMob (confirm: whether the server-side country counts) | App functionality, third-party advertising |
 | **Usage data** > Product interaction | Yes (gameplay sessions) | Yes | No | App functionality, analytics |
@@ -37,7 +37,9 @@ tracking.
 - Apple expects the label to cover the SDKs' data too. The Google Mobile Ads SDK and Firebase publish their own
   privacy details, and the labels must include what they collect. (confirm against the versions in `app/pubspec.lock`)
 - Apple's privacy manifest (`app/ios/Runner/PrivacyInfo.xcprivacy`) mirrors these answers, and Xcode bundles it with
-  the app. It has two open items: `NSPrivacyTrackingDomains` is empty until the AdMob tracking domains are confirmed
-  from Google's SDK manifest, and `NSPrivacyAccessedAPITypes` is empty because the app's own code uses no required-reason
-  API. Check both against the SDK manifests in the first TestFlight build. (confirm)
+  the app. `NSPrivacyTrackingDomains` is deliberately empty: iOS blocks every domain listed there when the player
+  declines tracking, so listing Google's ad domains in the app's manifest could stop all ads for those players,
+  including non-personalized ones. The Google Mobile Ads SDK declares its own tracking domains. `NSPrivacyAccessedAPITypes`
+  is empty because the app's own code uses no required-reason API; the SDKs and plugins declare theirs. Check Xcode's
+  privacy report for the first TestFlight build. (confirm)
 - Update the labels whenever a new SDK or data type is added, as Apple requires.

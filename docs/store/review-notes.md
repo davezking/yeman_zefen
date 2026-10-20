@@ -35,7 +35,7 @@ from Settings > Offline play.
 ## Features that need an account
 
 - **Leaderboards:** only signed-in players appear on them. Guests can view them.
-- **Display name:** shown on the leaderboards.
+- **Display name:** shown on the leaderboards, with the player's country.
 - **Account deletion:** Settings > Account > Delete account.
 
 **Test account (registered features):**
@@ -44,9 +44,20 @@ from Settings > Offline play.
 
 To test Sign in with Apple (iOS), use any Apple ID. To test Google sign-in, use any Google account.
 
+## Display names (user-generated content)
+
+The only text players write that others can see is the display name on the leaderboards. There is no chat,
+messaging or upload.
+
+- Names are checked on the server against a blocklist of offensive words, and refused if they match.
+- Administrators review flagged players and can hide a player from every other player's leaderboard (shadow ban),
+  with each decision logged.
+- **[Blocking for Apple guideline 1.2 if the reviewer asks: a way for players to report an offensive name. If one is
+  added, describe it here. The Amharic part of the blocklist still needs a native speaker's review.]**
+
 ## Ads and consent
 
-- Ads come from Google AdMob. Some ads may be test ads.
+- Ads come from Google AdMob.
 - Interstitial ads appear between rounds, after the first session, and never during audio playback.
 - In the EEA, UK and Switzerland, Google's consent form appears after a finished game. Elsewhere it does not.
 - On iOS, the App Tracking Transparency prompt appears after a finished game, once the consent check is done.
@@ -61,7 +72,8 @@ permission (above). It needs the network.
 
 - Privacy policy: **[PUBLIC PRIVACY POLICY URL]**
 - The in-app Settings > Privacy row opens the same policy. **[confirm the row is wired to the URL in the release build]**
-- Account deletion removes the account (see the policy, section 5).
+- Account deletion removes the account (see the policy, section 5). Play's web deletion page:
+  **[ACCOUNT DELETION URL. BLOCKING for Play]**
 
 ## Contact
 

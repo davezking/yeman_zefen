@@ -25,8 +25,9 @@ will delete it.
 | **Email address** | Only if you create an account with email, or sign in with Google or Apple and share your email. | Signing in, account recovery. Not shown to other players. | Google (Firebase Authentication) |
 | **Display name** | Only if you choose one. | Shown on the leaderboards once you have a registered account. | Us (stored on our servers) |
 | **Sign-in provider** (Google, email, Apple) | When you sign in. | Signing you back in. | Google (Firebase), Apple (for Sign in with Apple) |
-| **Country** (from your IP address) | Each request to our servers. We store the two-letter country code, not the address. | Country-level statistics, leaderboard filters, and deciding whether a consent form applies. | Cloudflare (which derives it), and us |
+| **Country** (from your IP address) | Each request to our servers. We store the two-letter country code, not the address. | Country-level statistics, and shown next to your display name on the leaderboards. | Cloudflare (which derives it), and us |
 | **Game sessions**: the tracks you were asked about, your answers, response times, scores, game mode and difficulty, whether it was played offline, and ad views | When you finish a game. Sessions played offline are sent when you are back online. | Scoring, leaderboards, anti-cheating checks, and the usage reports described in section 6. | Us |
+| **Moderation records**: anti-cheating flags on sessions, whether a player is hidden from others' leaderboards, and our administrators' notes on those decisions | When a session looks implausible, or an administrator reviews a player. | Keeping leaderboards fair. | Us |
 | **Clip problem reports**: the track and the kind of error, if a clip will not play | Automatically, when a clip fails to play on your phone. | Fixing broken audio. | Us |
 | **Crash reports and diagnostics**: the crash stack, device model, operating system version, app version, and your Firebase user ID (never your email) | When the app crashes or a handled error is logged. Only in the released app. | Finding and fixing crashes. | Google (Firebase Crashlytics) and us |
 | **Advertising ID** (Android advertising ID or Apple's IDFA), ad requests and clicks, approximate location from your IP address, and device information | When ads are shown. | Showing ads, and in regions that require it, personalized ads. | Google (AdMob, Google Mobile Ads SDK) |
@@ -65,27 +66,35 @@ your consent before personalized ads are shown, through its consent form. You ca
 On iPhone, Apple asks whether the app may track you across other companies' apps and websites. If you say no, the
 app does not send your advertising identifier for tracking. You can change this in your iPhone's settings.
 
-Elsewhere, ads may be non-personalized. You can still turn off personalized ads in your device's settings for
-ads (Android: Settings > Google > Ads; iPhone: Settings > Privacy & Security > Tracking). (confirm)
+Elsewhere, no consent form is shown and ads may be personalized using your advertising ID. You can turn off
+personalized ads in your device's settings (Android: Settings > Google > Ads, delete or reset the advertising ID;
+iPhone: Settings > Privacy & Security > Tracking). On iPhone, ads are personalized only if you allowed tracking.
+(confirm, including whether a US state privacy message is needed)
 
 ## 5. How long we keep data, and deleting it
 
 - **Account and game data** are kept while your account exists.
-- **Game sessions:** the round-by-round details (which tracks you saw and the answer times in each round) are removed
-  after 90 days. The session summary (the score and counts) is kept as long as your account is.
+- **Game sessions:** after 90 days, the detail of each round (the question, the options shown, the answer you chose,
+  how long you took and whether you used a hint) is removed. What remains is the session summary: the mode,
+  difficulty, score, country, the tracks played, and for each round its points and whether it was correct. This is
+  kept as long as your account is, and after that as described below.
 - **Deleting your account.** In the app, go to **Settings > Account > Delete account**. This:
   - removes your display name and your leaderboard rows;
-  - anonymizes your game sessions, so they are no longer linked to you, and keeps them only in the aggregated
-    play counts described in section 3;
+  - unlinks your game sessions from you: they are kept, with no user ID, display name or email attached, because
+    the play counts reported to the music association (section 3) and our usage totals (section 6) are built from
+    them;
   - deletes your sign-in account from Firebase;
   - revokes the app's access to your Apple account, if you signed in with Apple.
-  Deletion is immediate on our servers. Copies in backups are removed when the backups expire, within [number of days,
-  confirm].
+  Deletion is immediate on our servers. Our database keeps a point-in-time history for restores (Cloudflare D1
+  Time Travel), so deleted data leaves it within [7 days on the Free plan, 30 days on the Paid plan, confirm].
+- **Moderation records** about a player (section 2) are kept after the account is deleted, still under the deleted
+  account's user ID, as a record of the decisions made. They are kept for [retention period, confirm].
 - **Crash reports** are kept by Google for [number of days, confirm Crashlytics retention].
 - **Ad data** is kept by Google under its own policies. (confirm)
 - **Rate-limit counters** that stop abuse are kept for about one day.
-- **Server logs** do not contain your IP address or your email. They record the request route, the response status,
-  the time taken, the country, and a one-way hash of your user ID. They are kept for [number of days, confirm
+- **Server logs:** our own log line for each request records the route, the response status, the time taken, the
+  country, and a one-way hash of your user ID, and never your email. Cloudflare's logging may also record request
+  details such as your IP address. (confirm from a production log entry) They are kept for [number of days, confirm
   Workers Logs retention].
 
 If you cannot delete your account in the app, email us at the contact address in section 1.

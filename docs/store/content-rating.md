@@ -14,9 +14,9 @@ no chat**. If any song's lyrics are sensitive, see the note at the end.
 | Language (profanity, crude humor) | No | The app has no user chat; song titles and artist names come from the catalog. (confirm after the catalog review) |
 | Controlled substances (drugs, alcohol, tobacco) | No | None in the game itself. (confirm after lyric review) |
 | Gambling (real or simulated) | No | No real money. The points do not convert to money. |
-| Does the app allow users to interact or exchange information? | Yes, **limited**: leaderboards show display names. There is no chat or messaging. | IARC asks about user interaction; choose the option for limited, non-chat interaction if the form offers it. |
+| Does the app allow users to interact or exchange information? | **Yes**: players choose a display name, which other players see on the leaderboards with their country. There is no chat or messaging. | Display names are text that players write and others read, so answer yes rather than leave it out. |
 | Does the app share the user's location with other users? | No | Only the country shown in statistics. |
-| Does the app contain user-generated content? | No | Display names only; no posts or uploads. |
+| Does the app contain user-generated content? | Yes, limited to display names | Names are checked against a blocklist on the server, and administrators can hide a player from others' leaderboards. No posts or uploads. |
 | Does the app contain ads? | **Yes** | Interstitial and rewarded ads from Google AdMob. |
 | Does the app allow purchases? | No | |
 
@@ -32,7 +32,7 @@ Expected rating: a low, general-audience rating (for example "Everyone"). The ra
 | Sexual content or nudity | None |
 | Gambling and contests | No (no real-money gambling; no contests) |
 | Unrestricted web access | No |
-| User-generated content | No (display names only) |
+| User-generated content | Yes, display names only (blocklist on the server, administrators can hide a player; see `review-notes.md`) |
 | Messaging and chat | No |
 | Advertising | **Yes** (AdMob ads) |
 | Made for kids | No |
