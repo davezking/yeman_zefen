@@ -36,8 +36,8 @@ tracking.
 
 - Apple expects the label to cover the SDKs' data too. The Google Mobile Ads SDK and Firebase publish their own
   privacy details, and the labels must include what they collect. (confirm against the versions in `app/pubspec.lock`)
-- Apple's privacy manifest (`PrivacyInfo.xcprivacy`) is a separate requirement from the labels. **This repository has
-  no `app/ios/Runner/PrivacyInfo.xcprivacy` yet.** Check before TestFlight whether Apple's upload checks flag the
-  missing manifest, and add the app's own required-reason API declarations if they do. Most Flutter and Firebase
-  plugins ship their own manifests. (confirm)
+- Apple's privacy manifest (`app/ios/Runner/PrivacyInfo.xcprivacy`) mirrors these answers, and Xcode bundles it with
+  the app. It has two open items: `NSPrivacyTrackingDomains` is empty until the AdMob tracking domains are confirmed
+  from Google's SDK manifest, and `NSPrivacyAccessedAPITypes` is empty because the app's own code uses no required-reason
+  API. Check both against the SDK manifests in the first TestFlight build. (confirm)
 - Update the labels whenever a new SDK or data type is added, as Apple requires.
