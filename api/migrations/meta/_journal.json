@@ -78,6 +78,13 @@
       "when": 1792437646589,
       "tag": "0010_clip_report_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792483218643,
+      "tag": "0011_rate_limits",
+      "breakpoints": true
     }
   ]
 }

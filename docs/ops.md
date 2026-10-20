@@ -528,3 +528,23 @@ AdMob checks that the developer website listed on the store pages hosts an `app-
 - **Worker logs:** `[observability]` is enabled in `api/wrangler.toml` (top level and `env.prod`). Each request writes one JSON line (`src/lib/requestLog.ts`): `requestId`, `route` (the pattern, so IDs stay out), `status`, `latencyMs`, `uidHash` (first 16 hex of SHA-256 of the UID), `country`, and `errorCode` on failures. Tokens, bodies and emails are never logged. Read them in the Cloudflare dashboard under Workers Logs.
 - **App crashes:** Crashlytics collects in the prod flavor only (`lib/core/crash/crash_reporting.dart`). The user is the UID, never an email. Non-fatal issues have fixed labels: `pack_install_failed` (not on cancel or a full phone), `sync_parked`, `audio_play_failed` (not when the clip was stopped or interrupted).
 - **Symbols:** the Crashlytics Gradle plugin (`app/android`) uploads the R8 mapping file on prod release builds; dev builds, including CI, skip the upload. iOS dSYMs are not uploaded yet, so iOS release stack traces stay unreadable until the dSYM upload step is added to the Xcode build.
+
+## Rate limiting
+
+Two mechanisms, because Cloudflare's Workers Rate Limiting binding only counts in 10 or 60 second periods, so it cannot do the per-hour player limits.
+
+- **Per IP, 3000 requests a minute across `/v1`:** the Workers Rate Limiting binding `IP_LIMITER` (`[[ratelimits]]` in `api/wrangler.toml`, separate `namespace_id` for dev and prod). It is counted at the edge and costs no D1 query, so no WAF rule is needed. **Not yet verified:** that the binding is available on the account's plan (check the Cloudflare docs before launch; if it is not, use a WAF rate-limiting rule with the same limit). The task asked for 300; it is 3000 because Ethiopian mobile traffic goes out through carrier NAT, so thousands of players can share one IP, and the per-player buckets already guard the endpoints that write. Watch the 429 rate per route in Workers Logs after launch. Without the binding (local dev) or without a `cf-connecting-ip`, the check is skipped. Counters are per Cloudflare location, so the limit is approximate by design.
+- **Per player (UID):** a token bucket in D1 (`rate_limits`, `src/lib/rateLimit.ts`), one atomic statement per limited request, taken after the token is verified and before the body is read. The bucket size is the burst; the refill is the hourly limit.
+
+| Route | Burst | Sustained |
+|---|---|---|
+| `POST /v1/sessions` | 20 | 60 / hour |
+| `POST /v1/me/merge` | 5 | 5 / hour |
+| `PUT /v1/me` | 30 | 30 / hour |
+| `POST /v1/reports/clip` | | 10 / day (own counter, `clip_report_counts`) |
+
+A refused request is `429` with `{"error":{"code":"rate_limited",...}}` and `Retry-After` in seconds (60 for the IP limit). Refusals do not spend a token. The nightly job deletes buckets idle for a day, so the table stays as small as the day's active players. Each limited request costs one more D1 statement (see `test/sessions.test.ts` "D1 cost"), and the nightly run's query budget is 49 for that reason.
+
+**App:** a 429 on `POST /v1/sessions` holds the whole sync queue for the server's `Retry-After` (30 s when there is none), even for a forced pass, and a wake-up resumes it when the hold ends (`session_sync.dart`). A player with more than 20 queued sessions drains them 20 at once, then one a minute.
+
+**Checks to do once deployed:** sync 15 queued sessions on a test build (all succeed); post 100 sessions in a loop with a script and see 429s after the 20th with a sensible `Retry-After`. The `namespace_id`s (`1001`, `1002`) are arbitrary: change them if the account already uses them.

@@ -6,6 +6,7 @@ import type { AppEnv } from "../env";
 import { cdnUrl } from "../lib/cdn";
 import { remoteConfig } from "../lib/remoteConfig";
 import { requireUser } from "../lib/firebaseAuth";
+import { ipRateLimit, uidRateLimit } from "../lib/rateLimit";
 import { me } from "./me";
 import { leaderboard } from "./v1/leaderboard";
 import { reports } from "./v1/reports";
@@ -16,6 +17,9 @@ export const v1 = new Hono<AppEnv>();
 /** Paths (under /v1) that are public for GET (and HEAD). Everything else is authenticated. */
 const PUBLIC_ROUTES = new Set(["/config", "/packs"]);
 
+// Per IP, before anything else: it also covers the public reads and bad tokens.
+v1.use("*", ipRateLimit());
+
 const authenticate = requireUser();
 v1.use("*", async (c, next) => {
   const method = c.req.method;
@@ -23,6 +27,11 @@ v1.use("*", async (c, next) => {
   if ((method === "GET" || method === "HEAD") && PUBLIC_ROUTES.has(sub)) return next();
   return authenticate(c, next);
 });
+
+// Per player, once the token is verified. Clip reports keep their own daily counter (routes/v1/reports.ts).
+v1.use("/sessions", uidRateLimit("sessions", (m) => m === "POST"));
+v1.use("/me/merge", uidRateLimit("merge", (m) => m === "POST"));
+v1.use("/me", uidRateLimit("me", (m) => m === "PUT"));
 
 v1.route("/me", me);
 v1.route("/sessions", sessions);

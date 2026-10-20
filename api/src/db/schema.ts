@@ -5,6 +5,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -377,4 +378,18 @@ export const clipReportCounts = sqliteTable("clip_report_counts", {
   /** UTC day number (epoch ms / 86 400 000) the count is for. */
   day: integer("day").notNull(),
   count: integer("count").notNull(),
+});
+
+/**
+ * Token buckets for the per-player limits (src/lib/rateLimit.ts). One row per `<rule>:<uid>`; a
+ * nightly job drops the rows idle for a day, so the table is bounded by the players active today.
+ * No foreign key: guests are limited before they have a users row.
+ */
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  /** Tokens left at `updatedAt`, after the refill and this request's spend. */
+  tokens: real("tokens").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  /** Whether the last request was let through (1) or refused (0). */
+  allowed: integer("allowed").notNull(),
 });

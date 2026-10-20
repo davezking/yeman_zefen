@@ -28,6 +28,10 @@ import '../../../core/http/api_client.dart';
 ///   parks it for good. The row stays with `last_error` for debugging.
 /// - Anything that is not the session's fault (offline, a 5xx, 429, a token
 ///   problem) stops the pass and leaves the rest for the next one.
+/// - A 429 is about the player, not the session (the per-player limit on
+///   `POST /v1/sessions`, 20 at once and 60 an hour). Nothing at all is sent
+///   until its `Retry-After` is over, not even by a forced pass: the other
+///   queued sessions would only be refused too.
 class SessionSync {
   SessionSync({
     required this.db,
@@ -62,6 +66,18 @@ class SessionSync {
   bool _againForced = false;
   Timer? _wake;
   bool _disposed = false;
+
+  /// While the clock is before this, the server has said "slow down": nothing is sent.
+  /// Held in memory only; after a restart the first send finds out again.
+  int _rateLimitedUntil = 0;
+
+  /// Whether a 429's hold is still on. A hold that ends more than [maxDelay]
+  /// from now cannot be one this class set, so the device clock went back:
+  /// it is over.
+  bool get _held {
+    final left = _rateLimitedUntil - _nowMs();
+    return left > 0 && left <= maxDelay.inMilliseconds;
+  }
 
   /// The wait after [attempts] failed attempts: 30 s, 1 min, 2 min, ... up to [maxDelay].
   Duration backoff(int attempts) {
@@ -115,6 +131,7 @@ class SessionSync {
   Future<void> _pass(bool force, Set<String> tried) async {
     while (!_disposed) {
       if (!auth().hasUid) return;
+      if (_held) return;
       final row = await _nextDue(tried, force);
       if (row == null) return;
       tried.add(row.id);
@@ -202,6 +219,12 @@ class SessionSync {
     final attempts = row.attempts + 1;
     var wait = backoff(attempts);
     if (retryAfter != null && retryAfter > wait) wait = retryAfter > maxDelay ? maxDelay : retryAfter;
+    if (error is RateLimitedException) {
+      // The hold is the server's wait, not this session's own backoff, which
+      // earlier failures may have stretched far past it.
+      final hold = retryAfter ?? baseDelay;
+      _rateLimitedUntil = _nowMs() + (hold > maxDelay ? maxDelay : hold).inMilliseconds;
+    }
     return (db.update(db.pendingSessions)..where((t) => t.id.equals(row.id))).write(
       PendingSessionsCompanion(
         attempts: Value(attempts),
@@ -222,7 +245,9 @@ class SessionSync {
     final query = db.selectOnly(db.pendingSessions)
       ..addColumns([earliest])
       ..where(db.pendingSessions.parked.equals(false) & db.pendingSessions.nextAttemptAt.isBiggerThanValue(_nowMs()));
-    final next = await query.map((r) => r.read(earliest)).getSingleOrNull();
+    // While a 429's hold is on, nothing goes out before it ends, and the
+    // sessions it held may have no wait of their own: wake when it ends.
+    final next = _held ? _rateLimitedUntil : await query.map((r) => r.read(earliest)).getSingleOrNull();
     if (next == null) return;
     var delay = Duration(milliseconds: next - _nowMs());
     if (delay > maxDelay) delay = maxDelay; // the clock went back

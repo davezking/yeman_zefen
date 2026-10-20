@@ -591,13 +591,13 @@ describe("D1 cost", () => {
     return counter;
   }
 
-  it("a typical session costs 3 write statements", async () => {
-    // 10 rounds in an era: the user touch, one leaderboard upsert (4 rows), the session row.
+  it("a typical session costs 4 write statements", async () => {
+    // 10 rounds in an era: the rate-limit bucket, the user touch, one leaderboard upsert (4 rows), the session row.
     const now = Date.now();
     const rounds = Array.from({ length: 10 }, (_, i) => (i % 2 ? artistRound(i % 5) : songRound(i % 5)));
     const counter = await cost("u-cost", honest({ generationId: ERA, rounds, clientStartedAt: now - 120_000 }));
-    expect(counter.writes).toBe(3);
-    expect(counter.queries).toBe(5); // plus the two reads
+    expect(counter.writes).toBe(4);
+    expect(counter.queries).toBe(6); // plus the two reads
     expect(await board("u-cost")).toHaveLength(4);
   });
 
@@ -612,11 +612,11 @@ describe("D1 cost", () => {
     expect(many.writes).toBe(few.writes);
   });
 
-  it("a replay costs only the reads", async () => {
+  it("a replay costs only the reads and the rate-limit bucket", async () => {
     const body = honest();
     await post("u-cheap", body, { provider: REGISTERED });
     const counter = await cost("u-cheap", body);
-    expect(counter.writes).toBe(0);
-    expect(counter.queries).toBe(2);
+    expect(counter.writes).toBe(1); // the bucket: a replay is still a request
+    expect(counter.queries).toBe(3);
   });
 });
