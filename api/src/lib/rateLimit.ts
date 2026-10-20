@@ -52,11 +52,12 @@ export type TakeResult = { allowed: true } | { allowed: false; retryAfterS: numb
 
 export async function takeToken(db: D1Database, key: string, rule: BucketRule, now: number): Promise<TakeResult> {
   const perMs = rule.perHour / HOUR_MS;
-  const row = await db
+  const { results } = await db
     .prepare(TAKE_SQL)
     .bind(key, now, rule.burst, perMs)
-    .first<{ allowed: number; tokens: number }>();
-  if (row === null || row.allowed === 1) return { allowed: true };
+    .all<{ allowed: number; tokens: number }>();
+  const row = results[0];
+  if (row === undefined || row.allowed === 1) return { allowed: true };
   return { allowed: false, retryAfterS: Math.max(1, Math.ceil(((1 - row.tokens) / perMs) / 1000)) };
 }
 

@@ -46,14 +46,15 @@ v1.get("/config", (c) => {
   return c.json(config);
 });
 
+export const PACKS_SQL = `
+  SELECT p.slug, p.name_am, p.name_en, p.generation_id, p.genre_id,
+         pv.version, pv.manifest_key, pv.track_count, pv.total_bytes, pv.published_at
+    FROM packs p JOIN pack_versions pv ON pv.pack_id = p.id AND pv.version = p.current_version
+   ORDER BY p.slug`;
+
 // Published packs at their current version. The app downloads each manifest from `manifestUrl`.
 v1.get("/packs", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.slug, p.name_am, p.name_en, p.generation_id, p.genre_id,
-            pv.version, pv.manifest_key, pv.track_count, pv.total_bytes, pv.published_at
-       FROM packs p JOIN pack_versions pv ON pv.pack_id = p.id AND pv.version = p.current_version
-      ORDER BY p.slug`,
-  ).all<{
+  const { results } = await c.env.DB.prepare(PACKS_SQL).all<{
     slug: string; name_am: string; name_en: string; generation_id: number | null; genre_id: number | null;
     version: number; manifest_key: string; track_count: number; total_bytes: number; published_at: number;
   }>();

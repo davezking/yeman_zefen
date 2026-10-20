@@ -90,3 +90,48 @@ bucket_name = "yz-clips"
 [[env.prod.r2_buckets]]
 binding = "SOURCE"
 bucket_name = "yz-source"
+
+# Staging: the load-test target (docs/perf.md). Same code as prod, its own D1 and R2, no cron.
+# It uses the dev Firebase project, so a load test signs test players in there (ops/load/README.md).
+# Create once: `wrangler d1 create yz-db-staging`, `wrangler r2 bucket create yz-clips-staging` (and -source-),
+# put the new D1 id below, then `wrangler d1 migrations apply yz-db-staging --env staging --remote`.
+[env.staging]
+name = "yz-api-staging"
+
+[env.staging.observability]
+enabled = true
+
+[env.staging.vars]
+ENV = "staging"
+FIREBASE_PROJECT_ID = "yeman-zefen-dev"
+ACCESS_TEAM_DOMAIN = "https://yz.cloudflareaccess.com"
+ACCESS_AUD = ""
+CONFIG_INTERSTITIAL_EVERY_ROUNDS = "3"
+CONFIG_REGISTER_PROMPT_AFTER_SESSIONS = "5"
+CONFIG_REGISTER_PROMPT_COOLDOWN_DAYS = "7"
+CONFIG_MIN_APP_VERSION = "0.1.0"
+CONFIG_DEFAULT_CLIP_MS = "10000"
+CDN_BASE_URL = "https://cdn-staging.example.com"
+ADMIN_ORIGIN = "https://admin-staging.example.com"
+INGEST_SERVICE_CLIENT_ID = ""
+GH_REPO = "davezking/yeman_zefen"
+GH_REF = "main"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "yz-db-staging"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[env.staging.ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "1003"
+simple = { limit = 3000, period = 60 }
+
+[[env.staging.r2_buckets]]
+binding = "CLIPS"
+bucket_name = "yz-clips-staging"
+
+[[env.staging.r2_buckets]]
+binding = "SOURCE"
+bucket_name = "yz-source-staging"

@@ -97,14 +97,14 @@ type StoredEvents = {
 type CatalogRow = { kind: CatalogKind; id: number; artist_id: number | null; generation_id: number | null };
 type StoredRow = { user_id: string; score: number; flagged: number; events_json: string };
 
-const CATALOG_SQL = `
+export const CATALOG_SQL = `
   SELECT 't' AS kind, id, artist_id, generation_id FROM tracks WHERE id IN (SELECT value FROM json_each(?1))
   UNION ALL SELECT 'a', id, NULL, NULL FROM artists WHERE id IN (SELECT value FROM json_each(?2))
   UNION ALL SELECT 'g', id, NULL, NULL FROM generations WHERE id IN (SELECT value FROM json_each(?3))`;
 
-const STORED_SQL = "SELECT user_id, score, flagged, events_json FROM game_sessions WHERE id = ?1";
+export const STORED_SQL = "SELECT user_id, score, flagged, events_json FROM game_sessions WHERE id = ?1";
 
-const USER_TOUCH_SQL = `
+export const USER_TOUCH_SQL = `
   INSERT INTO users (id, display_name, is_anonymous, country, created_at, last_seen_at)
   VALUES (?1, NULL, ?2, ?3, ?4, ?4)
   ON CONFLICT (id) DO UPDATE SET
@@ -118,7 +118,7 @@ const USER_TOUCH_SQL = `
 // user touch), so a guest token still cached right after linking counts for the account.
 // One statement for every row the session adds to: json_each supplies the periods (?1) and the
 // generations (?2), so a guest's session (which adds nothing) costs one statement, not four.
-const LEADERBOARD_SQL = `
+export const LEADERBOARD_SQL = `
   INSERT INTO leaderboard_entries (period, generation_id, user_id, points, updated_at)
   SELECT p.value, g.value, u.id, ?3, ?4
     FROM users u
@@ -130,7 +130,7 @@ const LEADERBOARD_SQL = `
     points = points + excluded.points,
     updated_at = excluded.updated_at`;
 
-const SESSION_SQL = `
+export const SESSION_SQL = `
   INSERT INTO game_sessions (id, user_id, mode, generation_id, difficulty, client_started_at, received_at,
                              rounds, score, track_ids_json, events_json, offline, country, flagged, flag_reason)
   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
