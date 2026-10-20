@@ -29,7 +29,7 @@ make ios-symbols        # dSYMs and Dart symbols to Crashlytics (step 6)
 
 ## 4. Build
 
-`make ios-release`. The first run on a Mac creates `ios/Podfile` and `Podfile.lock` and installs the pods; if the archive builds, commit those two files so later builds use the same pods. Check that the archive is for scheme `prod` and the Release configuration of the prod flavor.
+`make ios-release`. The project uses **Swift Package Manager** for its plugins (Firebase included), not CocoaPods, so there is no `Podfile`: Xcode fetches the packages on the first build, into its DerivedData folder. Check that the archive is for scheme `prod` and the Release configuration of the prod flavor. The build uses the default export method (App Store Connect).
 
 ## 5. Upload to TestFlight
 
@@ -49,7 +49,7 @@ firebase login        # once; or set GOOGLE_APPLICATION_CREDENTIALS to a service
 make ios-symbols
 ```
 
-Do it for every build you send out. The symbols of a build that was not uploaded cannot be recreated later, so keep `app/build/ios/archive` and `app/build/symbols-ios` until it is done.
+The script finds Crashlytics' `upload-symbols` tool in Xcode's package checkout (DerivedData), which the build fills. Do it for every build you send out. The symbols of a build that was not uploaded cannot be recreated later, so keep `app/build/ios/archive` and `app/build/symbols-ios` until it is done.
 
 ## Checks before the first release
 

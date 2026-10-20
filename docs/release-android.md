@@ -29,7 +29,7 @@ keytool -genkeypair -v -keystore upload-keystore.jks -alias upload \
 
 ### 2. Secrets
 
-Create a GitHub **environment** named `release` (Settings > Environments) and add yourself as a required reviewer, so every release waits for your approval and only this job can read the secrets. Add these **environment secrets**:
+Create a GitHub **environment** named `release` (Settings > Environments), add yourself as a required reviewer, and under **Deployment branches and tags** allow only tags matching `app-v*`. Every release then waits for your approval, and only a release tag's run of this job can read the secrets. Add these **environment secrets**:
 
 | Secret | Value |
 |---|---|

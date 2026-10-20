@@ -35,8 +35,7 @@ build() {
   flutter build ipa --release --flavor prod \
     --dart-define-from-file=config/prod.json \
     --obfuscate --split-debug-info="$symbols_dir" \
-    --build-name="$name" --build-number="$number" \
-    --export-method app-store
+    --build-name="$name" --build-number="$number"
 
   echo
   echo "Built: $(ls build/ios/ipa/*.ipa)"
@@ -46,8 +45,12 @@ build() {
 symbols() {
   : "${IOS_GOOGLESERVICE_PLIST:?set IOS_GOOGLESERVICE_PLIST to the prod GoogleService-Info.plist}"
   [ -d "$archive/dSYMs" ] || { echo "error: no archive at $archive: run '$0 build' first" >&2; exit 1; }
-  uploader=ios/Pods/FirebaseCrashlytics/upload-symbols
-  [ -x "$uploader" ] || { echo "error: $uploader not found: run '$0 build' first (it installs the pods)" >&2; exit 1; }
+  # The app gets Firebase through Swift Package Manager, so Crashlytics' upload tool is in Xcode's package
+  # checkout under DerivedData. ios/Pods is the place it would be if the project moved back to CocoaPods.
+  uploader=$(find ios/Pods/FirebaseCrashlytics "$HOME/Library/Developer/Xcode/DerivedData" \
+    -path '*FirebaseCrashlytics/upload-symbols' -o -path '*firebase-ios-sdk/Crashlytics/upload-symbols' \
+    2>/dev/null | head -1 || true)
+  [ -n "$uploader" ] || { echo "error: Crashlytics' upload-symbols not found: run '$0 build' first (it fetches the packages)" >&2; exit 1; }
 
   # Native frames: the app's and the frameworks' dSYMs from the archive.
   "$uploader" -gsp "$IOS_GOOGLESERVICE_PLIST" -p ios "$archive/dSYMs"
