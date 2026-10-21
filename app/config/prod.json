@@ -1,8 +1,8 @@
 {
   "APP_FLAVOR": "prod",
-  "API_BASE": "https://api.TODO-set-domain",
+  "API_BASE": "https://yz-api-prod.yegnatop10.workers.dev",
   "STORE_URL": "https://play.google.com/store/apps/details?id=com.yemanzefen.yeman_zefen",
-  "GOOGLE_SERVER_CLIENT_ID": "",
+  "GOOGLE_SERVER_CLIENT_ID": "613078882624-4ikvisd5f95i78tntvlh5f90evjgq1k0.apps.googleusercontent.com",
   "APPLE_ON_ANDROID": false,
   "ADMOB_INTERSTITIAL_ANDROID": "",
   "ADMOB_REWARDED_ANDROID": "",
