@@ -9,7 +9,7 @@
         reports (a bad argument, pip failing, the runner being cancelled), and then the job would sit
         `queued` or `running` for good. The workflows call this from a step that runs on failure.
 
-Both read API_BASE, CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET; `fail` also reads JOB_ID unless it is
+Both read API_BASE, and INGEST_TOKEN or CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET; `fail` also reads JOB_ID unless it is
 told which job. Run it from the `ingest/` directory.
 """
 
@@ -23,7 +23,7 @@ import sys
 from collections.abc import Callable, Mapping
 
 from .api_client import ApiClient, ApiError
-from .config import ConfigError, github_run_url, require
+from .config import ConfigError, api_credentials, github_run_url, require
 
 log = logging.getLogger("yz.jobs")
 
@@ -38,8 +38,9 @@ def job_id_from_title(title: str) -> int | None:
 
 
 def _client(env: Mapping[str, str]) -> ApiClient:
-    c = require(env, "API_BASE", "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET")
-    return ApiClient(c["API_BASE"].rstrip("/"), c["CF_ACCESS_CLIENT_ID"], c["CF_ACCESS_CLIENT_SECRET"])
+    base = require(env, "API_BASE")["API_BASE"]
+    client_id, client_secret, token = api_credentials(env)
+    return ApiClient(base.rstrip("/"), client_id, client_secret, token=token)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

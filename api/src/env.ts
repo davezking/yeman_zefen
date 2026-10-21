@@ -11,6 +11,10 @@ export type Bindings = {
   CDN_BASE_URL: string;
   /** Exact origin of the admin SPA (e.g. https://admin.example.com). The only origin allowed CORS on /admin/*. */
   ADMIN_ORIGIN: string;
+  /** How admins sign in: "access" (Cloudflare Access, default) or "firebase" (Google sign-in, Bearer token). See lib/accessAuth.ts. */
+  ADMIN_LOGIN?: string;
+  /** Secret, optional. A shared secret (32+ characters) the ingest jobs may send as a Bearer token instead of the Access service token. */
+  INGEST_TOKEN?: string;
   /** Cloudflare Access service-token client id allowed on /admin/ingest/*. */
   INGEST_SERVICE_CLIENT_ID: string;
   /** Secret. Fine-grained GitHub PAT, Actions read/write on GH_REPO only, used to dispatch the ingest workflows. */

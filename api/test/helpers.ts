@@ -245,11 +245,12 @@ export function removeFirebaseJwks(): void {
  */
 export async function signFirebaseToken(
   uid: string,
-  opts: { provider?: string; ageS?: number; key?: CryptoKey } = {},
+  opts: { provider?: string; ageS?: number; key?: CryptoKey; email?: string; emailVerified?: boolean } = {},
 ): Promise<string> {
   const projectId = (env as { FIREBASE_PROJECT_ID: string }).FIREBASE_PROJECT_ID;
   const iat = Math.floor(Date.now() / 1000) - (opts.ageS ?? 10);
-  return new SignJWT({ auth_time: iat, firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} } })
+  const email = opts.email === undefined ? {} : { email: opts.email, email_verified: opts.emailVerified ?? true };
+  return new SignJWT({ auth_time: iat, ...email, firebase: { sign_in_provider: opts.provider ?? "anonymous", identities: {} } })
     .setProtectedHeader({ alg: "RS256", kid: "fb-test-key", typ: "JWT" })
     .setIssuer(`https://securetoken.google.com/${projectId}`)
     .setAudience(projectId)

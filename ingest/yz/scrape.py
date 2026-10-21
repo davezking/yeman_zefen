@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         except ConfigError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        api = ApiClient(cfg.api_base, cfg.cf_access_client_id, cfg.cf_access_client_secret)
+        api = ApiClient(cfg.api_base, cfg.cf_access_client_id, cfg.cf_access_client_secret, token=cfg.ingest_token)
         pipeline = Pipeline(
             source, api=api, store=SourceStore.from_config(cfg), job_id=cfg.job_id,
             gh_run_url=cfg.gh_run_url, resume=not args.fresh, **common,

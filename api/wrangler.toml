@@ -21,6 +21,8 @@ CDN_BASE_URL = "http://localhost:8787/cdn"
 # The address on GET /account-deletion (Play's deletion link). Empty: that page answers 503.
 PRIVACY_CONTACT_EMAIL = ""
 ADMIN_ORIGIN = "http://localhost:5173"
+# How admins sign in: "access" (Cloudflare Access; DEV_ADMIN_EMAIL skips it locally) or "firebase" (Google sign-in).
+ADMIN_LOGIN = "access"
 INGEST_SERVICE_CLIENT_ID = ""
 # Ingest workflows are dispatched on this repo/branch. The PAT is a secret: `wrangler secret put GH_DISPATCH_TOKEN`.
 GH_REPO = "davezking/yeman_zefen"
@@ -76,6 +78,9 @@ CDN_BASE_URL = "https://cdn.example.com"
 # The address on GET /account-deletion (Play's deletion link). Empty: that page answers 503.
 PRIVACY_CONTACT_EMAIL = ""
 ADMIN_ORIGIN = "https://admin.example.com"
+# How admins sign in (docs/ops.md, "Admin authentication"): "firebase" signs in with Google and works on the free
+# pages.dev and workers.dev addresses; "access" (Cloudflare Access) needs your own domain for both.
+ADMIN_LOGIN = "firebase"
 INGEST_SERVICE_CLIENT_ID = ""
 GH_REPO = "davezking/yeman_zefen"
 GH_REF = "main"
@@ -123,6 +128,7 @@ CDN_BASE_URL = "https://cdn-staging.example.com"
 # The address on GET /account-deletion (Play's deletion link). Empty: that page answers 503.
 PRIVACY_CONTACT_EMAIL = ""
 ADMIN_ORIGIN = "https://admin-staging.example.com"
+ADMIN_LOGIN = "access"
 INGEST_SERVICE_CLIENT_ID = ""
 GH_REPO = "davezking/yeman_zefen"
 GH_REF = "main"

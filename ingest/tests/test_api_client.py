@@ -201,3 +201,11 @@ def test_post_clips_sends_durations_and_batches_them():
     assert [len(c["json"]["durations"]) for c in s.calls] == [100, 50]
     assert all(c["json"]["clips"] == [] and c["json"]["flags"] == [] for c in s.calls)
     assert out["durations"] == [{"r": 1}, {"r": 1}]
+
+
+def test_sends_the_ingest_token_as_a_bearer_token_without_access_headers():
+    s = FakeSession(ok(created=1))
+    c = ApiClient("https://api.test/", "", "", token="tok", session=s, sleep=lambda _: None)
+    c.post_tracks(7, records(1))
+    assert s.headers["Authorization"] == "Bearer tok"
+    assert "CF-Access-Client-Id" not in s.headers and "CF-Access-Client-Secret" not in s.headers

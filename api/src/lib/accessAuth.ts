@@ -1,12 +1,18 @@
-// Cloudflare Access JWT verification and the two admin-boundary middlewares.
+// The two admin-boundary middlewares: admins (requireAdmin) and the ingest jobs (requireService).
 // Spec: docs/architecture.md §6 and docs/phase-1-sprint-1-prompts.md.
 //
-// Every /admin/* route sits behind Cloudflare Access, which injects a
-// `Cf-Access-Jwt-Assertion` header. We still verify that JWT ourselves
-// (defense in depth) against the team JWKS, then authorize:
-//   - humans by email in `admin_users` (requireAdmin),
-//   - the ingest service token by `common_name` (requireService).
-// We never trust any other header, and never fall through to one.
+// How an admin proves who they are depends on ADMIN_LOGIN (docs/ops.md, "Admin authentication"):
+//   - "access" (the default): every /admin/* route sits behind Cloudflare Access, which injects a
+//     `Cf-Access-Jwt-Assertion` header. We still verify that JWT ourselves (defense in depth)
+//     against the team JWKS. This needs the admin site and the API on hostnames of one domain.
+//   - "firebase": the admin site signs in with Google through Firebase Auth and sends the ID
+//     token as `Authorization: Bearer`. No cookie is involved, so it works when the admin site
+//     and the API are on unrelated hostnames (pages.dev and workers.dev).
+// Either way the email must be in `admin_users`. In "firebase" mode the Access header is ignored,
+// and in "access" mode the Bearer token is: one mode at a time, never a fall-through.
+//
+// The ingest jobs authenticate with the Access service token (`common_name`), or with the shared
+// secret INGEST_TOKEN as a Bearer token where Access is not in front of the API.
 import { eq } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
@@ -14,10 +20,20 @@ import { db } from "../db/client";
 import { ADMIN_ROLES, adminUsers } from "../db/schema";
 import type { AppEnv, Bindings } from "../env";
 import { ApiError } from "./errors";
+import { bearerToken, KeysUnavailableError, verifyFirebaseIdToken } from "./firebaseAuth";
 
 export const ACCESS_HEADER = "cf-access-jwt-assertion";
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+/** How admins sign in. Anything but "firebase" is "access", so a typo keeps the stricter default. */
+export type AdminLogin = "access" | "firebase";
+export const adminLogin = (env: Pick<Bindings, "ADMIN_LOGIN">): AdminLogin => (env.ADMIN_LOGIN === "firebase" ? "firebase" : "access");
+
+/** The sign-in provider an admin's Firebase token must come from. */
+export const ADMIN_FIREBASE_PROVIDER = "google.com";
+/** INGEST_TOKEN shorter than this is treated as not set: a short shared secret can be guessed. */
+export const MIN_INGEST_TOKEN_LENGTH = 32;
 
 export interface AccessClaims extends JWTPayload {
   /** Present on human (identity) tokens. */
@@ -77,23 +93,47 @@ async function verifyHeaderOrThrow(env: Bindings, token: string): Promise<Access
 }
 
 /**
+ * The verified Google email of a Firebase ID token sent as `Authorization: Bearer`. 401 for a missing or
+ * bad token, 503 when Google's keys cannot be fetched, 403 for a token not from a Google sign-in or
+ * without a verified email.
+ */
+async function firebaseAdminEmail(env: Bindings, token: string, requestId: string | undefined): Promise<string> {
+  let user;
+  try {
+    user = await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+  } catch (err) {
+    if (err instanceof KeysUnavailableError) {
+      console.error(JSON.stringify({ requestId, event: "admin_auth_keys_unavailable", reason: err.message }));
+      throw new ApiError(503, "auth_unavailable", "Authentication is temporarily unavailable");
+    }
+    console.warn(JSON.stringify({ requestId, event: "admin_auth_failed", reason: err instanceof Error ? err.message : String(err) }));
+    throw new ApiError(401, "unauthorized", "Invalid sign-in token");
+  }
+  if (user.provider !== ADMIN_FIREBASE_PROVIDER || !user.email) {
+    throw new ApiError(403, "forbidden", "Sign in with a Google account that is an admin");
+  }
+  return user.email;
+}
+
+/**
  * Require a human admin. The verified email must exist in `admin_users` with one
  * of `roles` (any role by default). Sets `{ email, role }` on the context.
  *
  * Dev convenience: when `ENV=dev` AND `DEV_ADMIN_EMAIL` is set, a request with no
- * Access header is treated as that email (still subject to the admin_users check).
- * With `DEV_ADMIN_EMAIL` unset, a missing header is 401 even in dev.
+ * token is treated as that email (still subject to the admin_users check).
+ * With `DEV_ADMIN_EMAIL` unset, a missing token is 401 even in dev.
  */
 export function requireAdmin(roles: readonly AdminRole[] = ADMIN_ROLES): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const token = c.req.header(ACCESS_HEADER);
+    const firebase = adminLogin(c.env) === "firebase";
+    const token = firebase ? bearerToken(c.req.header("authorization")) : c.req.header(ACCESS_HEADER);
     let email: string | undefined;
     if (token) {
-      email = (await verifyHeaderOrThrow(c.env, token)).email;
+      email = firebase ? await firebaseAdminEmail(c.env, token, c.get("requestId")) : (await verifyHeaderOrThrow(c.env, token)).email;
     } else if (c.env.ENV === "dev" && c.env.DEV_ADMIN_EMAIL) {
       email = c.env.DEV_ADMIN_EMAIL;
     } else {
-      throw new ApiError(401, "unauthorized", "Missing Access token");
+      throw new ApiError(401, "unauthorized", firebase ? "Missing sign-in token" : "Missing Access token");
     }
     if (!email) throw new ApiError(403, "forbidden", "Not an authorized admin");
     const row = await db(c.env).select().from(adminUsers).where(eq(adminUsers.email, email)).get();
@@ -121,12 +161,28 @@ export function requireRole(...roles: readonly AdminRole[]): MiddlewareHandler<A
   };
 }
 
+/** Compares two secrets in constant time (as digests, so their lengths do not leak either). */
+async function sameSecret(given: string, expected: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(given)), crypto.subtle.digest("SHA-256", enc.encode(expected))]);
+  return crypto.subtle.timingSafeEqual(a, b);
+}
+
 /**
- * Require the ingest service token. The verified JWT's `common_name` must equal
- * `INGEST_SERVICE_CLIENT_ID`. Human (email) tokens never satisfy this.
+ * Require the ingest jobs. Either the shared secret INGEST_TOKEN as `Authorization: Bearer` (when it is
+ * set, at least MIN_INGEST_TOKEN_LENGTH characters), or the Access service token: the verified JWT's
+ * `common_name` must equal `INGEST_SERVICE_CLIENT_ID`. Human (email) tokens never satisfy this.
  */
 export function requireService(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
+    const expectedSecret = c.env.INGEST_TOKEN ?? "";
+    const bearer = bearerToken(c.req.header("authorization"));
+    if (bearer && expectedSecret.length >= MIN_INGEST_TOKEN_LENGTH) {
+      if (!(await sameSecret(bearer, expectedSecret))) throw new ApiError(401, "unauthorized", "Invalid ingest token");
+      c.set("service", { clientId: "ingest-token" });
+      await next();
+      return;
+    }
     const token = c.req.header(ACCESS_HEADER);
     if (!token) throw new ApiError(401, "unauthorized", "Missing Access token");
     const claims = await verifyHeaderOrThrow(c.env, token);

@@ -44,6 +44,7 @@ class ApiClient:
         client_id: str,
         client_secret: str,
         *,
+        token: str = "",
         session: requests.Session | None = None,
         retries: int = 5,
         backoff: float = 1.0,
@@ -56,14 +57,12 @@ class ApiClient:
         self.timeout = timeout
         self._sleep = sleep
         self.session = session if session is not None else requests.Session()
-        self.session.headers.update(
-            {
-                "CF-Access-Client-Id": client_id,
-                "CF-Access-Client-Secret": client_secret,
-                "Accept": "application/json",
-                "User-Agent": USER_AGENT,
-            }
-        )
+        self.session.headers.update({"Accept": "application/json", "User-Agent": USER_AGENT})
+        # The shared INGEST_TOKEN where Cloudflare Access is not in front of the API; else the Access service token.
+        if token:
+            self.session.headers["Authorization"] = f"Bearer {token}"
+        if client_id and client_secret:
+            self.session.headers.update({"CF-Access-Client-Id": client_id, "CF-Access-Client-Secret": client_secret})
 
     # ------------------------------------------------------------- transport
 
