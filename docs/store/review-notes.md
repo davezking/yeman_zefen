@@ -73,9 +73,8 @@ permission (above). It needs the network.
 - Privacy policy: **[PUBLIC PRIVACY POLICY URL]**
 - The in-app Settings > Privacy row opens the same policy. **[confirm the row is wired to the URL in the release build]**
 - Account deletion removes the account (see the policy, section 5). Play's web deletion page:
-  **https://api.[domain]/account-deletion** (blocking for Play until `PRIVACY_CONTACT_EMAIL` is set and the URL is
-  checked, `docs/ops.md`)
+  **https://yz-api-prod.yegnatop10.workers.dev/account-deletion** (check it opens after the deploy)
 
 ## Contact
 
-For questions during review: **[REVIEWER CONTACT EMAIL]**.
+For questions during review: **yegnatop10@gmail.com**.

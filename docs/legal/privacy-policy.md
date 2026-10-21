@@ -11,7 +11,7 @@ Last updated: [date of publication]
 Yeman Zefen is a free, ad-supported music-guessing game for Amharic music. It is published by
 [legal name of the developer], [postal address], [country].
 
-Contact for privacy questions and requests: **[privacy contact email]**. We aim to answer within 30 days.
+Contact for privacy questions and requests: **yegnatop10@gmail.com**. We aim to answer within 30 days.
 
 The app is not designed for children, and we do not knowingly collect data from anyone under [13, or the
 minimum age for your jurisdictions, confirm]. If you think a child has given us information, contact us and we
@@ -98,7 +98,7 @@ iPhone: Settings > Privacy & Security > Tracking). On iPhone, ads are personaliz
   details such as your IP address. (confirm from a production log entry) They are kept for [number of days, confirm
   Workers Logs retention].
 
-If you cannot delete your account in the app, follow the steps at **[https://api.[domain]/account-deletion]**, or
+If you cannot delete your account in the app, follow the steps at **https://yz-api-prod.yegnatop10.workers.dev/account-deletion**, or
 email us at the contact address in section 1.
 
 ## 6. Usage reports
@@ -124,7 +124,7 @@ Depending on where you live, you may have the right to:
 - **receive** a copy of it in a common format;
 - **withdraw consent** for ads at any time (section 4).
 
-To use these rights, contact us at **[privacy contact email]**. We may need to confirm who you are before we act.
+To use these rights, contact us at **yegnatop10@gmail.com**. We may need to confirm who you are before we act.
 
 If you are in the European Economic Area or the United Kingdom and you think we have not handled your data properly,
 you can complain to your local data protection authority. (confirm the list of authorities and the lead authority
