@@ -1,0 +1,8 @@
+# Cloudflare Pages response headers for the admin site (copied into dist/ by the build).
+# The script policy matters most: with ADMIN_LOGIN=firebase the sign-in lives in browser storage that any script
+# on the page can read, so only the site's own files and Google's sign-in script (loaded by Firebase Auth) may run.
+# Styles, images, audio and API calls are not restricted here: the API and clip addresses differ per deployment.
+/*
+  Content-Security-Policy: script-src 'self' https://apis.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -1,6 +1,66 @@
 # Ops
 
-## Admin authentication (Cloudflare Access)
+## Admin authentication
+
+There are two ways for admins to sign in, chosen by `ADMIN_LOGIN` in `api/wrangler.toml` (and the matching
+`VITE_ADMIN_LOGIN` on the admin site). Either way the email must be in `admin_users` ("Seeding admins" below).
+
+| `ADMIN_LOGIN` | How | When |
+|---|---|---|
+| `firebase` (prod's setting now) | The admin site signs in with Google through Firebase (the prod project) and sends the ID token with every request. | The free `pages.dev` and `workers.dev` addresses, or any setup without Cloudflare Access. |
+| `access` (the default) | Cloudflare Access in front of the admin site and `/admin/*` signs the admin in; its cookie goes with every request. | Your own domain. Access also guards the site itself and offers one-time PINs. |
+
+With `firebase`, the Worker accepts only a token from a **Google** sign-in with a verified email; an email/password or
+guest account is refused even when its email is on the list. The Access header is ignored, and with `access` a Bearer
+token is ignored: one mode at a time.
+
+### Seeding admins
+
+```
+cd api
+npx tsx scripts/add-admin.ts you@example.com admin                       # local D1
+npx tsx scripts/add-admin.ts you@example.com editor --remote --env prod  # prod D1
+```
+
+Roles are `admin` and `editor`. Re-running updates the role. `--remote` needs `--env prod` (or `--env staging`): without
+it wrangler would use the top-level database in `wrangler.toml`, whose id is a placeholder. With `ADMIN_LOGIN=firebase`,
+add the Google address the admin signs in with.
+
+### Signing in with Google (`ADMIN_LOGIN=firebase`)
+
+1. **Firebase console › the prod project (`yeman-zefen-prod`) › Project settings › Your apps › Add app › Web.** Name it
+   "admin". Copy `apiKey`, `authDomain`, `projectId` and `appId` from the config it shows. These are public identifiers,
+   not secrets.
+2. **Authentication › Sign-in method:** Google is enabled (it already is for the app).
+3. **Authentication › Settings › Authorized domains › Add domain:** the admin site's address, e.g.
+   `yz-admin.pages.dev` (no `https://`). Sign-in from any other address fails with an "unauthorized domain" message.
+   Then restrict that app's API key: **Google Cloud Console › APIs & Services › Credentials**, open the key named for the
+   web app (or "Browser key"), set **Application restrictions › Websites** to the admin site's address
+   (`https://yz-admin.pages.dev/*`). The Android and iOS keys keep their own restrictions.
+4. **Pages project › Settings › Environment variables** (Production; Preview too, so preview builds do not fail): `VITE_ADMIN_LOGIN=firebase`,
+   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` and `VITE_FIREBASE_APP_ID` with the
+   values from step 1. A build with `firebase` and a missing value fails rather than deploying a site nobody can sign in to.
+   Redeploy the site.
+5. **Worker:** `ADMIN_LOGIN = "firebase"` and `ADMIN_ORIGIN` = the admin site's address under `[env.prod.vars]`, then
+   `npm run deploy`.
+6. **Add yourself** with your Google address ("Seeding admins"), open the admin site and sign in. "Sign out" in the top
+   bar switches accounts.
+
+Things to know:
+
+- **Use a Google account for admin work that never signs in to the game.** The game and the admin site share the prod
+  Firebase project, so a token the game holds for that account (on a phone, say) would also open the admin site.
+- **Only the production address works.** Pages preview builds get their own addresses (`<hash>.yz-admin.pages.dev`),
+  which neither `ADMIN_ORIGIN` nor Firebase's authorized domains allow.
+- **Signing in creates a user** for your Google account in the prod Firebase project, next to the players. It has no
+  player data unless that account also plays.
+- **The sign-in is kept in the browser's storage**, which scripts on the page can read (Access keeps its cookie out of
+  their reach). `admin/public/_headers` therefore lets only the site's own scripts and Google's sign-in script run.
+  If you add a script from somewhere else, add its origin to `script-src` there.
+- **"Missing sign-in token" or "Missing Access token"** on every page usually means `ADMIN_LOGIN` on the Worker and
+  `VITE_ADMIN_LOGIN` on the admin site differ.
+
+## Cloudflare Access (`ADMIN_LOGIN=access`)
 
 Admin routes (`/admin/*`) and the admin SPA sit behind Cloudflare Access. The
 Worker **also** verifies the `Cf-Access-Jwt-Assertion` header itself and checks
@@ -67,15 +127,6 @@ GitHub Actions authenticates as a machine, not a person:
 equals `INGEST_SERVICE_CLIENT_ID`. Human (email) tokens never satisfy it, and
 service tokens never satisfy the human `requireAdmin` routes.
 
-### Seeding admins
-
-```
-cd api
-npx tsx scripts/add-admin.ts you@example.com admin     # local D1
-npx tsx scripts/add-admin.ts you@example.com editor -- --remote  # prod D1
-```
-
-Roles are `admin` and `editor`. Re-running updates the role.
 
 ### Local development
 
@@ -131,7 +182,8 @@ Repository secrets (GitHub: Settings > Secrets and variables > Actions) used by 
 | Secret | Value |
 |---|---|
 | `API_BASE` | the Worker's URL, e.g. `https://api.example.com` |
-| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above) |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above), when Cloudflare Access is in front of the API |
+| `INGEST_TOKEN` | instead of the two above when Access is not in front of the API (free addresses, `ADMIN_LOGIN=firebase`): the same long random string as the Worker's `INGEST_TOKEN` |
 | `R2_ENDPOINT` | `https://<account>.r2.cloudflarestorage.com` |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | an R2 API token that can read `yz-source` and write `yz-clips` |
 
@@ -140,6 +192,7 @@ Worker configuration:
 | Name | Kind | Value |
 |---|---|---|
 | `GH_DISPATCH_TOKEN` | secret: `npx wrangler secret put GH_DISPATCH_TOKEN` (add `--env prod` for production) | the token below |
+| `INGEST_TOKEN` | secret: `npx wrangler secret put INGEST_TOKEN --env prod` | only without Access: the ingest jobs' shared secret, at least 32 characters (`openssl rand -hex 32` makes one; a shorter one is ignored). Put the same value in the GitHub secret `INGEST_TOKEN` |
 | `GH_REPO` | var in `wrangler.toml` | `owner/name` of this repository |
 | `GH_REF` | var in `wrangler.toml` | the branch the workflows run from, `main` |
 
@@ -206,7 +259,8 @@ the R2 token must be able to read `yz-source` and write `yz-clips`.
 | Variable | Meaning |
 |---|---|
 | `API_BASE` | Worker base URL, e.g. `https://api.example.com` |
-| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above) |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | the ingest service token (see above), when Cloudflare Access is in front of the API |
+| `INGEST_TOKEN` | instead of the two above when Access is not in front of the API (free addresses, `ADMIN_LOGIN=firebase`): the same long random string as the Worker's `INGEST_TOKEN` |
 | `R2_ENDPOINT` | `https://<account>.r2.cloudflarestorage.com` |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | an R2 API token with read/write on `yz-source` |
 | `JOB_ID` | the `ingest_jobs` row (kind `scrape`) this run reports to |
@@ -279,11 +333,10 @@ With the free addresses, set `ADMIN_ORIGIN` to the `pages.dev` address, `CDN_BAS
 
 - **The leaderboard cache.** The Cache API stores nothing on `workers.dev`, so every leaderboard read goes to D1. It
   still works; it just uses more of the database's free reads.
-- **The admin site's login.** The admin routes are protected by Cloudflare Access (see "Admin authentication"), which
-  this setup builds as one application covering the admin and API hostnames. That needs hostnames on a domain in your
-  Cloudflare account. We have not tried it on `pages.dev` plus `workers.dev`. Without Access working, the Worker
-  refuses every `/admin/*` call (it fails closed), so the admin site cannot be used. To run the admin site you need
-  your own domain (about $10 a year at Cloudflare Registrar).
+- **The admin site's login needs `ADMIN_LOGIN=firebase`.** Cloudflare Access cannot sign an admin in across
+  `pages.dev` and `workers.dev`: its cookie is not sent from one to the other. With `firebase` the admin signs in with
+  Google and nothing depends on a cookie ("Admin authentication"). The ingest jobs then use `INGEST_TOKEN` instead of
+  the Access service token.
 - **Moving later is not free.** `API_BASE` is compiled into the app. Players on a build with the old address stop
   working when it changes, so choose the address you will keep before the first store release.
 
@@ -302,6 +355,7 @@ deploy. Without it, every API call fails CORS.
 | Build command | `npm ci && npm run build` |
 | Build output directory | `dist` |
 | Environment variable | `VITE_API_BASE=https://api.<domain>` (Production **and** Preview) |
+| With `ADMIN_LOGIN=firebase` | `VITE_ADMIN_LOGIN=firebase` and the `VITE_FIREBASE_*` values ("Signing in with Google") |
 
 `VITE_API_BASE` is required: `npm run build` fails without it, so a misconfigured Pages project fails its deploy
 instead of shipping a site that calls `localhost`.

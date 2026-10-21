@@ -8,8 +8,6 @@ from dataclasses import dataclass
 
 REQUIRED_VARS = (
     "API_BASE",
-    "CF_ACCESS_CLIENT_ID",
-    "CF_ACCESS_CLIENT_SECRET",
     "R2_ENDPOINT",
     "R2_ACCESS_KEY_ID",
     "R2_SECRET_ACCESS_KEY",
@@ -26,6 +24,19 @@ def github_run_url(env: Mapping[str, str]) -> str | None:
     if all(env.get(k) for k in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID")):
         return f"{env['GITHUB_SERVER_URL']}/{env['GITHUB_REPOSITORY']}/actions/runs/{env['GITHUB_RUN_ID']}"
     return None
+
+
+def api_credentials(env: Mapping[str, str]) -> tuple[str, str, str]:
+    """(Access client id, Access client secret, ingest token) for the API. Either INGEST_TOKEN (where Cloudflare
+    Access is not in front of the API) or both CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET must be set."""
+    token = env.get("INGEST_TOKEN", "").strip()
+    client_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
+    client_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
+    if not token and not (client_id and client_secret):
+        raise ConfigError(
+            "missing environment variables: INGEST_TOKEN, or CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET"
+        )
+    return client_id, client_secret, token
 
 
 def require(env: Mapping[str, str], *names: str) -> dict[str, str]:
@@ -48,6 +59,7 @@ class Config:
     r2_bucket: str = "yz-source"
     r2_clips_bucket: str = "yz-clips"
     gh_run_url: str | None = None
+    ingest_token: str = ""
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -61,11 +73,12 @@ class Config:
             job_id = 0
         if job_id <= 0:
             raise ConfigError(f"JOB_ID must be a positive integer, got {env['JOB_ID']!r}")
+        client_id, client_secret, token = api_credentials(env)
 
         return cls(
             api_base=env["API_BASE"].strip().rstrip("/"),
-            cf_access_client_id=env["CF_ACCESS_CLIENT_ID"].strip(),
-            cf_access_client_secret=env["CF_ACCESS_CLIENT_SECRET"].strip(),
+            cf_access_client_id=client_id,
+            cf_access_client_secret=client_secret,
             r2_endpoint=env["R2_ENDPOINT"].strip(),
             r2_access_key_id=env["R2_ACCESS_KEY_ID"].strip(),
             r2_secret_access_key=env["R2_SECRET_ACCESS_KEY"].strip(),
@@ -73,4 +86,5 @@ class Config:
             r2_bucket=env.get("R2_BUCKET", "").strip() or "yz-source",
             r2_clips_bucket=env.get("R2_CLIPS_BUCKET", "").strip() or "yz-clips",
             gh_run_url=github_run_url(env),
+            ingest_token=token,
         )

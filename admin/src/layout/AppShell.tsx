@@ -1,8 +1,10 @@
-import { AppShell as MantineAppShell, Badge, Burger, Group, NavLink, Text, Title } from "@mantine/core";
+import { AppShell as MantineAppShell, Badge, Burger, Button, Group, NavLink, Text, Title } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import type { ReactNode } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useWhoami } from "../api/whoami";
+import { signOutAdmin } from "../auth/AuthGate";
+import { adminLogin } from "../auth/login";
 import { navItems } from "./nav";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -23,12 +25,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Burger opened={navOpened} onClick={toggleNav} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
             <Title order={4}>Admin</Title>
           </Group>
-          {whoami.data && (
-            <Group gap="xs">
-              <Text size="sm">{whoami.data.email}</Text>
-              <Badge variant="light">{whoami.data.role}</Badge>
-            </Group>
-          )}
+          <Group gap="xs">
+            {whoami.data && (
+              <>
+                <Text size="sm">{whoami.data.email}</Text>
+                <Badge variant="light">{whoami.data.role}</Badge>
+              </>
+            )}
+            {/* Also shown when the account is not an admin (whoami fails), so the admin can switch accounts. */}
+            {adminLogin() === "firebase" && (
+              <Button size="compact-sm" variant="subtle" onClick={() => void signOutAdmin()}>Sign out</Button>
+            )}
+          </Group>
         </Group>
       </MantineAppShell.Header>
 

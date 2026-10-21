@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         only_not_ready=args.all_missing,  # a --all-missing run never touches a clip that is already ready
     )
 
-    api = ApiClient(cfg.api_base, cfg.cf_access_client_id, cfg.cf_access_client_secret)
+    api = ApiClient(cfg.api_base, cfg.cf_access_client_id, cfg.cf_access_client_secret, token=cfg.ingest_token)
     cutter = Cutter(api, SourceStore.from_config(cfg), ClipStore.from_config(cfg), cfg.job_id, gh_run_url=cfg.gh_run_url)
     try:
         stats = cutter.run(selection, request)

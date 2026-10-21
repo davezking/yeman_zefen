@@ -34,6 +34,8 @@ jobs:
       API_BASE: ${{ secrets.API_BASE }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      # Instead of the two above where Cloudflare Access is not in front of the API (docs/ops.md).
+      INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 

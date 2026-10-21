@@ -12,6 +12,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
+import { AuthGate } from "./auth/AuthGate";
 import { queryClient } from "./queryClient";
 import { theme } from "./theme";
 
@@ -21,7 +22,9 @@ createRoot(document.getElementById("root")!).render(
       <Notifications />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          <AuthGate>
+            <App />
+          </AuthGate>
         </BrowserRouter>
       </QueryClientProvider>
     </MantineProvider>

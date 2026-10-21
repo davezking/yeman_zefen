@@ -175,7 +175,7 @@ export async function verifyFirebaseIdToken(
   return user;
 }
 
-function bearerToken(header: string | undefined): string | null {
+export function bearerToken(header: string | undefined): string | null {
   if (!header) return null;
   const match = /^Bearer[ ]+([^\s]+)[ ]*$/i.exec(header);
   return match ? match[1]! : null;

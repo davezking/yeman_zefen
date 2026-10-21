@@ -74,6 +74,18 @@ def test_the_real_client_is_built_from_the_environment():
     client = jobs._client(ENV)
     assert isinstance(client, ApiClient) and client.base_url == "https://api.test"
     assert client.session.headers["CF-Access-Client-Id"] == "i"
+    assert "Authorization" not in client.session.headers
+
+
+def test_the_client_uses_the_ingest_token_where_there_is_no_access_service_token():
+    client = jobs._client({"API_BASE": "https://api.test", "INGEST_TOKEN": "tok"})
+    assert client.session.headers["Authorization"] == "Bearer tok"
+    assert "CF-Access-Client-Id" not in client.session.headers
+
+
+def test_the_client_needs_one_kind_of_credentials(capsys):
+    code = jobs.main(["create", "--kind", "scrape"], env={"API_BASE": "https://api.test"}, client_factory=jobs._client)
+    assert code == 2 and "INGEST_TOKEN" in capsys.readouterr().err
 
 
 # ------------------------------------------------------------------ fail
