@@ -14,6 +14,18 @@ With `firebase`, the Worker accepts only a token from a **Google** sign-in with 
 guest account is refused even when its email is on the list. The Access header is ignored, and with `access` a Bearer
 token is ignored: one mode at a time.
 
+### Seeding admins
+
+```
+cd api
+npx tsx scripts/add-admin.ts you@example.com admin                       # local D1
+npx tsx scripts/add-admin.ts you@example.com editor --remote --env prod  # prod D1
+```
+
+Roles are `admin` and `editor`. Re-running updates the role. `--remote` needs `--env prod` (or `--env staging`): without
+it wrangler would use the top-level database in `wrangler.toml`, whose id is a placeholder. With `ADMIN_LOGIN=firebase`,
+add the Google address the admin signs in with.
+
 ### Signing in with Google (`ADMIN_LOGIN=firebase`)
 
 1. **Firebase console › the prod project (`yeman-zefen-prod`) › Project settings › Your apps › Add app › Web.** Name it
@@ -22,7 +34,10 @@ token is ignored: one mode at a time.
 2. **Authentication › Sign-in method:** Google is enabled (it already is for the app).
 3. **Authentication › Settings › Authorized domains › Add domain:** the admin site's address, e.g.
    `yz-admin.pages.dev` (no `https://`). Sign-in from any other address fails with an "unauthorized domain" message.
-4. **Pages project › Settings › Environment variables** (Production and Preview): `VITE_ADMIN_LOGIN=firebase`,
+   Then restrict that app's API key: **Google Cloud Console › APIs & Services › Credentials**, open the key named for the
+   web app (or "Browser key"), set **Application restrictions › Websites** to the admin site's address
+   (`https://yz-admin.pages.dev/*`). The Android and iOS keys keep their own restrictions.
+4. **Pages project › Settings › Environment variables** (Production; Preview too, so preview builds do not fail): `VITE_ADMIN_LOGIN=firebase`,
    `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` and `VITE_FIREBASE_APP_ID` with the
    values from step 1. A build with `firebase` and a missing value fails rather than deploying a site nobody can sign in to.
    Redeploy the site.
@@ -31,8 +46,19 @@ token is ignored: one mode at a time.
 6. **Add yourself** with your Google address ("Seeding admins"), open the admin site and sign in. "Sign out" in the top
    bar switches accounts.
 
-Signing in creates a user for your Google account in the prod Firebase project, next to the players. It has no player
-data unless that account also plays.
+Things to know:
+
+- **Use a Google account for admin work that never signs in to the game.** The game and the admin site share the prod
+  Firebase project, so a token the game holds for that account (on a phone, say) would also open the admin site.
+- **Only the production address works.** Pages preview builds get their own addresses (`<hash>.yz-admin.pages.dev`),
+  which neither `ADMIN_ORIGIN` nor Firebase's authorized domains allow.
+- **Signing in creates a user** for your Google account in the prod Firebase project, next to the players. It has no
+  player data unless that account also plays.
+- **The sign-in is kept in the browser's storage**, which scripts on the page can read (Access keeps its cookie out of
+  their reach). `admin/public/_headers` therefore lets only the site's own scripts and Google's sign-in script run.
+  If you add a script from somewhere else, add its origin to `script-src` there.
+- **"Missing sign-in token" or "Missing Access token"** on every page usually means `ADMIN_LOGIN` on the Worker and
+  `VITE_ADMIN_LOGIN` on the admin site differ.
 
 ## Cloudflare Access (`ADMIN_LOGIN=access`)
 
@@ -101,15 +127,6 @@ GitHub Actions authenticates as a machine, not a person:
 equals `INGEST_SERVICE_CLIENT_ID`. Human (email) tokens never satisfy it, and
 service tokens never satisfy the human `requireAdmin` routes.
 
-### Seeding admins
-
-```
-cd api
-npx tsx scripts/add-admin.ts you@example.com admin     # local D1
-npx tsx scripts/add-admin.ts you@example.com editor -- --remote  # prod D1
-```
-
-Roles are `admin` and `editor`. Re-running updates the role.
 
 ### Local development
 

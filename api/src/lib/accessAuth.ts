@@ -133,7 +133,9 @@ export function requireAdmin(roles: readonly AdminRole[] = ADMIN_ROLES): Middlew
     } else if (c.env.ENV === "dev" && c.env.DEV_ADMIN_EMAIL) {
       email = c.env.DEV_ADMIN_EMAIL;
     } else {
-      throw new ApiError(401, "unauthorized", firebase ? "Missing sign-in token" : "Missing Access token");
+      // The usual cause on a new setup: ADMIN_LOGIN here and VITE_ADMIN_LOGIN on the admin site differ.
+      const hint = "check that ADMIN_LOGIN on the Worker and VITE_ADMIN_LOGIN on the admin site match";
+      throw new ApiError(401, "unauthorized", `${firebase ? "Missing sign-in token" : "Missing Access token"} (${hint})`);
     }
     if (!email) throw new ApiError(403, "forbidden", "Not an authorized admin");
     const row = await db(c.env).select().from(adminUsers).where(eq(adminUsers.email, email)).get();
