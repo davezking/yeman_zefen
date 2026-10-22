@@ -93,6 +93,9 @@ class _RoundHint {
   /// Draws the round again.
   void Function()? refresh;
 
+  /// Removes two wrong options. Set by the round, which knows the answer.
+  void Function()? grant;
+
   void tell(HintNotice next) {
     notice = next;
     noticeId++;
@@ -231,13 +234,21 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// "Hint" on the round: opens the sheet and stops the answer clock. The clip keeps playing. Only
-  /// while a rewarded ad is loaded, and once a round.
+  /// while a rewarded ad is loaded, and once a round. In a build without ads the hint is given at
+  /// once, with no sheet and no ad.
   void openHint() {
     final hint = _hint;
     final pending = _outcome;
     final round = state.round;
     if (hint == null || pending == null || pending.isCompleted || round == null || !round.hintOffered) return;
-    if (_adShowing || !ref.read(adServiceProvider).rewardedReady.value) return;
+    final ads = ref.read(adServiceProvider);
+    if (ads.freeHints) {
+      hint.asked = true;
+      hint.grant?.call();
+      hint.refresh?.call();
+      return;
+    }
+    if (_adShowing || !ads.rewardedReady.value) return;
     final env = ref.read(sessionEnvironmentProvider);
     hint.asked = true;
     hint.sheetOpenedAtMs = env.monotonicMs();
@@ -511,7 +522,7 @@ class SessionController extends Notifier<SessionState> {
       config: config,
       rounds: generated.rounds,
       generator: generator,
-      downloader: ref.read(clipDownloaderProvider),
+      downloader: ref.read(streamClipDownloaderProvider),
       store: ref.read(clipStoreProvider),
       fileExists: env.fileExists,
       timer: env.timer,
@@ -770,6 +781,11 @@ class SessionController extends Notifier<SessionState> {
       ));
     }
 
+    hint.grant = () {
+      hint.used = true;
+      final wrong = [...round.optionIds.where((id) => !round.isCorrect(id))]..shuffle(env.rng());
+      hint.removedIds = wrong.take(2).toSet();
+    };
     var attempt = 0;
     hint.refresh = () {
       if (_alive(runId) && state.round?.phase == RoundPhase.answering) show(view(RoundPhase.answering, attempt));
@@ -859,9 +875,7 @@ class SessionController extends Notifier<SessionState> {
           }
           switch (result) {
             case RewardedResult.earned:
-              hint.used = true;
-              final wrong = [...round.optionIds.where((id) => !round.isCorrect(id))]..shuffle(env.rng());
-              hint.removedIds = wrong.take(2).toSet();
+              hint.grant?.call();
               _rewardsCompleted++;
             case RewardedResult.notFinished:
               hint.tell(HintNotice.notFinished);

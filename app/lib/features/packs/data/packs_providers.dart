@@ -21,6 +21,13 @@ final packsApiProvider = Provider<PacksApi>((ref) {
 
 final clipDownloaderProvider = Provider<ClipDownloader>((ref) => BackgroundClipDownloader());
 
+/// The downloader for clips a session fetches while it plays: they are needed within seconds.
+final streamClipDownloaderProvider = Provider<ClipDownloader>((ref) {
+  final downloader = HttpClipDownloader(supportDirectory: getApplicationSupportDirectory);
+  ref.onDispose(downloader.close);
+  return downloader;
+});
+
 /// Where pack files live. Paths in `local_tracks` are relative to this directory.
 final supportDirectoryProvider = FutureProvider<Directory>((ref) => getApplicationSupportDirectory());
 

@@ -26,6 +26,10 @@ class CatalogRefresher {
   /// How often the catalog is refreshed while the app runs.
   static const interval = Duration(hours: 12);
 
+  /// How old the last refresh may be when the app comes back to the foreground or back online, so
+  /// newly published songs show up without restarting the app.
+  static const resumeInterval = Duration(minutes: 15);
+
   static const refreshedAtKey = 'catalog_refreshed_at';
 
   /// Where the version of each pack whose manifest is in the catalog is saved. Settings compares it
@@ -42,11 +46,11 @@ class CatalogRefresher {
     return db.into(db.appSettings).insertOnConflictUpdate(AppSettingsCompanion.insert(key: key, value: value));
   }
 
-  /// Refreshes if the last successful refresh is older than [interval] (or there was none).
-  /// Returns whether a refresh ran. Never throws.
-  Future<bool> refreshIfDue() async {
+  /// Refreshes if the last successful refresh is older than [olderThan] ([interval] by default),
+  /// or there was none. Returns whether a refresh ran. Never throws.
+  Future<bool> refreshIfDue({Duration olderThan = interval}) async {
     final last = int.tryParse(await _get(refreshedAtKey) ?? '');
-    if (last != null && _nowMs() - last < interval.inMilliseconds) return false;
+    if (last != null && _nowMs() - last < olderThan.inMilliseconds) return false;
     await refresh();
     return true;
   }

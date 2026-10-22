@@ -560,7 +560,8 @@ dart run tool/fetch_starter_pack.dart --api-base https://<api host>   # prod or 
 - The folder is registered in `app/pubspec.yaml`. An app built with no `manifest.json` still starts; it just has no bundled clips, so a first launch with no network cannot play.
 - On first start, and after an update that changes the starter manifest (pack version or publish time), the app copies each clip once into `starter/` in its support directory (`just_audio` is handed file paths) and records it as a `starter` clip. Starter clips are never evicted.
 - **Republish the starter pack only when a new app build should pick it up.** Old app versions keep their bundled copy.
-- `app/assets/starter/` has no clips until a `starter` pack is published and the tool has been run. Do that before the first release build.
+- `app/assets/starter/` has no clips until a `starter` pack is published and the tool has been run. The Android release workflow (`.github/workflows/app-android.yml`) runs the tool against the prod API before it builds, so publish the `starter` pack before tagging a release; without one the build warns and ships no bundled clips.
+- New songs reach the app only through a published pack version: approving a track is not enough. After approving songs, publish a new version of the packs they belong to (Admin > Packs). The app reads the pack list on every start, when it comes back to the foreground or back online (if the last read is over 15 minutes old), and every 12 hours.
 
 ## Ads (AdMob and consent)
 

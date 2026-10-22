@@ -13,6 +13,9 @@ class FakeAdService implements AdService {
   /// A closed interstitial is replaced at once, as the real service reloads one.
   var reloadInterstitial = true;
 
+  /// The hint is given without an ad, as in a build without ad units.
+  var hints = false;
+
   var started = 0;
   var interstitialShows = 0;
   var rewardedShows = 0;
@@ -31,6 +34,9 @@ class FakeAdService implements AdService {
 
   @override
   ValueListenable<bool> get rewardedReady => rewarded;
+
+  @override
+  bool get freeHints => hints;
 
   @override
   Future<bool> showInterstitial() {

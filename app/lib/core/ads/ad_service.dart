@@ -28,8 +28,11 @@ abstract class AdService {
   /// An interstitial is loaded and can show now.
   bool get interstitialReady;
 
-  /// A rewarded ad is loaded. The hint button shows only while this is true.
+  /// A rewarded ad is loaded. The hint button shows only while this is true, unless [freeHints].
   ValueListenable<bool> get rewardedReady;
+
+  /// The build has no ads, so the hint is given without one (its points are still halved).
+  bool get freeHints;
 
   /// Shows the loaded interstitial. Completes when the player closes it: true when it was shown.
   Future<bool> showInterstitial();
@@ -40,9 +43,13 @@ abstract class AdService {
   void dispose();
 }
 
-/// A build without ad units: never any ads.
+/// A build without ad units: never any ads. With [freeHints] (a real build, not a test) the hint
+/// is still offered, and given without an ad.
 class NoAdService implements AdService {
-  NoAdService();
+  NoAdService({this.freeHints = false});
+
+  @override
+  final bool freeHints;
 
   final _rewardedReady = ValueNotifier(false);
 
@@ -113,6 +120,9 @@ class GoogleAdService implements AdService {
 
   @override
   ValueListenable<bool> get rewardedReady => _rewardedReady;
+
+  @override
+  bool get freeHints => false;
 
   void _loadInterstitial() {
     if (_disposed || !_interstitial.canLoad) return;

@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/ads/ads_providers.dart';
 import '../../../core/ads/consent_service.dart';
+import '../../../core/audio/audio_providers.dart';
+import '../../../core/audio/game_sfx.dart';
 import '../../../core/l10n/display_name.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
@@ -47,8 +49,38 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     // The countdown and the "Tap to continue" seconds move on the design's tick.
     _tick = Timer.periodic(MotionTokens.durationTimerTick, (_) {
-      if (mounted && _clockRuns(ref.read(sessionControllerProvider))) setState(() {});
+      if (!mounted) return;
+      final state = ref.read(sessionControllerProvider);
+      if (!_clockRuns(state)) return;
+      _countdownTick(state);
+      setState(() {});
     });
+  }
+
+  /// How many of the last seconds of the answer window tick.
+  static const _tickSeconds = 3;
+
+  /// The round, attempt and second the countdown last ticked for.
+  (int, int, int)? _lastTick;
+
+  /// A tick each second over the last [_tickSeconds] seconds, while the answer clock runs.
+  void _countdownTick(SessionState state) {
+    final round = state.round;
+    final clockStart = round?.answerClockStartMs;
+    if (round == null || round.phase != RoundPhase.answering || clockStart == null || state.ad != RoundAd.none) return;
+    final nowMs = ref.read(sessionEnvironmentProvider).monotonicMs();
+    final leftMs = round.windowMs - (nowMs - clockStart);
+    if (leftMs <= 0) return;
+    final second = (leftMs / 1000).ceil();
+    if (second > _tickSeconds) return;
+    final key = (round.number, round.attempt, second);
+    if (key == _lastTick) return;
+    _lastTick = key;
+    _sound(Sfx.tick);
+  }
+
+  void _sound(Sfx sfx) {
+    if (ref.read(soundOnProvider)) unawaited(ref.read(gameSfxProvider).play(sfx));
   }
 
   @override
@@ -124,6 +156,11 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
     context.go('/setup');
   }
 
+  /// The result of an answer, heard: right, wrong, or the time ran out.
+  void _resultSound(RoundView round) {
+    _sound(round.timedOut ? Sfx.timeout : round.isCorrect ? Sfx.correct : Sfx.wrong);
+  }
+
   void _haptic(RoundView round) {
     if (!ref.read(hapticsOnProvider)) return;
     if (round.timedOut || !round.isCorrect) {
@@ -137,6 +174,7 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
   Widget build(BuildContext context) {
     ref.listen(sessionControllerProvider, (previous, next) {
       if (next.phase == SessionPhase.finished && previous?.phase != SessionPhase.finished) {
+        _sound(Sfx.gameOver);
         if (_leaveOpen) {
           _resultsWaiting = true;
         } else {
@@ -151,6 +189,7 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
       // The result of an answer: a tap you can feel, if the player wants one.
       if (round.phase == RoundPhase.feedback && (before?.phase != RoundPhase.feedback || before?.number != round.number)) {
         _haptic(round);
+        _resultSound(round);
       }
       // A new round started while the question is open: it waits too.
       if (_leaveOpen && round.phase == RoundPhase.answering && before?.phase != RoundPhase.answering) {
@@ -182,7 +221,7 @@ class _RoundRouteState extends ConsumerState<RoundRoute> with WidgetsBindingObse
           locale: Localizations.localeOf(context),
           nowMs: ref.read(sessionEnvironmentProvider).monotonicMs(),
           leaveOpen: _leaveOpen,
-          rewardedReady: ref.watch(rewardedReadyProvider),
+          rewardedReady: ref.watch(hintReadyProvider),
         ),
         onAnswer: (index) {
           if (!_leaveOpen && index >= 0 && index < round.options.length) _controller.answer(round.options[index].id);
@@ -256,7 +295,8 @@ class _Message extends StatelessWidget {
 ///
 /// Names are resolved to [locale]'s script here, on every build, so a language switch changes the
 /// screen at once. [leaveOpen] puts the "Leave this game?" question over the round, with the
-/// timer stopped. [rewardedReady] says a rewarded ad is loaded, so the hint can be offered.
+/// timer stopped. [rewardedReady] says the hint can be offered: a rewarded ad is loaded, or hints
+/// are free in this build.
 proto.RoundView screenViewOf(
   SessionState state, {
   required AppLocalizations l10n,

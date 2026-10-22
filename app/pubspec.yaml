@@ -48,6 +48,8 @@ flutter:
     # The bundled starter pack (manifest and clips), written by tool/fetch_starter_pack.dart.
     - assets/starter/
     - assets/starter/clips/
+    # Sound effects (correct, wrong, time-out, countdown tick, game over).
+    - assets/sfx/
   # Family names are the ones in docs/design/tokens.json (typography.family).
   fonts:
     - family: Poppins

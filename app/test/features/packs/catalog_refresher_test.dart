@@ -136,6 +136,19 @@ void main() {
       now += const Duration(minutes: 1).inMilliseconds;
       expect(await refresher.refreshIfDue(), isTrue);
     });
+
+    test('back in front or back online, a refresh older than 15 minutes runs again', () async {
+      api.publish('golden-era', 1);
+      await refresher.refresh();
+
+      now += const Duration(minutes: 14).inMilliseconds;
+      expect(await refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval), isFalse);
+
+      api.publish('golden-era', 2, tracks: 5);
+      now += const Duration(minutes: 1).inMilliseconds;
+      expect(await refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval), isTrue);
+      expect(await db.select(db.catalogTracks).get(), hasLength(5), reason: 'the new songs are in');
+    });
   });
 
   group('offline or broken', () {

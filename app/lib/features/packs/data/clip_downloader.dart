@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:background_downloader/background_downloader.dart';
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 class ClipDownloadException implements Exception {
@@ -114,4 +117,65 @@ class BackgroundClipDownloader implements ClipDownloader {
     if (tasks == null || tasks.isEmpty) return;
     await _downloader.cancelAll(tasks: tasks);
   }
+}
+
+/// Downloader for the clips a session streams while it plays: a plain HTTP request that starts at
+/// once. [BackgroundClipDownloader] hands each file to the OS scheduler (WorkManager on Android),
+/// which can hold a download back for seconds, longer than a round waits for its clip. A session
+/// only needs its clips while it is on screen, so it does not need background downloads.
+class HttpClipDownloader implements ClipDownloader {
+  HttpClipDownloader({required this.supportDirectory, http.Client? client}) : _client = client ?? http.Client();
+
+  final Future<Directory> Function() supportDirectory;
+  final http.Client _client;
+
+  /// A clip is a few hundred KB; a connection this slow would not keep up with the game anyway.
+  static const timeout = Duration(seconds: 20);
+
+  @override
+  Future<void> download({
+    required String url,
+    required String relativePath,
+    required void Function(double fraction) onProgress,
+    String? group,
+    bool wifiOnly = false,
+  }) async {
+    final base = await supportDirectory();
+    final file = File(p.join(base.path, relativePath));
+    final part = File('${file.path}.part');
+    try {
+      await file.parent.create(recursive: true);
+      final response = await _client.send(http.Request('GET', Uri.parse(url))).timeout(timeout);
+      if (response.statusCode != 200) {
+        throw ClipDownloadException('HTTP ${response.statusCode} for $url');
+      }
+      final total = response.contentLength;
+      var received = 0;
+      final sink = part.openWrite();
+      try {
+        await response.stream.timeout(timeout).forEach((chunk) {
+          sink.add(chunk);
+          received += chunk.length;
+          if (total != null && total > 0) onProgress((received / total).clamp(0.0, 1.0));
+        });
+      } finally {
+        await sink.close();
+      }
+      await part.rename(file.path);
+    } on ClipDownloadException {
+      rethrow;
+    } on FileSystemException catch (e) {
+      throw ClipDownloadException('could not save $url: ${e.message}', noSpace: e.osError?.errorCode == 28);
+    } catch (e) {
+      throw ClipDownloadException('failed for $url: $e');
+    } finally {
+      if (await part.exists()) await part.delete();
+    }
+  }
+
+  /// Session downloads have no groups: they are short and finish on their own.
+  @override
+  Future<void> cancelGroup(String group) async {}
+
+  void close() => _client.close();
 }

@@ -69,6 +69,17 @@ jobs:
       # Stops a build that would ship a placeholder API domain or Google's sample AdMob id with real ad units.
       - run: tool/check_release_config.sh android
 
+      # Bundles the published `starter` pack, so a first launch plays with no network (docs/ops.md, "Starter
+      # clips"). Clips already committed are replaced by the current pack. With no starter pack published the
+      # build goes on without bundled clips, and says so.
+      - name: Bundle the starter pack
+        run: |
+          set -uo pipefail
+          api_base=$(jq -r '.API_BASE' config/prod.json)
+          if ! dart run tool/fetch_starter_pack.dart --api-base "$api_base"; then
+            echo "::warning::No starter pack bundled: publish a pack with slug 'starter' in the admin site (docs/ops.md, \"Starter clips\"). A first launch with no network cannot play."
+          fi
+
       - name: Upload key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
