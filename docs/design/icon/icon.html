@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  Yeman Zefen app icon, source of every exported PNG. Final design from the
+  "Yeman Zefen App Icon" canvas: ዘ in ink on the sun hero gradient, with a
+  coral note badge. Colors are docs/design/tokens.json palette values.
+
+  render.mjs opens this file at a fixed viewport and screenshots it.
+  ?layer= picks what to draw:
+    full  full-bleed square (iOS, store listing)
+    round rounded square on transparent (Android legacy launcher)
+    fg    adaptive-icon foreground: art only, inside the 66/108 safe zone
+    bg    adaptive-icon background: gradient only
+    mono  adaptive-icon monochrome (Android 13 themed icons): art in black
+-->
+<html lang="am">
+<head>
+<meta charset="utf-8">
+<title>Yeman Zefen icon</title>
+<style>
+@font-face {
+  font-family: "Noto Sans Ethiopic";
+  src: url("../../../app/assets/fonts/NotoSansEthiopic.ttf") format("truetype");
+  font-weight: 100 900;
+}
+html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+#tile {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, #FFDF6E 0%, #FFC93C 55%, #FFB02E 100%);
+}
+#art { position: absolute; width: 440px; height: 440px; transform-origin: top left; }
+#glyph {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: "Noto Sans Ethiopic", sans-serif; font-weight: 800; font-size: 300px; line-height: 1;
+  color: #2B2118; padding: 0 28px 10px 0; box-sizing: border-box;
+}
+#badge {
+  position: absolute; right: 38px; top: 38px; width: 108px; height: 108px; border-radius: 54px;
+  background: #F0563A; display: flex; align-items: center; justify-content: center;
+}
+.mono #glyph { color: #000; }
+.mono #badge { background: #000; }
+.mono #badge path { stroke: #fff; }
+.mono #badge ellipse { fill: #fff; }
+</style>
+</head>
+<body>
+<div id="tile"></div>
+<div id="art">
+  <div id="glyph">ዘ</div>
+  <div id="badge">
+    <svg width="60" height="60" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M10 17 V5 L19 3 V15" fill="none" stroke="#2B2118" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+      <ellipse cx="7.5" cy="17.5" rx="3" ry="2.3" transform="rotate(-20 7.5 17.5)" fill="#2B2118"></ellipse>
+      <ellipse cx="16.5" cy="15.5" rx="3" ry="2.3" transform="rotate(-20 16.5 15.5)" fill="#2B2118"></ellipse>
+    </svg>
+  </div>
+</div>
+<script>
+  const layer = new URLSearchParams(location.search).get("layer") || "full";
+  const size = innerWidth;
+  const tile = document.getElementById("tile");
+  const art = document.getElementById("art");
+  // Art box edge as a share of the canvas, and the tile's inset and corner radius.
+  let box = 1, inset = 0, radius = 0;
+  if (layer === "round") { inset = 0.04; radius = 0.2237 * (1 - 2 * inset); box = 1 - 2 * inset; }
+  // Adaptive layers are 108dp; launchers may mask down to a 66dp circle. The badge's
+  // far edge sits 235/440 of the box from its centre, so a 60dp box keeps it inside.
+  if (layer === "fg" || layer === "mono") box = 60 / 108;
+  if (layer === "fg" || layer === "mono") tile.style.display = "none";
+  if (layer === "bg") art.style.display = "none";
+  if (layer === "mono") document.body.classList.add("mono");
+  tile.style.inset = inset * size + "px";
+  tile.style.borderRadius = radius * size + "px";
+  const px = box * size;
+  art.style.left = art.style.top = (size - px) / 2 + "px";
+  art.style.transform = "scale(" + px / 440 + ")";
+</script>
+</body>
+</html>

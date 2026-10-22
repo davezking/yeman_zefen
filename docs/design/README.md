@@ -9,6 +9,7 @@ The approved design for Yeman Zefen, in direction **F · Adey**: sunny yellow, c
 | `copy.md` | Every string in English and Amharic, keyed for the ARB files. **The Amharic has been reviewed by a native speaker.** |
 | `artifacts/` | The HTML source of each approved board (`H01`–`H21`) and the interactive round prototype (`P00`). Read exact sizes, colors and spacing from these. |
 | `screens/` | A screenshot of each board, English and Amharic side by side (WebP, 2×). |
+| `icon/` | The app icon: `icon.html` is the source (ዘ on the sun hero gradient with a coral note badge), `render.mjs` regenerates every iOS and Android icon PNG from it (`node docs/design/icon/render.mjs`, needs Playwright), plus the 1024 px master and the 512 px Play Store icon. |
 
 ## Reading the HTML
 
