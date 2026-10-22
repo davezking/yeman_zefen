@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  Yeman Zefen app icon, source of every exported PNG. Final design from the
+  "Yeman Zefen App Icon" canvas: a krar (Ethiopian lyre) in ink with a coral
+  bowl and a question mark between its strings, on the sun hero gradient.
+  Colors are docs/design/tokens.json palette values.
+
+  render.mjs opens this file at a fixed viewport and screenshots it.
+  ?layer= picks what to draw:
+    full  full-bleed square (iOS, store listing)
+    round rounded square on transparent (Android legacy launcher)
+    fg    adaptive-icon foreground: art only, inside the 66/108 safe zone
+    bg    adaptive-icon background: gradient only
+    mono  adaptive-icon monochrome (Android 13 themed icons): art in black
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Yeman Zefen icon</title>
+<style>
+html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+#tile {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, #FFDF6E 0%, #FFC93C 55%, #FFB02E 100%);
+}
+#art { position: absolute; display: block; }
+.ink { stroke: #2B2118; }
+.ink-fill { fill: #2B2118; }
+.bowl { fill: #F0563A; }
+.mono .ink { stroke: #000; }
+.mono .ink-fill, .mono .bowl { fill: #000; }
+</style>
+</head>
+<body>
+<div id="tile"></div>
+<svg id="art" viewBox="0 0 100 100" aria-hidden="true">
+  <line class="ink" x1="22" y1="24" x2="78" y2="24" stroke-width="5.5" stroke-linecap="round"></line>
+  <line class="ink" x1="38" y1="70" x2="27" y2="24" stroke-width="5.5" stroke-linecap="round"></line>
+  <line class="ink" x1="62" y1="70" x2="73" y2="24" stroke-width="5.5" stroke-linecap="round"></line>
+  <line class="ink" x1="40" y1="24" x2="44" y2="72" stroke-width="1.4" opacity="0.4"></line>
+  <line class="ink" x1="60" y1="24" x2="56" y2="72" stroke-width="1.4" opacity="0.4"></line>
+  <ellipse class="bowl" cx="50" cy="76" rx="18" ry="10"></ellipse>
+  <path class="ink" d="M44 38 C44 33 47 31 50.5 31 C54 31 56.5 33.5 56.5 37 C56.5 41 53 42.5 51.5 44 C50.5 45 50.5 46.5 50.5 49" fill="none" stroke-width="3.6" stroke-linecap="round"></path>
+  <circle class="ink-fill" cx="50.5" cy="56" r="2.4"></circle>
+</svg>
+<script>
+  const layer = new URLSearchParams(location.search).get("layer") || "full";
+  const size = innerWidth;
+  const tile = document.getElementById("tile");
+  const art = document.getElementById("art");
+  // Art box edge as a share of the canvas, and the tile's inset and corner radius.
+  let box = 1, inset = 0, radius = 0;
+  if (layer === "round") { inset = 0.04; radius = 0.2237 * (1 - 2 * inset); box = 1 - 2 * inset; }
+  // Adaptive layers are 108dp; launchers may mask down to a 66dp circle. The
+  // crossbar's ends reach 0.41 of the box from its centre, so a 76dp box keeps
+  // them inside.
+  if (layer === "fg" || layer === "mono") box = 76 / 108;
+  if (layer === "fg" || layer === "mono") tile.style.display = "none";
+  if (layer === "bg") art.style.display = "none";
+  if (layer === "mono") document.body.classList.add("mono");
+  tile.style.inset = inset * size + "px";
+  tile.style.borderRadius = radius * size + "px";
+  const px = box * size;
+  art.style.left = art.style.top = (size - px) / 2 + "px";
+  art.style.width = art.style.height = px + "px";
+</script>
+</body>
+</html>
