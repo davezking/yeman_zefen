@@ -77,7 +77,7 @@ CONFIG_DEFAULT_CLIP_MS = "10000"
 CDN_BASE_URL = "https://pub-eb56748f009544f59f169c9bc8c04e7d.r2.dev"
 # The address on GET /account-deletion (Play's deletion link). Empty: that page answers 503.
 PRIVACY_CONTACT_EMAIL = "yegnatop10@gmail.com"
-ADMIN_ORIGIN = "https://yemanzefen-admin.pages.dev"
+ADMIN_ORIGIN = "https://yeman-zefen.pages.dev"
 # How admins sign in (docs/ops.md, "Admin authentication"): "firebase" signs in with Google and works on the free
 # pages.dev and workers.dev addresses; "access" (Cloudflare Access) needs your own domain for both.
 ADMIN_LOGIN = "firebase"
