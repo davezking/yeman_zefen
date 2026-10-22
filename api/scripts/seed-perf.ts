@@ -8,11 +8,11 @@
 // sessions go in chunks to stay under D1's per-query time limit. Numbers are derived from the row
 // index (no randomness), so two runs make the same data. It refuses to run on a database that
 // already has tracks, so it can never touch real data by accident.
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isoWeek } from "../src/lib/period";
+import { wrangler } from "./wrangler";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
@@ -47,9 +47,8 @@ let n = 0;
 function run(sql: string, label: string): string {
   const file = join(dir, `${String(++n).padStart(3, "0")}.sql`);
   writeFileSync(file, sql);
-  const out = execFileSync(
-    "npx",
-    ["wrangler", "d1", "execute", db, remote ? "--remote" : "--local", ...(env ? ["--env", env] : []), "--file", file, "--yes", "--json"],
+  const out = wrangler(
+    ["d1", "execute", db, remote ? "--remote" : "--local", ...(env ? ["--env", env] : []), "--file", file, "--yes", "--json"],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
   console.log(`ok ${label}`);

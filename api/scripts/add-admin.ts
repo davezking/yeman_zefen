@@ -3,9 +3,9 @@
 //   npx tsx scripts/add-admin.ts you@example.com editor --remote --env prod
 //
 // With ADMIN_LOGIN=firebase, use the Google account the admin signs in with (docs/ops.md).
-// It shells out to `wrangler d1 execute`, so it uses the same DB wrangler does.
-import { execFileSync } from "node:child_process";
+// It runs `wrangler d1 execute`, so it uses the same DB wrangler does.
 import { ADMIN_ROLES } from "../src/db/schema";
+import { wrangler } from "./wrangler";
 
 const [email, role, ...rest] = process.argv.slice(2);
 const remote = rest.includes("--remote");
@@ -38,7 +38,7 @@ const sql =
   `INSERT INTO admin_users (email, role, created_at) VALUES (${literal(email)}, ${literal(role)}, unixepoch() * 1000) ` +
   "ON CONFLICT(email) DO UPDATE SET role = excluded.role";
 
-const args = ["wrangler", "d1", "execute", "yz-db", remote ? "--remote" : "--local", ...(env ? ["--env", env] : []), "--command", sql];
+const args = ["d1", "execute", "yz-db", remote ? "--remote" : "--local", ...(env ? ["--env", env] : []), "--command", sql];
 
-execFileSync("npx", args, { stdio: "inherit" });
+wrangler(args, { stdio: "inherit" });
 console.log(`${remote ? `[remote, ${env}]` : "[local]"} ${email} is now ${role}.`);
