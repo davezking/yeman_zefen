@@ -46,10 +46,19 @@ class CatalogRefresher {
     return db.into(db.appSettings).insertOnConflictUpdate(AppSettingsCompanion.insert(key: key, value: value));
   }
 
+  /// The refresh running now, which a second caller joins instead of starting another.
+  Future<void>? _running;
+
+  /// When the pack list last came back in this run of the app, even if a pack then failed. A pack
+  /// that keeps failing is retried on the same schedule as the rest, not on every resume.
+  int? _listedAtMs;
+
   /// Refreshes if the last successful refresh is older than [olderThan] ([interval] by default),
   /// or there was none. Returns whether a refresh ran. Never throws.
   Future<bool> refreshIfDue({Duration olderThan = interval}) async {
-    final last = int.tryParse(await _get(refreshedAtKey) ?? '');
+    final saved = int.tryParse(await _get(refreshedAtKey) ?? '');
+    final listed = _listedAtMs;
+    final last = saved == null ? listed : (listed == null || saved > listed ? saved : listed);
     if (last != null && _nowMs() - last < olderThan.inMilliseconds) return false;
     await refresh();
     return true;
@@ -57,8 +66,11 @@ class CatalogRefresher {
 
   /// Fetches the pack list, then each manifest that has not been read at its current version. A
   /// pack that fails (offline, a bad manifest) is left for the next refresh. The refresh time is
-  /// saved only when the list itself came back, so an offline start tries again soon.
-  Future<void> refresh() async {
+  /// saved only when the list itself came back, so an offline start tries again soon. A call while
+  /// a refresh runs waits for that one.
+  Future<void> refresh() => _running ??= _refresh().whenComplete(() => _running = null);
+
+  Future<void> _refresh() async {
     final List<PackListing> listings;
     try {
       listings = await api.listPacks();
@@ -66,6 +78,7 @@ class CatalogRefresher {
       developer.log('catalog refresh: pack list failed', name: 'catalog', error: e);
       return;
     }
+    _listedAtMs = _nowMs();
     var allOk = true;
     for (final listing in listings) {
       final known = int.tryParse(await _get(versionKey(listing.slug)) ?? '');

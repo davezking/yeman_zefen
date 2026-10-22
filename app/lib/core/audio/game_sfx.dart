@@ -59,10 +59,12 @@ class JustAudioGameSfx implements GameSfx {
   }
 
   Future<AudioPlayer> _player(Sfx sfx) {
-    final loading = _players[sfx] ??= _load(sfx);
+    final loaded = _players[sfx];
+    if (loaded != null) return loaded;
+    final loading = _players[sfx] = _load(sfx);
     // A failed load is tried again next time.
     loading.then((_) {}, onError: (Object _) {
-      _players.remove(sfx);
+      if (identical(_players[sfx], loading)) _players.remove(sfx);
     });
     return loading;
   }

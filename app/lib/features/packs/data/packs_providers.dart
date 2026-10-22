@@ -23,7 +23,7 @@ final clipDownloaderProvider = Provider<ClipDownloader>((ref) => BackgroundClipD
 
 /// The downloader for clips a session fetches while it plays: they are needed within seconds.
 final streamClipDownloaderProvider = Provider<ClipDownloader>((ref) {
-  final downloader = HttpClipDownloader(supportDirectory: getApplicationSupportDirectory);
+  final downloader = HttpClipDownloader(supportDirectory: () => ref.read(supportDirectoryProvider.future));
   ref.onDispose(downloader.close);
   return downloader;
 });

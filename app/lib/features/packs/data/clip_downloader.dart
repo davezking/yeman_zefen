@@ -147,6 +147,8 @@ class HttpClipDownloader implements ClipDownloader {
       await file.parent.create(recursive: true);
       final response = await _client.send(http.Request('GET', Uri.parse(url))).timeout(timeout);
       if (response.statusCode != 200) {
+        // Read to the end, so the connection goes back to the client's pool.
+        await response.stream.drain<void>().timeout(timeout).catchError((Object _) {});
         throw ClipDownloadException('HTTP ${response.statusCode} for $url');
       }
       final total = response.contentLength;

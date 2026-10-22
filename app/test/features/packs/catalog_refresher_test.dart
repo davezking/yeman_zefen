@@ -149,6 +149,26 @@ void main() {
       expect(await refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval), isTrue);
       expect(await db.select(db.catalogTracks).get(), hasLength(5), reason: 'the new songs are in');
     });
+
+    test('a pack that keeps failing does not bring the refresh back on every resume', () async {
+      api.publish('golden-era', 1);
+      api.failingManifests.add(api.listings.single.manifestUrl);
+      await refresher.refresh();
+
+      now += const Duration(minutes: 5).inMilliseconds;
+      expect(await refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval), isFalse);
+      now += const Duration(minutes: 10).inMilliseconds;
+      expect(await refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval), isTrue);
+    });
+
+    test('a refresh asked for while one runs joins it', () async {
+      api.publish('golden-era', 1);
+      final first = refresher.refresh();
+      final second = refresher.refresh();
+      expect(identical(first, second), isTrue);
+      await first;
+      expect(api.fetched, hasLength(1));
+    });
   });
 
   group('offline or broken', () {

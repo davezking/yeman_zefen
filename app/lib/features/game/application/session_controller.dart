@@ -241,6 +241,7 @@ class SessionController extends Notifier<SessionState> {
     final pending = _outcome;
     final round = state.round;
     if (hint == null || pending == null || pending.isCompleted || round == null || !round.hintOffered) return;
+    if (_adShowing) return;
     final ads = ref.read(adServiceProvider);
     if (ads.freeHints) {
       hint.asked = true;
@@ -248,7 +249,7 @@ class SessionController extends Notifier<SessionState> {
       hint.refresh?.call();
       return;
     }
-    if (_adShowing || !ads.rewardedReady.value) return;
+    if (!ads.rewardedReady.value) return;
     final env = ref.read(sessionEnvironmentProvider);
     hint.asked = true;
     hint.sheetOpenedAtMs = env.monotonicMs();
