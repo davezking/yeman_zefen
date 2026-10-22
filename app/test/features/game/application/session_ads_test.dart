@@ -109,6 +109,35 @@ void main() {
       expect(payload['ads'], {'interstitialShown': 0, 'rewardedCompleted': 1});
     });
 
+    test('in a build without ads the hint is given at once, with no sheet and no ad', () async {
+      kit.ads.hints = true;
+      kit.start(song);
+      await kit.untilRound(1, RoundPhase.answering);
+      final correct = kit.correctOption();
+      expect(kit.state.round!.hintOffered, isTrue);
+
+      kit.clockMs += 3000;
+      kit.controller.openHint();
+      final round = kit.state.round!;
+      expect(round.hintSheetOpenedAtMs, isNull, reason: 'no sheet');
+      expect(kit.ads.rewardedShows, 0, reason: 'no ad');
+      expect(round.answerClockStartMs, isNotNull, reason: 'the answer clock keeps running');
+      expect(round.hintUsed, isTrue);
+      expect(round.removedIds, hasLength(2));
+      expect(round.removedIds, isNot(contains(correct)));
+      expect(round.hintOffered, isFalse, reason: 'one hint a round');
+
+      kit.clockMs += 500;
+      kit.controller.answer(correct);
+      // 3000 + 500 ms: 150 + 49 = 199 points, halved (half up) to 100.
+      expect((await kit.untilRound(1, RoundPhase.feedback)).points, 100);
+      kit.endFeedback();
+      await kit.playAll(pick: kit.correctOption);
+      final payload = await savedPayload();
+      expect(((payload['rounds'] as List).first as Map)['hintUsed'], isTrue);
+      expect(payload['ads'], {'interstitialShown': 0, 'rewardedCompleted': 0});
+    });
+
     test('an ad closed early changes nothing and tells the player', () async {
       kit.ads.rewarded.value = true;
       kit.start(song);

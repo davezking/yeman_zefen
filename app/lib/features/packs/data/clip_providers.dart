@@ -107,17 +107,24 @@ final clipsChangedProvider = StreamProvider.autoDispose<void>((ref) {
 });
 
 /// Registers the starter clips, then keeps the catalog fresh: on every start (when online), every
-/// 12 hours while the app runs, and again when the app returns to the foreground after that long.
-/// The refresh is also what notices a new version of an installed pack (the Settings badge). On
-/// start it runs even when the last one is recent: with nothing new it is a single small request.
+/// 12 hours while the app runs, and when the app returns to the foreground or comes back online
+/// with the last refresh more than 15 minutes old (an offline start is caught up as soon as the
+/// phone connects). The refresh is also what notices a new version of an installed pack (the
+/// Settings badge). On start it runs even when the last one is recent: with nothing new it is a
+/// single small request.
 final catalogStarterProvider = Provider<void>((ref) {
   unawaited(ref.read(starterReadyProvider.future));
   final refresher = ref.watch(catalogRefresherProvider);
   unawaited(refresher.refresh());
+  void catchUp() => unawaited(refresher.refreshIfDue(olderThan: CatalogRefresher.resumeInterval));
   final timer = Timer.periodic(CatalogRefresher.interval, (_) => unawaited(refresher.refresh()));
-  final lifecycle = AppLifecycleListener(onResume: () => unawaited(refresher.refreshIfDue()));
+  final lifecycle = AppLifecycleListener(onResume: catchUp);
+  final online = connectivityOnlineChanges().listen((online) {
+    if (online) catchUp();
+  }, onError: (Object _) {});
   ref.onDispose(() {
     timer.cancel();
     lifecycle.dispose();
+    unawaited(online.cancel());
   });
 });

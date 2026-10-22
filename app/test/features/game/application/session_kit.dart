@@ -174,6 +174,7 @@ class SessionKit {
         supportDirectoryProvider.overrideWith((ref) async => kit.dir),
         clipPlayerProvider.overrideWithValue(kit.player),
         clipDownloaderProvider.overrideWithValue(kit.downloader),
+        streamClipDownloaderProvider.overrideWithValue(kit.downloader),
         adServiceProvider.overrideWithValue(kit.ads),
         apiClientProvider.overrideWithValue(
           ApiClient(
